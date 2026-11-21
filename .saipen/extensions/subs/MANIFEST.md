@@ -1,6 +1,6 @@
 # SubSaipen Manifest
 
-- saihunt -- .saipen/extensions/subs/saihunt/ | last_collect: sha256:e1c7820663c73ce32ac73882c72222f8309a91b7242fb23652b61f8efb45dadf@2026-11-21T23:18:55Z
-- saitest -- .saipen/extensions/subs/saitest/ | last_collect: sha256:7e7aab4ad58fe2bd3bcb1f0f4709f854abd8da8ac0b39fc1561b3f3254031ec5@2026-11-21T23:18:58Z
-- saipython -- .saipen/extensions/subs/saipython/ | last_collect: sha256:53d538b62a321345c3d44473605a02fb13aa7d30fa75550fbcd0dde63fb09fec@2026-11-21T23:19:00Z
+- saihunt -- .saipen/extensions/subs/saihunt/ | last_collect: sha256:03e0ab95e3648d801d58ceb8d2d9cd01659519baac529c1040aa68718e9a0d2c@2026-11-21T23:28:00Z
+- saitest -- .saipen/extensions/subs/saitest/ | last_collect: sha256:8e71d15cde28c96a765f23c00bcf2733ce0ac9c4a6022b7bc59f78eac2b8fc8a@2026-11-21T23:28:01Z
+- saipython -- .saipen/extensions/subs/saipython/ | last_collect: sha256:9f67757a5344684ec2bde75e678c61aa38913e3cbc3aa878b9aa8a537f171131@2026-11-21T23:28:03Z
 - saiwiki -- .saipen/extensions/subs/saiwiki/
