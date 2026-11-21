@@ -1,7 +1,7 @@
 # OUTBOX
 
 ## W-003: native blocker reproduction verified
-- **status:** ready
+- **status:** stale
 - **summary:** saihunt no-findings result independently reproduced by current suite and build.
 - **main_project_refs:** [tests/native_experiment_probe.gd, tools/run_native_experiment.cmd, docs/NATIVE_TESTING.md]
 - **critical:** false
@@ -22,7 +22,7 @@
 - **main_project_refs:** [tests/native_experiment_probe.gd, tools/run_native_experiment.cmd, docs/NATIVE_TESTING.md]
 - **critical:** false
 - **producer:** saitest
-- **source_head:** 76156a61b1121924f57e6cd5ab828f1c58f2963a
+- **source_head:** 727e38a0f2a7536a7f5d0075b252df930d26610d
 - **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
 - **role_revision:** sha256:801fbfdc4be680d87b18cd21e6246d83fad5b474ebd7fe82efa83918cecf2f08
 - **coverage:** repo suite, Windows build, native evidence artifact

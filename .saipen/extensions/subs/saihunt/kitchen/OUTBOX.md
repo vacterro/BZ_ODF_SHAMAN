@@ -1,7 +1,7 @@
 # OUTBOX
 
 ## W-003: bounded six-signal HUNT — no findings
-- **status:** ready
+- **status:** stale
 - **summary:** No reproducible HUNT signal found on the current closed tree.
 - **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
 - **critical:** false
@@ -22,7 +22,7 @@
 - **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
 - **critical:** false
 - **producer:** saihunt
-- **source_head:** 76156a61b1121924f57e6cd5ab828f1c58f2963a
+- **source_head:** 727e38a0f2a7536a7f5d0075b252df930d26610d
 - **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
 - **role_revision:** sha256:4edb04181cb07e0946afd06fbe711166fa9dcc403e56b52e9be3844f0a71b0a5
 - **coverage:** stale TODO/FIXME/HACK grep over scripts, tools, tests, docs and README; recent-commit LOG audit; untracked product-file check; live native blocker evidence already tracked in T-20/T-17.
