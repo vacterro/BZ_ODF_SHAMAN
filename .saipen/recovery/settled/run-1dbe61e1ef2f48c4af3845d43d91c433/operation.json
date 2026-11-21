@@ -1,0 +1,26 @@
+{
+  "op_id": "run-1dbe61e1ef2f48c4af3845d43d91c433",
+  "operation": "run",
+  "created_at": "2026-11-21T22:54:33Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "1a436305ba6d9a79",
+  "preconditions": {
+    ".saipen/improve/imp-vacterro-bz_odf_shaman-20261121-8/saipen-01/saipen_improve_SAIPEN.md": "9e78c273e6d0f5f2"
+  },
+  "read_preconditions": {},
+  "verification_policy": "improve_atomic_file",
+  "status": "COMMITTED",
+  "progress_index": 1,
+  "targets": [
+    {
+      "path": ".saipen/improve/imp-vacterro-bz_odf_shaman-20261121-8/saipen-01/saipen_improve_SAIPEN.md",
+      "role": "report",
+      "action": "write",
+      "before_hash": "9e78c273e6d0f5f2",
+      "after_hash": "6fe9042b20acbc29",
+      "applied": true
+    }
+  ]
+}
