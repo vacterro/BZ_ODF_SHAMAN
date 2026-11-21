@@ -56,28 +56,29 @@
   "T-41",
   "T-37",
   "T-16",
-  "T-20"
+  "T-20",
+  "T-17"
  ],
  "last_interval_consumed": 40,
  "last_run": {
-  "counted_at_run": 41,
-  "run_id": "20261121T221345-ec5c3d0f"
+  "counted_at_run": 42,
+  "run_id": "20261121T225139-749f97ca"
  },
  "maintenance": {
   "blockers": [
    {
     "code": "EVIDENCE_KEPT",
-    "detail": "707803 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
+    "detail": "763172 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
    }
   ],
   "bytes_reclaimed": 0,
-  "fingerprint": "861a1d60e12125a96d2d8de22cc161c0a941c551d3b1bc066cf6e78114e0e34e",
-  "last_attempt_fingerprint": "861a1d60e12125a96d2d8de22cc161c0a941c551d3b1bc066cf6e78114e0e34e",
-  "protected_bytes": 707803,
+  "fingerprint": "6d7d8d2817bfc8277f50e79a301f9c11a46b29b4710b37af5467ed8910e0901c",
+  "last_attempt_fingerprint": "6d7d8d2817bfc8277f50e79a301f9c11a46b29b4710b37af5467ed8910e0901c",
+  "protected_bytes": 763172,
   "reason": "no reclaimable candidate exists; nothing is safe to delete",
-  "run_id": "20261121T221345-ec5c3d0f",
+  "run_id": "20261121T225139-749f97ca",
   "state": "GC_BLOCKED_NO_SAFE_CANDIDATES",
-  "updated": "2026-11-21T22:13:46Z"
+  "updated": "2026-11-21T22:51:39Z"
  },
  "runs": [
   {
@@ -114,6 +115,13 @@
    "finished": "2026-11-21T22:13:45Z",
    "run_id": "20261121T221345-ec5c3d0f",
    "started": "2026-11-21T22:13:45Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 42,
+   "finished": "2026-11-21T22:51:39Z",
+   "run_id": "20261121T225139-749f97ca",
+   "started": "2026-11-21T22:51:39Z"
   }
  ],
  "schema": 1

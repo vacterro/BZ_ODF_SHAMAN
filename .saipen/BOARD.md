@@ -27,11 +27,11 @@
      write that field name next to a concrete id anywhere in this file. -->
 
 ## DOING
-- [/] T-17 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-011 | owner: saipen | claim_time: 2026-11-21T22:46:35Z
 
 ## TODO
 
 ## DONE
+- [x] T-17 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-011 | owner: saipen | claim_time: 2026-11-21T22:46:35Z | closure_mode: own_patch | publication_state: pending
 - [x] T-20 [P2] Wave D: First real native BZCC experiment (preflight, launch, observation, comparison) (P2-01) | verify: reproducible staged native BZCC scenario executed or exact engine blocker documented with real evidence artifacts | owner: saipen | claim_time: 2026-11-21T22:13:44Z | closure_mode: own_patch | publication_state: pending
 - [x] T-16 [P0] Battery test scaffolding | verify: n/a | owner: saipen | claim_time: 2026-11-21T21:44:20Z | closure_mode: finding_invalidated | implementation_delta: none | invalidation_evidence: E-603
 - [x] T-37 [P1] GitHub publication: initialize/verify git repo, verify .gitignore excludes build/.godot/ephemeral state, and push BZ_ODF_SHAMAN cleanly to https://github.com/vacterro/BZ_ODF_SHAMAN | verify: git status && git ls-remote origin | owner: saipen | claim_time: 2026-11-21T21:40:02Z | closure_mode: own_patch | publication_state: pending
