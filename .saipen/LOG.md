@@ -672,3 +672,132 @@
 - 21.11.26 23:18 [E-671] [parent: E-670] [agent: saipen] [op: crew-run-5206d574fe794f1eb5b13bab75738c8d] DEC: crew run -- epoch converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53 role saihunt (1 package(s))
 - 21.11.26 23:18 [E-672] [parent: E-671] [agent: saipen] [op: crew-run-84288c2195b14aca9c1425c8ec8a370a] DEC: crew run -- epoch converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53 role saitest (1 package(s))
 - 21.11.26 23:18 [E-673] [parent: E-672] [agent: saipen] [op: crew-run-ab396d6738dc43228c47d9f512c4ee38] DEC: crew run -- epoch converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53 role saipython (1 package(s))
+- 21.11.26 23:18 [E-674] [parent: E-673] [agent: saipen] [op: crew-run-ef9b96bc4ffa482fb0536e73c4add5c4] DEC: crew run -- epoch converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53 role saihunt (1 package(s))
+- 21.11.26 23:18 [E-675] [parent: E-674] [T-53] [agent: saipen] [op: sub-collect-8d1129ca] RUN: collect saihunt/W-005 -> T-53; package_identity=sha256:e1c7820663c73ce32ac73882c72222f8309a91b7242fb23652b61f8efb45dadf; producer=saihunt; package=W-005; source_head=8c261a93f38b1d7d919daf42cdcacab3cde34262; source_tree_fingerprint=git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195; role_revision=sha256:4edb04181cb07e0946afd06fbe711166fa9dcc403e56b52e9be3844f0a71b0a5; outbox=.saipen/extensions/subs/saihunt/kitchen/OUTBOX.md; queued as Core review hypothesis
+- 21.11.26 23:18 [E-676] [parent: E-675] [agent: saipen] [op: crew-run-0862f650e5c74db6a410d48bbaede92d] DEC: crew run -- epoch converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53 role saitest (1 package(s))
+- 21.11.26 23:18 [E-677] [parent: E-676] [T-54] [agent: saipen] [op: sub-collect-8d342d99] RUN: collect saitest/W-005 -> T-54; package_identity=sha256:7e7aab4ad58fe2bd3bcb1f0f4709f854abd8da8ac0b39fc1561b3f3254031ec5; producer=saitest; package=W-005; source_head=8c261a93f38b1d7d919daf42cdcacab3cde34262; source_tree_fingerprint=git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195; role_revision=sha256:801fbfdc4be680d87b18cd21e6246d83fad5b474ebd7fe82efa83918cecf2f08; outbox=.saipen/extensions/subs/saitest/kitchen/OUTBOX.md; queued as Core review hypothesis
+- 21.11.26 23:18 [E-678] [parent: E-677] [agent: saipen] [op: crew-run-e33d9153dc5148ea84dc2aa0265bd209] DEC: crew run -- epoch converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53 role saipython (1 package(s))
+- 21.11.26 23:19 [E-679] [parent: E-678] [T-55] [agent: saipen] [op: sub-collect-c0ba1095] RUN: collect saipython/W-005 -> T-55; package_identity=sha256:53d538b62a321345c3d44473605a02fb13aa7d30fa75550fbcd0dde63fb09fec; producer=saipython; package=W-005; source_head=8c261a93f38b1d7d919daf42cdcacab3cde34262; source_tree_fingerprint=git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195; role_revision=sha256:3069120b1a83291867c000dd5d7edb141d5fedf7895e5dc8f07d06624d05d9ff; outbox=.saipen/extensions/subs/saipython/kitchen/OUTBOX.md; queued as Core review hypothesis
+- 21.11.26 23:20 [E-680] [parent: E-679] [T-44] [agent: saipen] [op: claim-b3a7bbad1bbd4a5fa05206c048947bf8] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:20 [E-681] [parent: E-680] [T-44] [agent: saipen] [op: checkpoint-f869df0128d94cedb010ffd1d14885aa] RUN: REVIEW of SubSaipen no-finding package: independently confirmed by bounded HUNT and current suite PASS
+- 21.11.26 23:20 [E-682] [parent: E-681] [T-44] [agent: saipen] [op: transition-c1e48318d3534c9f95201c291f7aeafe] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:20 [E-683] [parent: E-682] [T-44] [agent: saipen] [op: transition-664d385dbda148ccbfb17443d1e94fc9] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:20 [E-684] [parent: E-683] [T-44] [agent: saipen] [op: checkpoint-8ed4ed5ca6574420b290659b8df9d8ad] RUN: verify -> PASS [target: T-44] conf: high -- bounded HUNT clean, saipen test suite PASS
+- 21.11.26 23:20 [E-685] [parent: E-684] [T-44] [agent: saipen] [op: transition-ddb7d8ca720c405ab0df3186656f0bfb] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:20 [E-686] [parent: E-685] [T-44] [agent: saipen] [op: checkpoint-4912a949a9054ae7b19c4ce470af045f] DEC: REVIEW: DEC: SHIP -- package disposition clean, no P0/P1
+- 21.11.26 23:20 [E-687] [parent: E-686] [T-44] [agent: saipen] [op: transition-295429641dc24299b38c3d71b646f7ca] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:20 [E-688] [parent: E-687] [T-44] [agent: saipen] [op: finish-8015221ab1d047828520fc35c2491bbf] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:21 [E-689] [parent: E-688] [T-45] [agent: saipen] [op: claim-d6b1479319b44f88861728b43a54734e] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:21 [E-690] [parent: E-689] [T-45] [agent: saipen] [op: checkpoint-b9781b0a9d5d453483002027ba05610f] RUN: REVIEW independent no-finding confirmation
+- 21.11.26 23:21 [E-691] [parent: E-690] [T-45] [agent: saipen] [op: transition-4d18df79294a4c00996000ef12a7ee9b] RUN: transition to BUILD -- review tree-identity:3090db31e9136c2c
+- 21.11.26 23:21 [E-692] [parent: E-691] [T-45] [agent: saipen] [op: transition-f91c7bda8e5442a3acf82837fe118dfe] RUN: transition to VERIFY -- no-delta
+- 21.11.26 23:21 [E-693] [parent: E-692] [T-45] [agent: saipen] [op: checkpoint-699f51e0cee144a5afdd155dd982eb64] RUN: verify -> PASS [target: T-45] conf: high -- bounded HUNT clean and suite PASS --json
+- 21.11.26 23:21 [E-694] [parent: E-693] [T-45] [agent: saipen] [op: transition-479251ad99a14897b8e01aadd56473fc] RUN: transition to REVIEW -- no finding
+- 21.11.26 23:21 [E-695] [parent: E-694] [T-45] [agent: saipen] [op: checkpoint-6570f8fb97a14fa8a0d995ca171087d4] DEC: REVIEW: DEC: SHIP -- no P0/P1 --json
+- 21.11.26 23:21 [E-696] [parent: E-695] [T-45] [agent: saipen] [op: transition-554548b216db42fca1f05c1f2ce9877d] RUN: transition to SHIP -- disposition
+- 21.11.26 23:21 [E-697] [parent: E-696] [T-45] [agent: saipen] [op: checkpoint-978a9b8026d64793a252ab689ad7fed5] RUN: verify -> PASS [target: T-45] conf: high -- suite PASS, independent HUNT clean --json
+- 21.11.26 23:22 [E-698] [parent: E-697] [T-45] [agent: saipen] [op: checkpoint-629a171efe5549628d179c7402aa8a63] RUN: verify -> PASS [target: T-45] conf: high -- bounded HUNT clean and suite PASS on current tree
+- 21.11.26 23:22 [E-699] [parent: E-698] [T-45] [agent: saipen] [op: finish-4e1cbfafa91540c690c447f9171adfb6] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:22 [E-700] [parent: E-699] [T-46] [agent: saipen] [op: claim-47206b40262543d1b4a2379e4a5864c6] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:22 [E-701] [parent: E-700] [T-46] [agent: saipen] [op: checkpoint-a4cdf9f402a54be8bc0ec1d760ee8739] RUN: SCOUT/REVIEW: independent no-finding confirmation
+- 21.11.26 23:22 [E-702] [parent: E-701] [T-46] [agent: saipen] [op: transition-9f0da02d3e3f48239c8ce9c54f818d32] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:22 [E-703] [parent: E-702] [T-46] [agent: saipen] [op: transition-5edb4e5fb0cc4d55afec1f70ef33a0b0] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:22 [E-704] [parent: E-703] [T-46] [agent: saipen] [op: checkpoint-281d0400868d4588adb98c911bc4f647] RUN: verify -> PASS: bounded HUNT clean and suite PASS on current tree
+- 21.11.26 23:22 [E-705] [parent: E-704] [T-46] [agent: saipen] [op: checkpoint-56f9f4b6cd814c1da4c88927c146e522] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:22 [E-706] [parent: E-705] [T-46] [agent: saipen] [op: checkpoint-a2b3e78ba3824f0aa75accb9bceb92aa] RUN: verify -> PASS [target: T-46] conf: high -- suite PASS, independent HUNT clean
+- 21.11.26 23:24 [E-707] [parent: E-706] [T-46] [agent: saipen] [op: checkpoint-ef8aa8d9ddb041caa281a03c5ca565f0] RUN: verify -> PASS [target: T-46] conf: high -- bounded HUNT clean and suite PASS on current tree
+- 21.11.26 23:24 [E-708] [parent: E-707] [T-46] [agent: saipen] [op: transition-cc3a483eb23f4c64a7e3b3725cc2a9f1] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:24 [E-709] [parent: E-708] [T-46] [agent: saipen] [op: checkpoint-82c5886c39ce40bb99888e8241cdbccf] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:24 [E-710] [parent: E-709] [T-46] [agent: saipen] [op: transition-a18dcd5840a34bcbaa37d806a8812eb9] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:24 [E-711] [parent: E-710] [T-46] [agent: saipen] [op: checkpoint-a3c6981de21e4eb98043d09cdc889ea0] RUN: verify -> PASS [target: T-46] conf: high -- bounded HUNT clean and suite PASS
+- 21.11.26 23:24 [E-712] [parent: E-711] [T-46] [agent: saipen] [op: finish-c5896ac3f71b467ea9498707d9435f6e] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:24 [E-713] [parent: E-712] [T-47] [agent: saipen] [op: claim-1efd0a123b374183b6026476cff1bdf6] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:24 [E-714] [parent: E-713] [T-47] [agent: saipen] [op: checkpoint-063e409df8bd43bb91c46b3b7dfce482] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:24 [E-715] [parent: E-714] [T-47] [agent: saipen] [op: transition-8ef691b38798473aa7fe3424736e99ff] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:24 [E-716] [parent: E-715] [T-47] [agent: saipen] [op: transition-e2bfd2912c5741b4b1856cb4804f5492] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:25 [E-717] [parent: E-716] [T-47] [agent: saipen] [op: checkpoint-9e3881504c604e2fbb2892eae92436d1] RUN: verify -> PASS [target: T-47] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-718] [parent: E-717] [T-47] [agent: saipen] [op: transition-965b616b217647b2bad28313a9d4570a] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:25 [E-719] [parent: E-718] [T-47] [agent: saipen] [op: checkpoint-2d2d329608f24ead8e23379ed11d2dc1] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:25 [E-720] [parent: E-719] [T-47] [agent: saipen] [op: transition-8b3759080858427b87137451243f49b3] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:25 [E-721] [parent: E-720] [T-47] [agent: saipen] [op: checkpoint-da221dd007684530b43ddf6bb28357cd] RUN: verify -> PASS [target: T-47] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-722] [parent: E-721] [T-47] [agent: saipen] [op: finish-93cf743b9dd84ad5b6cf190d40a86f6f] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:25 [E-723] [parent: E-722] [T-48] [agent: saipen] [op: claim-86cccee0f8c04aa8bfb950ac69a2c631] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:25 [E-724] [parent: E-723] [T-48] [agent: saipen] [op: checkpoint-b9b9fd0a44754cd7a0c90ffbfb52d235] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:25 [E-725] [parent: E-724] [T-48] [agent: saipen] [op: transition-4fbd516129ee460092c60d5ab16530fd] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:25 [E-726] [parent: E-725] [T-48] [agent: saipen] [op: transition-a17f599c41d34925a4208389cee44790] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:25 [E-727] [parent: E-726] [T-48] [agent: saipen] [op: checkpoint-e761fe1a309340b094a62bee05f756b6] RUN: verify -> PASS [target: T-48] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-728] [parent: E-727] [T-48] [agent: saipen] [op: transition-7c24b16a55624eb49d9f3a47e0df5797] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:25 [E-729] [parent: E-728] [T-48] [agent: saipen] [op: checkpoint-6d167a7221c1447b8f3387cfe550ea50] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:25 [E-730] [parent: E-729] [T-48] [agent: saipen] [op: transition-8534f12cf6e842cab4bda78982b3bcfe] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:25 [E-731] [parent: E-730] [T-48] [agent: saipen] [op: checkpoint-de7ec55d599a4637b304124b057baa41] RUN: verify -> PASS [target: T-48] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-732] [parent: E-731] [T-48] [agent: saipen] [op: finish-347b13f3fee343858189c308db942ef1] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:25 [E-733] [parent: E-732] [T-49] [agent: saipen] [op: claim-42133428a1744de2818a3e57218d7b76] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:25 [E-734] [parent: E-733] [T-49] [agent: saipen] [op: checkpoint-b7c71f782f7845e3af5057f3d5c8efeb] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:25 [E-735] [parent: E-734] [T-49] [agent: saipen] [op: transition-97a8ab3dbbdb4d31a9e50128d038ef53] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:25 [E-736] [parent: E-735] [T-49] [agent: saipen] [op: transition-0839dddc1ca84a9dbc5c614fe86f79c4] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:25 [E-737] [parent: E-736] [T-49] [agent: saipen] [op: checkpoint-5bcf028098f94ab597c36cbaed743fe9] RUN: verify -> PASS [target: T-49] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-738] [parent: E-737] [T-49] [agent: saipen] [op: transition-b52beb87a7674c25a6739cacea88a98a] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:25 [E-739] [parent: E-738] [T-49] [agent: saipen] [op: checkpoint-777b578561ac4409870631e1233bf208] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:25 [E-740] [parent: E-739] [T-49] [agent: saipen] [op: transition-036928a76fd446369812aae77d47a95c] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:25 [E-741] [parent: E-740] [T-49] [agent: saipen] [op: checkpoint-f558ff04b0034521b90043ec88f14535] RUN: verify -> PASS [target: T-49] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-742] [parent: E-741] [T-49] [agent: saipen] [op: finish-4019df4e6cb346589f6e8c8340f2d1f9] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:25 [E-743] [parent: E-742] [T-50] [agent: saipen] [op: claim-f156fb47addd4a8a9cda7507ade0f476] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:25 [E-744] [parent: E-743] [T-50] [agent: saipen] [op: checkpoint-690c207e282642bf962938da2f338e80] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:25 [E-745] [parent: E-744] [T-50] [agent: saipen] [op: transition-d8b514687ac949fc82e36f5f54ef5e63] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:25 [E-746] [parent: E-745] [T-50] [agent: saipen] [op: transition-14f194e2969a4a5eaa9a38debc7a9a58] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:25 [E-747] [parent: E-746] [T-50] [agent: saipen] [op: checkpoint-7c2eebbeb21a46e9a5db64325a99228c] RUN: verify -> PASS [target: T-50] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-748] [parent: E-747] [T-50] [agent: saipen] [op: transition-0a13b1fb80654b7db6ca4401406798f2] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:25 [E-749] [parent: E-748] [T-50] [agent: saipen] [op: checkpoint-81da1febcdc44703864b5ab62efdfaa3] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:25 [E-750] [parent: E-749] [T-50] [agent: saipen] [op: transition-22619b6f5662487ea23a61cfbd0ed1e8] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:25 [E-751] [parent: E-750] [T-50] [agent: saipen] [op: checkpoint-b2357418619c4758ac57aa2417f978c6] RUN: verify -> PASS [target: T-50] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-752] [parent: E-751] [T-50] [agent: saipen] [op: finish-851a733d332c4af190496153d5992edb] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:25 [E-753] [parent: E-752] [T-51] [agent: saipen] [op: claim-16adf1e15f3e4f3e96665ee52a712ef7] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:25 [E-754] [parent: E-753] [T-51] [agent: saipen] [op: checkpoint-0455aafb72d847fa8466b163f719b42a] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:25 [E-755] [parent: E-754] [T-51] [agent: saipen] [op: transition-83b9ac1a80f9451a98900c8555e41849] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:25 [E-756] [parent: E-755] [T-51] [agent: saipen] [op: transition-2beb5a39911c4accb8efd317a23a3df0] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:25 [E-757] [parent: E-756] [T-51] [agent: saipen] [op: checkpoint-cccfcf16b3a0431caafb97bd0f7371bd] RUN: verify -> PASS [target: T-51] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-758] [parent: E-757] [T-51] [agent: saipen] [op: transition-a85e85d443104697a277d9f757ec54c1] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:25 [E-759] [parent: E-758] [T-51] [agent: saipen] [op: checkpoint-1b0fabca16ef4c7380eb1a5548c7044b] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:25 [E-760] [parent: E-759] [T-51] [agent: saipen] [op: transition-b3362f8170794037bf0f786ac958d2c9] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:25 [E-761] [parent: E-760] [T-51] [agent: saipen] [op: checkpoint-9dd24a01287446b3b756339bd1bbfab8] RUN: verify -> PASS [target: T-51] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-762] [parent: E-761] [T-51] [agent: saipen] [op: finish-85068d9f1f6c4ad39bdd1c6b0fa4d5f9] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:25 [E-763] [parent: E-762] [T-52] [agent: saipen] [op: claim-5262f0476dbe476ba31cfbacdb3df7f9] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:25 [E-764] [parent: E-763] [T-52] [agent: saipen] [op: checkpoint-65ea91b82a344bc8be946a1e0e364f30] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:25 [E-765] [parent: E-764] [T-52] [agent: saipen] [op: transition-64e6cffe973e46bd802a01b55514136c] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:25 [E-766] [parent: E-765] [T-52] [agent: saipen] [op: transition-917e15e6e2144589b6dade0d2afc3584] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:25 [E-767] [parent: E-766] [T-52] [agent: saipen] [op: checkpoint-79863973d7d94cf49f6277a1b2178f4d] RUN: verify -> PASS [target: T-52] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-768] [parent: E-767] [T-52] [agent: saipen] [op: transition-bccf24a429ac4f559c531557f9f1e614] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:25 [E-769] [parent: E-768] [T-52] [agent: saipen] [op: checkpoint-3ace1f6ab22841fdab6b2632bebd6c70] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:25 [E-770] [parent: E-769] [T-52] [agent: saipen] [op: transition-f60154bf9c91415f9da6b5764ae60f16] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:25 [E-771] [parent: E-770] [T-52] [agent: saipen] [op: checkpoint-bbc0e9a6b6ee4ca3a451037754bac994] RUN: verify -> PASS [target: T-52] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:25 [E-772] [parent: E-771] [T-52] [agent: saipen] [op: finish-d7cd1dc4d7c9470f8da5631c1d5c91f4] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:25 [E-773] [parent: E-772] [T-53] [agent: saipen] [op: claim-d601bf780ce640d4b5ee1e1ee715a9f4] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:25 [E-774] [parent: E-773] [T-53] [agent: saipen] [op: checkpoint-912d28a7a76647b0bf774b1fef68a2fd] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:26 [E-775] [parent: E-774] [T-53] [agent: saipen] [op: transition-47e366c5f4ee4792a6f5184a822f7b54] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:26 [E-776] [parent: E-775] [T-53] [agent: saipen] [op: transition-b86eeb98bf3440f08ae22e46bc09f5fc] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:26 [E-777] [parent: E-776] [T-53] [agent: saipen] [op: checkpoint-4304b714a42c480991de6f9210d1f972] RUN: verify -> PASS [target: T-53] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:26 [E-778] [parent: E-777] [T-53] [agent: saipen] [op: transition-0e6afcd185a649f2a49c9aa81fe4d551] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:26 [E-779] [parent: E-778] [T-53] [agent: saipen] [op: checkpoint-431ec8a236fb44abacc4f41986e7945d] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:26 [E-780] [parent: E-779] [T-53] [agent: saipen] [op: transition-5dc1c2a76f08481b98e9b57ad0ad41e6] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:26 [E-781] [parent: E-780] [T-53] [agent: saipen] [op: checkpoint-7abc6ac02bd24ea49e0bf7e8d2c6928d] RUN: verify -> PASS [target: T-53] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:26 [E-782] [parent: E-781] [T-53] [agent: saipen] [op: finish-3479ee41dde04a37943d3bbbfbc5372f] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:26 [E-783] [parent: E-782] [T-54] [agent: saipen] [op: claim-6edbd2e1e2314db1b0cce22feae407f1] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:26 [E-784] [parent: E-783] [T-54] [agent: saipen] [op: checkpoint-d352503d4611470a9d4b8f9b25df7acc] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:26 [E-785] [parent: E-784] [T-54] [agent: saipen] [op: transition-209ee6cc2e4a4897b653c079527a6d9a] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:26 [E-786] [parent: E-785] [T-54] [agent: saipen] [op: transition-3e5823a15dbe49ed9cb33be903a70ee6] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:26 [E-787] [parent: E-786] [T-54] [agent: saipen] [op: checkpoint-37af544bfdf447ca92720ceb52069d85] RUN: verify -> PASS [target: T-54] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:26 [E-788] [parent: E-787] [T-54] [agent: saipen] [op: transition-974485f144a14a3d91b40057f02a0318] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:26 [E-789] [parent: E-788] [T-54] [agent: saipen] [op: checkpoint-215b1e8faa3643ac973acb22758c7c4b] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:26 [E-790] [parent: E-789] [T-54] [agent: saipen] [op: transition-9594ef8925f448aea0c9557c4119b153] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:26 [E-791] [parent: E-790] [T-54] [agent: saipen] [op: checkpoint-b4970b3da1354089a76e0ed7b5527ff9] RUN: verify -> PASS [target: T-54] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:26 [E-792] [parent: E-791] [T-54] [agent: saipen] [op: finish-0d23bd94ee894855993923c32cbf817f] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
+- 21.11.26 23:26 [E-793] [parent: E-792] [T-55] [agent: saipen] [op: claim-5d3d4650165c46bf8624210e0f0ae7ee] DEC: claimed via SAIOPS -- owner saipen
+- 21.11.26 23:26 [E-794] [parent: E-793] [T-55] [agent: saipen] [op: checkpoint-6c39c8481ce9499091abf17959bbfc33] RUN: SCOUT/REVIEW: no-finding package independently confirmed
+- 21.11.26 23:26 [E-795] [parent: E-794] [T-55] [agent: saipen] [op: transition-862207521e2f4b75a4f54484ac0878c7] RUN: transition to BUILD -- review package tree-identity:3090db31e9136c2c
+- 21.11.26 23:26 [E-796] [parent: E-795] [T-55] [agent: saipen] [op: transition-73a2d9c981594bf084df89a90db89840] RUN: transition to VERIFY -- no implementation delta
+- 21.11.26 23:26 [E-797] [parent: E-796] [T-55] [agent: saipen] [op: checkpoint-f1da449bdc7148fa96d61897bf150888] RUN: verify -> PASS [target: T-55] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:26 [E-798] [parent: E-797] [T-55] [agent: saipen] [op: transition-d5dc9e5a8f6b43df82b3d21c4a85e0d6] RUN: transition to REVIEW -- no findings confirmed
+- 21.11.26 23:26 [E-799] [parent: E-798] [T-55] [agent: saipen] [op: checkpoint-0c0980ed119845b298d836df81ada9f3] DEC: REVIEW: DEC: SHIP -- no P0/P1
+- 21.11.26 23:26 [E-800] [parent: E-799] [T-55] [agent: saipen] [op: transition-89194d81bfcb446bb3a307b76694f0d1] RUN: transition to SHIP -- no findings disposition
+- 21.11.26 23:26 [E-801] [parent: E-800] [T-55] [agent: saipen] [op: checkpoint-c7aa4692343b43bf9bffd7994f1b4247] RUN: verify -> PASS [target: T-55] conf: high -- bounded HUNT clean, suite PASS
+- 21.11.26 23:26 [E-802] [parent: E-801] [T-55] [agent: saipen] [op: finish-f87aa16d104b4acd9741a1a4399792b3] DEC: ticket finished via SAIOPS -- completion (from SHIP); publication_state pending; release route: saipen cohort ship <C-###> (a released batch names this ticket, flipping the state to published)
