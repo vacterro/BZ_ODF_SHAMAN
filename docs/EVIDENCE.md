@@ -280,7 +280,7 @@ preview APPROXIMATED 47, NOT_IMPLEMENTED 1443; native NOT_TESTED 1490
 
 ## Not evidenced (explicitly)
 
-- Live native BZCC observation and comparison. T-20 reproduced a staged `STEAM_MANAGED` launch with a logged-in Steam client, but BZCC 2.0.185 exited before mission initialization and no session-bound LuaMission artifact appeared (`.saipen/evidence/native/T-20-native-probe-1136976.json`; `NATIVE_VERIFIED = 0`). The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was session-specific.
+- Live native BZCC observation and comparison. T-20 reproduced a staged `STEAM_MANAGED` launch with a logged-in Steam client, but BZCC 2.0.185 showed `Unable to load console font 'ds16.brf'` and never reached mission initialization; no session-bound LuaMission artifact appeared (`.saipen/evidence/native/T-20-native-probe-1136976.json`, `.saipen/evidence/native/T-20-font-blocker.md`; `NATIVE_VERIFIED = 0`). The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was session-specific.
 - `.msha` files and skeletal/bone animations.
 - OS-level mouse/keyboard click injection outside the Godot UI smoke / self-verify harness.
 - Parameter sweep chart (CSV export exists and is tested).

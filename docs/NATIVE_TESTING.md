@@ -8,9 +8,12 @@ attestation, and MD5-verified staging cleanup are implemented and regression-tes
 No live native BZCC execution or calibration is claimed (`NATIVE_VERIFIED: 0`). T-20 reproduced the
 full staged launch: logged-in Steam client, `steam_appid.txt` present in read-only `BZ2R`, and
 `steam.exe -applaunch 624970` spawning `battlezone2.exe` with the staged `/config` and
-`shaman_shot.bzn`. BZCC 2.0.185 then exited roughly four seconds after startup, before any
-`Config: 'AddDirRecurse'` or mission initialization line, and no session-bound LuaMission
-observation artifact appeared. Evidence: `.saipen/evidence/native/T-20-native-probe-1136976.json`.
+`shaman_shot.bzn`. BZCC 2.0.185 then showed a modal fatal dialog: `Unable to load console font
+'ds16.brf' -- check MOD installation and/or .cfg`; the font is absent from the read-only
+game installation and Steam injects `/logconsole` through global launch options. No
+`Config: 'AddDirRecurse'` or mission initialization line appeared and no session-bound LuaMission
+observation artifact was produced. Evidence: `.saipen/evidence/native/T-20-native-probe-1136976.json`
+and `.saipen/evidence/native/T-20-font-blocker.md`.
 The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was session-specific and is no longer the
 current blocker. Nothing claims `NATIVE_VERIFIED`.
 
@@ -101,7 +104,7 @@ What already existed and still applies:
 
 ## Remaining adapter work (when the engine reaches mission initialization)
 
-1. **Engine-side mission initialization** — diagnose why BZCC 2.0.185 terminates after reading the staged `/config` and before any `Config: 'AddDirRecurse'` line; this is outside the Godot project's code.
+1. **Engine-side startup font** — BZCC 2.0.185 requires `ds16.brf` for its console and Steam injects `/logconsole`; the read-only game installation lacks that font. Resolving it belongs to the game installation, not the Godot project.
 2. **Engine observation & calibration (`NOT_IMPLEMENTED` until live run completes)** — confirm real `battlezone2.exe` process + LuaMission load + resource probe + `WriteToFile` output, then compare Godot vs native BZCC before marking any scenario `NATIVE_VERIFIED`.
 
 ## Reload semantics (must be stated per change)

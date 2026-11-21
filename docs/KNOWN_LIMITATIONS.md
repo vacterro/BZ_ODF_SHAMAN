@@ -12,10 +12,13 @@ Ordered by impact. None of these is silently removed from scope.
   schema-vs-trusted-session evidence attestation. T-20 observed a logged-in Steam client,
   `steam_appid.txt` present in read-only `BZ2R`, and `steam.exe -applaunch 624970` successfully
   spawning `battlezone2.exe` with the staged `/config` and `shaman_shot.bzn`. BZCC 2.0.185 then
-  terminated roughly four seconds after startup, before any `Config: 'AddDirRecurse'` or mission
-  initialization line, and never produced the session-bound LuaMission observation artifact.
-  The exact launch and shutdown are recorded in
-  `.saipen/evidence/native/T-20-native-probe-1136976.json` and the BZCC startup log it names.
+  showed a modal fatal dialog: `Unable to load console font 'ds16.brf' -- check MOD installation
+  and/or .cfg`; `ds16.brf` is absent from the read-only game installation and Steam injects
+  `/logconsole` through global launch options even when it is omitted from the command. No
+  `Config: 'AddDirRecurse'` or mission initialization line appeared and no session-bound
+  LuaMission observation artifact was produced. The launch and dialog are recorded in
+  `.saipen/evidence/native/T-20-native-probe-1136976.json` and
+  `.saipen/evidence/native/T-20-font-blocker.md`.
   No live engine measurement or calibration is claimed; read-only `BZ2R` is never modified, and
   native verified count remains `0`. The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was
   a session-specific condition and is no longer the current blocker.

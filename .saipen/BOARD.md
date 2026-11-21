@@ -27,7 +27,7 @@
      write that field name next to a concrete id anywhere in this file. -->
 
 ## DOING
-- [/] T-17 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-011 | owner: saipen | claim_time: 2026-11-21T22:22:21Z
+- [/] T-17 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-011 | owner: saipen | claim_time: 2026-11-21T22:46:35Z
 
 ## TODO
 
