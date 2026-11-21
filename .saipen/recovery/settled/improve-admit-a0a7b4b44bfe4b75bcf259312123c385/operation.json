@@ -1,0 +1,35 @@
+{
+  "op_id": "improve-admit-a0a7b4b44bfe4b75bcf259312123c385",
+  "operation": "improve_admit",
+  "created_at": "2026-11-21T06:48:50Z",
+  "agent": "saipen-01",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "4fb027101a4d64a6",
+  "preconditions": {
+    ".saipen/improve/imp-_bz_odf_shaman-20261121-5/MANIFEST.md": "",
+    ".saipen/improve/imp-_bz_odf_shaman-20261121-5/saipen-01/saipen_improve_SAIPEN.md": ""
+  },
+  "read_preconditions": {},
+  "verification_policy": "improve_atomic_file",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/improve/imp-_bz_odf_shaman-20261121-5/MANIFEST.md",
+      "role": "manifest",
+      "action": "write",
+      "before_hash": "",
+      "after_hash": "6f3cf6a2aeb4d172",
+      "applied": true
+    },
+    {
+      "path": ".saipen/improve/imp-_bz_odf_shaman-20261121-5/saipen-01/saipen_improve_SAIPEN.md",
+      "role": "report",
+      "action": "write",
+      "before_hash": "",
+      "after_hash": "81eb248760a6421a",
+      "applied": true
+    }
+  ]
+}

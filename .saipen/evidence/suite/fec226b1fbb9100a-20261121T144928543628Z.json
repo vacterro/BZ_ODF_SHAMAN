@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 82.3,
+  "timeout_s": 3600,
+  "subject_before": "tree:5caf2c825c27247143e81e12c4bcbca3deb9ab5fbcdcb9e2eade5ba9f86e71ef",
+  "subject": "tree:5caf2c825c27247143e81e12c4bcbca3deb9ab5fbcdcb9e2eade5ba9f86e71ef",
+  "stdout_tail": "nderBase value\n  ✓ RENAME renamed the render header\n  ✓ renamed header replaces the old name\n  ✓ rename is undoable\n  ✓ raw editor populated\n  ✓ schema registry loaded: 1490 properties\n  ✓ Wintage theme applied\n  ✓ manual rescan rebuilt the index (17028 ODFs)\n  ✓ workspace overrides restored after cache clear\n  ✓ saved damage 200 restored into the editor\n  ✓ restored document shows OVERRIDE state\n  ✓ settings stay inside the test root\n  ✓ saved-revision test found the damage entry\n  ✓ edit saved before export\n  ✓ export after save writes the saved 250 bytes\n  ✓ export report write is confirmed before success is announced\n  ✓ export report records the exported file hash\n  ✓ two exports in the same second get distinct stage directories\n  ✓ second edit saved\n  ✓ second export uses the newer saved revision\n  ✓ restart serves the last saved edit (275)\n  ✓ original game ODF has no saved override content\n  ✓ original game ODF is unchanged since the save\n  ✓ P1-07: multi-selection tracks 2 render nodes\n  ✓ P1-07: duplicate_selected_subgraph created 2 linked headers\n  ✓ P1-07: duplicated subgraph remapped internal emitName edge\n  ✓ P1-07: compound undo removed entire duplicated subgraph in one step\n  ✓ P1-07: copy_selected_nodes captured header\n  ✓ P1-07: paste_nodes created cloned header\n  ✓ P1-07: node search filter matched ChildFlame\n  ✓ P1-07: emitter preset created documented draw_twirl header\n  ✓ P1-07: quick inspector edited lifeTime\n  ✓ P1-07: quick inspector edit persisted on shared OdfDocument\n  ✓ V8: cross-file save_with_external_dependencies saved parent and external render ODFs\n  ✓ 3D Lab: hardpoint picker populated from .msh\n  ✓ 3D Lab: hardpoint picker switches active hardpoint\n  ✓ 3D Lab: bounding-box overlay mesh rendered\n  ✓ 3D Lab: baseline shot snapshot captured\n  ✓ 3D Lab: before/after shot comparison succeeded\n  ✓ V9: synchronized audiovisual timeline recorded weapon activation + audio/impact events\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nALL TESTS PASSED\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T14:49:28Z",
+  "verdict": "PASS",
+  "problems": []
+}

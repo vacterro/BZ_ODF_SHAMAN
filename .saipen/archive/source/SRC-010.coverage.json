@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-010:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-11 closed with verification evidence in LOG: verify -> PASS [target: T-11] conf: high -- graph node positions persist per source path in the isolated workspace and restore after reload; core 182/0, UI 60/0, build+boot exit 0.",
+      "text": "cc all",
+      "verification": "the Work this request created reached its own verification gate; see the T-11 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-11"
+    }
+  },
+  "schema_version": 1
+}

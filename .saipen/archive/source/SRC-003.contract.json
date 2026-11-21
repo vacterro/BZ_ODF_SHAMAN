@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-003:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Alternate weapon chain (altName): resolve and fire the morph/alternate WeaponClass"
+    }
+  },
+  "derived_at": "2026-11-21T05:13:36Z",
+  "derived_from": "SRC-003",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "89a212c4577624366fb901566a7483c7ab1924d971aa51a1144b9904f455785d"
+}

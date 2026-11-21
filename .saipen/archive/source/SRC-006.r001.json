@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-006:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Close post-review regressions: startup must not wipe saved settings; test settings isolated; real parent-edit FIRE regression test"
+    }
+  },
+  "derived_at": "2026-11-21T06:33:34Z",
+  "derived_from": "SRC-006",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "49090c8c10022cc6431535e09e21a0ed9371304ab57e24b8fdb706b29e84e8f5"
+}

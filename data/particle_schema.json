@@ -1,0 +1,1285 @@
+{
+ "generatedFrom": "V:\\___VAC\\__K\\__CODE\\_MISC\\_BZDECOMP\\vrv\\BATTLEZONE\\DOCS\\PARTICLE.md",
+ "schemaVersion": 1,
+ "renderBases": [
+  "draw_null",
+  "draw_emit",
+  "draw_multi",
+  "draw_bolt",
+  "draw_geom",
+  "draw_light",
+  "draw_planar",
+  "draw_sphere",
+  "draw_sprite",
+  "draw_static",
+  "draw_tracer",
+  "draw_trail",
+  "draw_twirl",
+  "draw_twirl_trail",
+  "draw_wave"
+ ],
+ "simulateBases": [
+  "sim_null",
+  "sim_chunk",
+  "sim_dust",
+  "sim_ember",
+  "sim_spray",
+  "sim_smoke"
+ ],
+ "renderSections": {
+  "draw_null": {
+   "name": "draw_null",
+   "properties": {
+    "minLOD": {
+     "name": "minLOD",
+     "defaultRaw": "0",
+     "typeHint": "int",
+     "description": "Minimum LOD setting, used with Graphics Option's Particle settings to cull particles.",
+     "docLine": 115,
+     "doc": "PARTICLE.md"
+    },
+    "maxLOD": {
+     "name": "maxLOD",
+     "defaultRaw": "2",
+     "typeHint": "int",
+     "description": "Maximum LOD setting, used with Graphics Option's Particle settings to cull particles.",
+     "docLine": 120,
+     "doc": "PARTICLE.md"
+    },
+    "StartDelay": {
+     "name": "StartDelay",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Time, in seconds, before this render Starts to animate.",
+     "docLine": 125,
+     "doc": "PARTICLE.md"
+    },
+    "lifeTime": {
+     "name": "lifeTime",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Time in seconds this Render lasts.",
+     "docLine": 143,
+     "doc": "PARTICLE.md"
+    },
+    "maxCount": {
+     "name": "maxCount",
+     "defaultRaw": "128",
+     "typeHint": "int",
+     "description": "Maximum number of this particle that can be active on the screen at any given time before oldest ones get Culled.",
+     "docLine": 154,
+     "doc": "PARTICLE.md"
+    },
+    "SimulateSoundEffect": {
+     "name": "SimulateSoundEffect",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "If specified, this is the sound file played when this particle is emitted.",
+     "docLine": 159,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_emit": {
+   "name": "draw_emit",
+   "properties": {
+    "emitName": {
+     "name": "emitName",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "The Render name to emit.",
+     "docLine": 177,
+     "doc": "PARTICLE.md"
+    },
+    "emitDelay": {
+     "name": "emitDelay",
+     "defaultRaw": "1e30.0f",
+     "typeHint": "raw",
+     "description": "Time in seconds between emitting an instance of the Render.",
+     "docLine": 182,
+     "doc": "PARTICLE.md"
+    },
+    "emitDelayVar": {
+     "name": "emitDelayVar",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Maximum variance in the emitDelay for this render. Adds a random between 0.0f and emitDelayVar to emitDelay each time it emits an instance of the Render.",
+     "docLine": 188,
+     "doc": "PARTICLE.md"
+    },
+    "emitPosVariance": {
+     "name": "emitPosVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Position variance for this Render's initial starting position from the root position of the emitter Object.",
+     "docLine": 194,
+     "doc": "PARTICLE.md"
+    },
+    "emitVelocity": {
+     "name": "emitVelocity",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Velocity variance for this Render.",
+     "docLine": 199,
+     "doc": "PARTICLE.md"
+    },
+    "emitVariance": {
+     "name": "emitVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Directional variance for this Render's velocity.",
+     "docLine": 204,
+     "doc": "PARTICLE.md"
+    },
+    "emitInherit": {
+     "name": "emitInherit",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Percent of Velocity inherited from the root emitter Object's velocity. 1.0 is 100%, but is not limited.",
+     "docLine": 209,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_multi": {
+   "name": "draw_multi",
+   "properties": {
+    "renderCount": {
+     "name": "renderCount",
+     "defaultRaw": "0",
+     "typeHint": "int",
+     "description": "How many Renders to add. This list is unlimited, try not to over do it.",
+     "docLine": 227,
+     "doc": "PARTICLE.md"
+    },
+    "textureName": {
+     "name": "textureName",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "Texture filename applied to this Render. File extension does not matter, game internally converts it to .dds.",
+     "docLine": 248,
+     "doc": "PARTICLE.md"
+    },
+    "textureBlend": {
+     "name": "textureBlend",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "Texture Blend mode for the Texture on this Render.",
+     "docLine": 253,
+     "doc": "PARTICLE.md"
+    },
+    "startColor": {
+     "name": "startColor",
+     "defaultRaw": "\"0 0 0 0\"",
+     "typeHint": "string",
+     "description": "Start color, in RGBA format.",
+     "docLine": 301,
+     "doc": "PARTICLE.md"
+    },
+    "finishColor": {
+     "name": "finishColor",
+     "defaultRaw": "\"0 0 0 0\"",
+     "typeHint": "string",
+     "description": "Finish color, in RGBA format.",
+     "docLine": 306,
+     "doc": "PARTICLE.md"
+    },
+    "startRadius": {
+     "name": "startRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Start Radius.",
+     "docLine": 311,
+     "doc": "PARTICLE.md"
+    },
+    "finishRadius": {
+     "name": "finishRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Finish Radius.",
+     "docLine": 316,
+     "doc": "PARTICLE.md"
+    },
+    "animateTime": {
+     "name": "animateTime",
+     "defaultRaw": "1e30.0f",
+     "typeHint": "raw",
+     "description": "Time to transition between StartColor / StartRadius, to FinishColor / Radius.",
+     "docLine": 321,
+     "doc": "PARTICLE.md"
+    },
+    "useTerrainColor": {
+     "name": "useTerrainColor",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "The Percent value of Terrain cluster color under the Render to blend with the current Color. Valid values are 0.0 to 1.0.",
+     "docLine": 326,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_bolt": {
+   "name": "draw_bolt",
+   "properties": {
+    "segmentLength": {
+     "name": "segmentLength",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "The length of each Segment.",
+     "docLine": 349,
+     "doc": "PARTICLE.md"
+    },
+    "segmentVariance": {
+     "name": "segmentVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "The X Y Z variance of each segment's direction.",
+     "docLine": 354,
+     "doc": "PARTICLE.md"
+    },
+    "textureRate": {
+     "name": "textureRate",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Rate which the texture can change per segment.",
+     "docLine": 359,
+     "doc": "PARTICLE.md"
+    },
+    "textureSpeed": {
+     "name": "textureSpeed",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "UV Speed of the Texture along the trail.",
+     "docLine": 364,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_geom": {
+   "name": "draw_geom",
+   "properties": {
+    "geomName": {
+     "name": "geomName",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "Model file name for this Render. Can be .XSI or .FBX. The TextureName is applied to the uvmapping on the Model, and the textureMode is used on it.",
+     "docLine": 382,
+     "doc": "PARTICLE.md"
+    },
+    "InitialPitch": {
+     "name": "InitialPitch",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Pitch value.",
+     "docLine": 388,
+     "doc": "PARTICLE.md"
+    },
+    "InitialYaw": {
+     "name": "InitialYaw",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Yaw value.",
+     "docLine": 393,
+     "doc": "PARTICLE.md"
+    },
+    "InitialRoll": {
+     "name": "InitialRoll",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Roll value.",
+     "docLine": 398,
+     "doc": "PARTICLE.md"
+    },
+    "AddPitch": {
+     "name": "AddPitch",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Pitch per second.",
+     "docLine": 403,
+     "doc": "PARTICLE.md"
+    },
+    "AddYaw": {
+     "name": "AddYaw",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Yaw per second.",
+     "docLine": 408,
+     "doc": "PARTICLE.md"
+    },
+    "AddRoll": {
+     "name": "AddRoll",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Roll per second.",
+     "docLine": 413,
+     "doc": "PARTICLE.md"
+    },
+    "ForceDrawTransparent": {
+     "name": "ForceDrawTransparent",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If this is true, it forces it to draw using transparency. If false, draws it opaque.",
+     "docLine": 418,
+     "doc": "PARTICLE.md"
+    },
+    "ForceDraw2Sided": {
+     "name": "ForceDraw2Sided",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If this is true, draws it as a 2 Sided geometry, if false, hides back faces.",
+     "docLine": 423,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_light": {
+   "name": "draw_light",
+   "properties": {
+    "lightType": {
+     "name": "lightType",
+     "defaultRaw": "\"point\"",
+     "typeHint": "string",
+     "description": "The type of light. Valid values are:",
+     "docLine": 442,
+     "doc": "PARTICLE.md"
+    },
+    "R": {
+     "name": "R",
+     "defaultRaw": "Radius, Kc = Constant, Kl = Linear, Kq = Quadratic. The Blue line represents BZCC's light falloff. BZCC's Shader forces the light to end at 0, which is why the dotted Red line isn't the actual light falloff curve.",
+     "typeHint": "raw",
+     "description": "",
+     "docLine": 453,
+     "doc": "PARTICLE.md"
+    },
+    "attenuateConstant": {
+     "name": "attenuateConstant",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Constant Attenuation, modified by Liniar/Quadratic.",
+     "docLine": 456,
+     "doc": "PARTICLE.md"
+    },
+    "attenuateLinear": {
+     "name": "attenuateLinear",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Liniar Attenuation.",
+     "docLine": 461,
+     "doc": "PARTICLE.md"
+    },
+    "attenuateQuadratic": {
+     "name": "attenuateQuadratic",
+     "defaultRaw": "15.0f",
+     "typeHint": "float",
+     "description": "Quadratic Attenuation.",
+     "docLine": 466,
+     "doc": "PARTICLE.md"
+    },
+    "coneAngInner": {
+     "name": "coneAngInner",
+     "defaultRaw": "1.570795",
+     "typeHint": "float",
+     "description": "Inner Cone Angle for lightType: spot.",
+     "docLine": 471,
+     "doc": "PARTICLE.md"
+    },
+    "coneAngOuter": {
+     "name": "coneAngOuter",
+     "defaultRaw": "1.570795",
+     "typeHint": "float",
+     "description": "Outer Cone Angle for lightType: spot.",
+     "docLine": 476,
+     "doc": "PARTICLE.md"
+    },
+    "coneFalloff": {
+     "name": "coneFalloff",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Cone Falloff ratio between origin and Radius. Used for lightType: spot.",
+     "docLine": 481,
+     "doc": "PARTICLE.md"
+    },
+    "lensFlare": {
+     "name": "lensFlare",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If false, doesn't create a Sprite of \"lightflare.tga\" and \"lighthalo.tga\" at it's origin.",
+     "docLine": 486,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_planar": {
+   "name": "draw_planar",
+   "properties": {
+    "rotationRate": {
+     "name": "rotationRate",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Rotation rate of the Render.",
+     "docLine": 505,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_sphere": {
+   "name": "draw_sphere",
+   "properties": {
+    "InitialPitch": {
+     "name": "InitialPitch",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Pitch value.",
+     "docLine": 524,
+     "doc": "PARTICLE.md"
+    },
+    "InitialYaw": {
+     "name": "InitialYaw",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Yaw value.",
+     "docLine": 529,
+     "doc": "PARTICLE.md"
+    },
+    "InitialRoll": {
+     "name": "InitialRoll",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Roll value.",
+     "docLine": 534,
+     "doc": "PARTICLE.md"
+    },
+    "AddPitch": {
+     "name": "AddPitch",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Pitch per second.",
+     "docLine": 539,
+     "doc": "PARTICLE.md"
+    },
+    "AddYaw": {
+     "name": "AddYaw",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Yaw per second.",
+     "docLine": 544,
+     "doc": "PARTICLE.md"
+    },
+    "AddRoll": {
+     "name": "AddRoll",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Roll per second.",
+     "docLine": 549,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_sprite": {
+   "name": "draw_sprite",
+   "properties": {
+    "spriteCenter.x": {
+     "name": "spriteCenter.x",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Offsets the Center position of the Sprite texture on the X Axis. 1.0 is 100%.",
+     "docLine": 567,
+     "doc": "PARTICLE.md"
+    },
+    "spriteCenter.y": {
+     "name": "spriteCenter.y",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Offsets the Center position of the Sprite texture on the Y Axis. 1.0 is 100%.",
+     "docLine": 572,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_static": {
+   "name": "draw_static",
+   "properties": {
+    "innerRadius": {
+     "name": "innerRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Inner radius of sphere.",
+     "docLine": 590,
+     "doc": "PARTICLE.md"
+    },
+    "outerRadius": {
+     "name": "outerRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Outer radius of sphere.",
+     "docLine": 595,
+     "doc": "PARTICLE.md"
+    },
+    "emitDelay": {
+     "name": "emitDelay",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Time in seconds between emitting particles.",
+     "docLine": 600,
+     "doc": "PARTICLE.md"
+    },
+    "emitDelayVar": {
+     "name": "emitDelayVar",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Maximum random variance added to emitDelay.",
+     "docLine": 605,
+     "doc": "PARTICLE.md"
+    },
+    "staticTime": {
+     "name": "staticTime",
+     "defaultRaw": "1e30.0f",
+     "typeHint": "raw",
+     "description": "Overrides the lifeTime value, if present.",
+     "docLine": 610,
+     "doc": "PARTICLE.md"
+    },
+    "segmentTime": {
+     "name": "segmentTime",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Overrides the animateTime value, if present.",
+     "docLine": 615,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_tracer": {
+   "name": "draw_tracer",
+   "properties": {
+    "tracerLength": {
+     "name": "tracerLength",
+     "defaultRaw": "10.0f",
+     "typeHint": "float",
+     "description": "Length of the Tracer geometry.",
+     "docLine": 633,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_trail": {
+   "name": "draw_trail",
+   "properties": {
+    "segmentTime": {
+     "name": "segmentTime",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Overrides animateTime if specified. Controls how long each Segment takes to render.",
+     "docLine": 651,
+     "doc": "PARTICLE.md"
+    },
+    "textureRate": {
+     "name": "textureRate",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Rate the texture repeats across each segment.",
+     "docLine": 656,
+     "doc": "PARTICLE.md"
+    },
+    "textureSpeed": {
+     "name": "textureSpeed",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Speed the UV coordinates move the texture along the Trail.",
+     "docLine": 661,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_twirl": {
+   "name": "draw_twirl",
+   "properties": {
+    "rotationRate": {
+     "name": "rotationRate",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Maximum random Rotation that can be applied.",
+     "docLine": 679,
+     "doc": "PARTICLE.md"
+    },
+    "BottomInteractsWithTerrain": {
+     "name": "BottomInteractsWithTerrain",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If true, squishes vertically to avoid clipping through Terrain.",
+     "docLine": 684,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_twirl_trail": {
+   "name": "draw_twirl_trail",
+   "properties": {
+    "emitDelay": {
+     "name": "emitDelay",
+     "defaultRaw": "1e30.0f",
+     "typeHint": "raw",
+     "description": "Time in seconds between emitting an instance of the Render.",
+     "docLine": 702,
+     "doc": "PARTICLE.md"
+    },
+    "emitDelayVar": {
+     "name": "emitDelayVar",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Maximum variance in the emitDelay for this render. Adds a random between 0.0f and emitDelayVar to emitDelay each time it emits an instance of the Render.",
+     "docLine": 708,
+     "doc": "PARTICLE.md"
+    },
+    "emitPosVariance": {
+     "name": "emitPosVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Position variance for this Render's initial starting position from the root position of the emitter Object.",
+     "docLine": 714,
+     "doc": "PARTICLE.md"
+    },
+    "emitVelocity": {
+     "name": "emitVelocity",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Velocity variance for this Render.",
+     "docLine": 719,
+     "doc": "PARTICLE.md"
+    },
+    "emitVariance": {
+     "name": "emitVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Directional variance for this Render's velocity.",
+     "docLine": 724,
+     "doc": "PARTICLE.md"
+    },
+    "emitInherit": {
+     "name": "emitInherit",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Percent of Velocity inherited from the root emitter Object's velocity. 1.0 is 100%, but is not limited.",
+     "docLine": 729,
+     "doc": "PARTICLE.md"
+    },
+    "emitLife": {
+     "name": "emitLife",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Time in seconds that each emitted TwirlRender lasts.",
+     "docLine": 734,
+     "doc": "PARTICLE.md"
+    },
+    "maxDist": {
+     "name": "maxDist",
+     "defaultRaw": "400.0f",
+     "typeHint": "float",
+     "description": "Distance from Camera for it to stop Rendering.",
+     "docLine": 739,
+     "doc": "PARTICLE.md"
+    },
+    "maxRadii": {
+     "name": "maxRadii",
+     "defaultRaw": "-10.0f",
+     "typeHint": "float",
+     "description": "Radius outside of Camera view for it to skip Rendering.",
+     "docLine": 744,
+     "doc": "PARTICLE.md"
+    },
+    "groupDelay": {
+     "name": "groupDelay",
+     "defaultRaw": "0.1f",
+     "typeHint": "float",
+     "description": "Delay between Groups.",
+     "docLine": 749,
+     "doc": "PARTICLE.md"
+    }
+   }
+  },
+  "draw_wave": {
+   "name": "draw_wave",
+   "properties": {
+    "waveAngle": {
+     "name": "waveAngle",
+     "defaultRaw": "0.5f",
+     "typeHint": "float",
+     "description": "Angle of the Wave. Pi is fully circular.",
+     "docLine": 767,
+     "doc": "PARTICLE.md"
+    },
+    "waveDepth": {
+     "name": "waveDepth",
+     "defaultRaw": "0.1f",
+     "typeHint": "float",
+     "description": "How wide the Wave is.",
+     "docLine": 772,
+     "doc": "PARTICLE.md"
+    },
+    "waveColorCenter": {
+     "name": "waveColorCenter",
+     "defaultRaw": "\"255 255 255 255\"",
+     "typeHint": "string",
+     "description": "Color of the wave in the Center.",
+     "docLine": 777,
+     "doc": "PARTICLE.md"
+    },
+    "waveColorEdge": {
+     "name": "waveColorEdge",
+     "defaultRaw": "\"255 255 255 255\"",
+     "typeHint": "string",
+     "description": "Color of the Wave at the Edge.",
+     "docLine": 782,
+     "doc": "PARTICLE.md"
+    },
+    "waveTextureRepeats": {
+     "name": "waveTextureRepeats",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If true, repeats the texture for each Segment. If false, applies the texture across the whole Wave.",
+     "docLine": 787,
+     "doc": "PARTICLE.md"
+    },
+    "waveSegments": {
+     "name": "waveSegments",
+     "defaultRaw": "4",
+     "typeHint": "int",
+     "description": "Number of Segments in the Wave.",
+     "docLine": 792,
+     "doc": "PARTICLE.md"
+    }
+   }
+  }
+ },
+ "simulateSections": {
+  "sim_null": {
+   "name": "sim_null",
+   "properties": {}
+  },
+  "sim_chunk": {
+   "name": "sim_chunk",
+   "properties": {}
+  },
+  "sim_dust": {
+   "name": "sim_dust",
+   "properties": {}
+  },
+  "sim_ember": {
+   "name": "sim_ember",
+   "properties": {}
+  },
+  "sim_spray": {
+   "name": "sim_spray",
+   "properties": {}
+  },
+  "sim_smoke": {
+   "name": "sim_smoke",
+   "properties": {
+    "minLOD": {
+     "name": "minLOD",
+     "defaultRaw": "0",
+     "typeHint": "int",
+     "description": "Minimum LOD setting, used with Graphics Option's Particle settings to cull particles.",
+     "docLine": 115,
+     "doc": "PARTICLE.md"
+    },
+    "maxLOD": {
+     "name": "maxLOD",
+     "defaultRaw": "2",
+     "typeHint": "int",
+     "description": "Maximum LOD setting, used with Graphics Option's Particle settings to cull particles.",
+     "docLine": 120,
+     "doc": "PARTICLE.md"
+    },
+    "StartDelay": {
+     "name": "StartDelay",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Time, in seconds, before this render Starts to animate.",
+     "docLine": 125,
+     "doc": "PARTICLE.md"
+    },
+    "lifeTime": {
+     "name": "lifeTime",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Time in seconds this Render lasts.",
+     "docLine": 143,
+     "doc": "PARTICLE.md"
+    },
+    "maxCount": {
+     "name": "maxCount",
+     "defaultRaw": "128",
+     "typeHint": "int",
+     "description": "Maximum number of this particle that can be active on the screen at any given time before oldest ones get Culled.",
+     "docLine": 154,
+     "doc": "PARTICLE.md"
+    },
+    "SimulateSoundEffect": {
+     "name": "SimulateSoundEffect",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "If specified, this is the sound file played when this particle is emitted.",
+     "docLine": 159,
+     "doc": "PARTICLE.md"
+    },
+    "emitName": {
+     "name": "emitName",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "The Render name to emit.",
+     "docLine": 177,
+     "doc": "PARTICLE.md"
+    },
+    "emitDelay": {
+     "name": "emitDelay",
+     "defaultRaw": "1e30.0f",
+     "typeHint": "raw",
+     "description": "Time in seconds between emitting an instance of the Render.",
+     "docLine": 182,
+     "doc": "PARTICLE.md"
+    },
+    "emitDelayVar": {
+     "name": "emitDelayVar",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Maximum variance in the emitDelay for this render. Adds a random between 0.0f and emitDelayVar to emitDelay each time it emits an instance of the Render.",
+     "docLine": 188,
+     "doc": "PARTICLE.md"
+    },
+    "emitPosVariance": {
+     "name": "emitPosVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Position variance for this Render's initial starting position from the root position of the emitter Object.",
+     "docLine": 194,
+     "doc": "PARTICLE.md"
+    },
+    "emitVelocity": {
+     "name": "emitVelocity",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Velocity variance for this Render.",
+     "docLine": 199,
+     "doc": "PARTICLE.md"
+    },
+    "emitVariance": {
+     "name": "emitVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Maximum random Directional variance for this Render's velocity.",
+     "docLine": 204,
+     "doc": "PARTICLE.md"
+    },
+    "emitInherit": {
+     "name": "emitInherit",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "Percent of Velocity inherited from the root emitter Object's velocity. 1.0 is 100%, but is not limited.",
+     "docLine": 209,
+     "doc": "PARTICLE.md"
+    },
+    "renderCount": {
+     "name": "renderCount",
+     "defaultRaw": "0",
+     "typeHint": "int",
+     "description": "How many Renders to add. This list is unlimited, try not to over do it.",
+     "docLine": 227,
+     "doc": "PARTICLE.md"
+    },
+    "textureName": {
+     "name": "textureName",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "Texture filename applied to this Render. File extension does not matter, game internally converts it to .dds.",
+     "docLine": 248,
+     "doc": "PARTICLE.md"
+    },
+    "textureBlend": {
+     "name": "textureBlend",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "Texture Blend mode for the Texture on this Render.",
+     "docLine": 253,
+     "doc": "PARTICLE.md"
+    },
+    "startColor": {
+     "name": "startColor",
+     "defaultRaw": "\"0 0 0 0\"",
+     "typeHint": "string",
+     "description": "Start color, in RGBA format.",
+     "docLine": 301,
+     "doc": "PARTICLE.md"
+    },
+    "finishColor": {
+     "name": "finishColor",
+     "defaultRaw": "\"0 0 0 0\"",
+     "typeHint": "string",
+     "description": "Finish color, in RGBA format.",
+     "docLine": 306,
+     "doc": "PARTICLE.md"
+    },
+    "startRadius": {
+     "name": "startRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Start Radius.",
+     "docLine": 311,
+     "doc": "PARTICLE.md"
+    },
+    "finishRadius": {
+     "name": "finishRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Finish Radius.",
+     "docLine": 316,
+     "doc": "PARTICLE.md"
+    },
+    "animateTime": {
+     "name": "animateTime",
+     "defaultRaw": "1e30.0f",
+     "typeHint": "raw",
+     "description": "Time to transition between StartColor / StartRadius, to FinishColor / Radius.",
+     "docLine": 321,
+     "doc": "PARTICLE.md"
+    },
+    "useTerrainColor": {
+     "name": "useTerrainColor",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "The Percent value of Terrain cluster color under the Render to blend with the current Color. Valid values are 0.0 to 1.0.",
+     "docLine": 326,
+     "doc": "PARTICLE.md"
+    },
+    "segmentLength": {
+     "name": "segmentLength",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "The length of each Segment.",
+     "docLine": 349,
+     "doc": "PARTICLE.md"
+    },
+    "segmentVariance": {
+     "name": "segmentVariance",
+     "defaultRaw": "\"0.0 0.0 0.0\"",
+     "typeHint": "string",
+     "description": "The X Y Z variance of each segment's direction.",
+     "docLine": 354,
+     "doc": "PARTICLE.md"
+    },
+    "textureRate": {
+     "name": "textureRate",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Rate which the texture can change per segment.",
+     "docLine": 359,
+     "doc": "PARTICLE.md"
+    },
+    "textureSpeed": {
+     "name": "textureSpeed",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "UV Speed of the Texture along the trail.",
+     "docLine": 364,
+     "doc": "PARTICLE.md"
+    },
+    "geomName": {
+     "name": "geomName",
+     "defaultRaw": "\"\"",
+     "typeHint": "string",
+     "description": "Model file name for this Render. Can be .XSI or .FBX. The TextureName is applied to the uvmapping on the Model, and the textureMode is used on it.",
+     "docLine": 382,
+     "doc": "PARTICLE.md"
+    },
+    "InitialPitch": {
+     "name": "InitialPitch",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Pitch value.",
+     "docLine": 388,
+     "doc": "PARTICLE.md"
+    },
+    "InitialYaw": {
+     "name": "InitialYaw",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Yaw value.",
+     "docLine": 393,
+     "doc": "PARTICLE.md"
+    },
+    "InitialRoll": {
+     "name": "InitialRoll",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Initial starting Roll value.",
+     "docLine": 398,
+     "doc": "PARTICLE.md"
+    },
+    "AddPitch": {
+     "name": "AddPitch",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Pitch per second.",
+     "docLine": 403,
+     "doc": "PARTICLE.md"
+    },
+    "AddYaw": {
+     "name": "AddYaw",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Yaw per second.",
+     "docLine": 408,
+     "doc": "PARTICLE.md"
+    },
+    "AddRoll": {
+     "name": "AddRoll",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Amount added to Roll per second.",
+     "docLine": 413,
+     "doc": "PARTICLE.md"
+    },
+    "ForceDrawTransparent": {
+     "name": "ForceDrawTransparent",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If this is true, it forces it to draw using transparency. If false, draws it opaque.",
+     "docLine": 418,
+     "doc": "PARTICLE.md"
+    },
+    "ForceDraw2Sided": {
+     "name": "ForceDraw2Sided",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If this is true, draws it as a 2 Sided geometry, if false, hides back faces.",
+     "docLine": 423,
+     "doc": "PARTICLE.md"
+    },
+    "lightType": {
+     "name": "lightType",
+     "defaultRaw": "\"point\"",
+     "typeHint": "string",
+     "description": "The type of light. Valid values are:",
+     "docLine": 442,
+     "doc": "PARTICLE.md"
+    },
+    "R": {
+     "name": "R",
+     "defaultRaw": "Radius, Kc = Constant, Kl = Linear, Kq = Quadratic. The Blue line represents BZCC's light falloff. BZCC's Shader forces the light to end at 0, which is why the dotted Red line isn't the actual light falloff curve.",
+     "typeHint": "raw",
+     "description": "",
+     "docLine": 453,
+     "doc": "PARTICLE.md"
+    },
+    "attenuateConstant": {
+     "name": "attenuateConstant",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Constant Attenuation, modified by Liniar/Quadratic.",
+     "docLine": 456,
+     "doc": "PARTICLE.md"
+    },
+    "attenuateLinear": {
+     "name": "attenuateLinear",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Liniar Attenuation.",
+     "docLine": 461,
+     "doc": "PARTICLE.md"
+    },
+    "attenuateQuadratic": {
+     "name": "attenuateQuadratic",
+     "defaultRaw": "15.0f",
+     "typeHint": "float",
+     "description": "Quadratic Attenuation.",
+     "docLine": 466,
+     "doc": "PARTICLE.md"
+    },
+    "coneAngInner": {
+     "name": "coneAngInner",
+     "defaultRaw": "1.570795",
+     "typeHint": "float",
+     "description": "Inner Cone Angle for lightType: spot.",
+     "docLine": 471,
+     "doc": "PARTICLE.md"
+    },
+    "coneAngOuter": {
+     "name": "coneAngOuter",
+     "defaultRaw": "1.570795",
+     "typeHint": "float",
+     "description": "Outer Cone Angle for lightType: spot.",
+     "docLine": 476,
+     "doc": "PARTICLE.md"
+    },
+    "coneFalloff": {
+     "name": "coneFalloff",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Cone Falloff ratio between origin and Radius. Used for lightType: spot.",
+     "docLine": 481,
+     "doc": "PARTICLE.md"
+    },
+    "lensFlare": {
+     "name": "lensFlare",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If false, doesn't create a Sprite of \"lightflare.tga\" and \"lighthalo.tga\" at it's origin.",
+     "docLine": 486,
+     "doc": "PARTICLE.md"
+    },
+    "rotationRate": {
+     "name": "rotationRate",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Rotation rate of the Render.",
+     "docLine": 505,
+     "doc": "PARTICLE.md"
+    },
+    "spriteCenter.x": {
+     "name": "spriteCenter.x",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Offsets the Center position of the Sprite texture on the X Axis. 1.0 is 100%.",
+     "docLine": 567,
+     "doc": "PARTICLE.md"
+    },
+    "spriteCenter.y": {
+     "name": "spriteCenter.y",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Offsets the Center position of the Sprite texture on the Y Axis. 1.0 is 100%.",
+     "docLine": 572,
+     "doc": "PARTICLE.md"
+    },
+    "innerRadius": {
+     "name": "innerRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Inner radius of sphere.",
+     "docLine": 590,
+     "doc": "PARTICLE.md"
+    },
+    "outerRadius": {
+     "name": "outerRadius",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Outer radius of sphere.",
+     "docLine": 595,
+     "doc": "PARTICLE.md"
+    },
+    "staticTime": {
+     "name": "staticTime",
+     "defaultRaw": "1e30.0f",
+     "typeHint": "raw",
+     "description": "Overrides the lifeTime value, if present.",
+     "docLine": 610,
+     "doc": "PARTICLE.md"
+    },
+    "segmentTime": {
+     "name": "segmentTime",
+     "defaultRaw": "0.0f",
+     "typeHint": "float",
+     "description": "Overrides the animateTime value, if present.",
+     "docLine": 615,
+     "doc": "PARTICLE.md"
+    },
+    "tracerLength": {
+     "name": "tracerLength",
+     "defaultRaw": "10.0f",
+     "typeHint": "float",
+     "description": "Length of the Tracer geometry.",
+     "docLine": 633,
+     "doc": "PARTICLE.md"
+    },
+    "BottomInteractsWithTerrain": {
+     "name": "BottomInteractsWithTerrain",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If true, squishes vertically to avoid clipping through Terrain.",
+     "docLine": 684,
+     "doc": "PARTICLE.md"
+    },
+    "emitLife": {
+     "name": "emitLife",
+     "defaultRaw": "1.0f",
+     "typeHint": "float",
+     "description": "Time in seconds that each emitted TwirlRender lasts.",
+     "docLine": 734,
+     "doc": "PARTICLE.md"
+    },
+    "maxDist": {
+     "name": "maxDist",
+     "defaultRaw": "400.0f",
+     "typeHint": "float",
+     "description": "Distance from Camera for it to stop Rendering.",
+     "docLine": 739,
+     "doc": "PARTICLE.md"
+    },
+    "maxRadii": {
+     "name": "maxRadii",
+     "defaultRaw": "-10.0f",
+     "typeHint": "float",
+     "description": "Radius outside of Camera view for it to skip Rendering.",
+     "docLine": 744,
+     "doc": "PARTICLE.md"
+    },
+    "groupDelay": {
+     "name": "groupDelay",
+     "defaultRaw": "0.1f",
+     "typeHint": "float",
+     "description": "Delay between Groups.",
+     "docLine": 749,
+     "doc": "PARTICLE.md"
+    },
+    "waveAngle": {
+     "name": "waveAngle",
+     "defaultRaw": "0.5f",
+     "typeHint": "float",
+     "description": "Angle of the Wave. Pi is fully circular.",
+     "docLine": 767,
+     "doc": "PARTICLE.md"
+    },
+    "waveDepth": {
+     "name": "waveDepth",
+     "defaultRaw": "0.1f",
+     "typeHint": "float",
+     "description": "How wide the Wave is.",
+     "docLine": 772,
+     "doc": "PARTICLE.md"
+    },
+    "waveColorCenter": {
+     "name": "waveColorCenter",
+     "defaultRaw": "\"255 255 255 255\"",
+     "typeHint": "string",
+     "description": "Color of the wave in the Center.",
+     "docLine": 777,
+     "doc": "PARTICLE.md"
+    },
+    "waveColorEdge": {
+     "name": "waveColorEdge",
+     "defaultRaw": "\"255 255 255 255\"",
+     "typeHint": "string",
+     "description": "Color of the Wave at the Edge.",
+     "docLine": 782,
+     "doc": "PARTICLE.md"
+    },
+    "waveTextureRepeats": {
+     "name": "waveTextureRepeats",
+     "defaultRaw": "true",
+     "typeHint": "bool",
+     "description": "If true, repeats the texture for each Segment. If false, applies the texture across the whole Wave.",
+     "docLine": 787,
+     "doc": "PARTICLE.md"
+    },
+    "waveSegments": {
+     "name": "waveSegments",
+     "defaultRaw": "4",
+     "typeHint": "int",
+     "description": "Number of Segments in the Wave.",
+     "docLine": 792,
+     "doc": "PARTICLE.md"
+    }
+   }
+  }
+ }
+}

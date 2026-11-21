@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 144.3,
+  "timeout_s": 3600,
+  "subject_before": "tree:ed74df576413a3d6837032eee92f030c18187a233df97b03a7c6dac9d67451de",
+  "subject": "tree:ed74df576413a3d6837032eee92f030c18187a233df97b03a7c6dac9d67451de",
+  "stdout_tail": "IES button present\n  ✓ T-27 V7: cross-file external edit refreshed Particle Lab live preview\n  ✓ T-27 V7: live Particle Lab emitter reflects edited external startColor\n  ✓ T-27 V8: SAVE DEPENDENCIES badge tracks dirty external dependency\n  ✓ T-27 V8: clicking SAVE DEPENDENCIES saved dirty dependencies and cleared dirty state\n  ✓ T-27 V8: original external ODF untouched on disk\n  ✓ 3D Lab: hardpoint picker populated from .msh\n  ✓ 3D Lab: hardpoint picker switches active hardpoint\n  ✓ 3D Lab: bounding-box overlay mesh rendered\n  ✓ 3D Lab: baseline shot snapshot captured\n  ✓ 3D Lab: before/after shot comparison succeeded\n  ✓ V9: synchronized audiovisual timeline recorded weapon activation + audio/impact events\n  ✓ T-26 UI: all 5 split native controls (PREFLIGHT/STAGE/LAUNCH/COLLECT/CLEANUP) present\n  ✓ T-26 UI: PREFLIGHT created active durable session\n  ✓ T-26 UI: STAGE materialized isolated native stage\n  ✓ T-26 UI: LAUNCH / HANDOFF prepared workflow cleanly\n  ✓ T-26 UI: COLLECT reports OBSERVATION_ARTIFACT_MISSING before game run\n  ✓ T-26 UI: CLEANUP safely cleaned staged files\n  ✓ T-27 UI: 5 camera presets available\n  ✓ T-27 UI: muzzle camera preset applied\n  ✓ T-27 UI: camera preset moved 3D camera\n  ✓ T-27 UI: top and overview camera presets applied\n  ✓ T-27 UI: target transform offset and yaw applied\n  ✓ T-27 UI: obstacle added to 3D scene\n  ✓ T-27 UI: 3D obstacle intercepted shot and protected target hull\n  ✓ T-27 UI: clear_obstacles removed obstacle\n  ✓ T-27 UI: secondary target took independent damage while primary stayed untouched\n  ✓ T-27 UI: interactive Timeline panel controls present\n  ✓ T-27 V9: bounded multichannel audio pool initialized to 8 channels\n  ✓ T-27 V9: audio pool remains strictly bounded at 8 after 12 rapid plays\n  ✓ T-27 UI: Timeline filter('audio') returned SFX events\n  ✓ T-27 UI: Timeline scrub_timeline_to(0.0) selected event\n  ✓ T-27 UI: select_timeline_event emitted selection cleanly\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nALL TESTS PASSED\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T15:14:58Z",
+  "verdict": "PASS",
+  "problems": []
+}

@@ -1,0 +1,16 @@
+{
+  "op_id": "scope-3b61b2c2aeb047db90c9826c52469208",
+  "paths": {
+    "docs/EVIDENCE.md": "4a60f03e8caf61b74fab0a0e1493adac700da64016e171bbcd6dd0923b6d0b2f",
+    "docs/NATIVE_TESTING.md": "1b0dd4462333d818786744c0e3520a34635d1f026f1e91a778bced4260e6b0a3",
+    "scripts/native/native_test_adapter.gd": "6040e40ad32394a4045a812656a2c83a06ef7f3e087086ae7c918a4b2102d3d8",
+    "tests/test_runner.gd": "ec6a4317bdbe211d9ab5677e77ad992e4ed72425f3137b70612e6079f1cc8016"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T14:10:13Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:8cd4c2ec1c6c8cc4388de4cd73da6b854d74b0ec4d5d5a74febd03caad9c3445",
+  "ticket": "T-22"
+}

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 61.2,
+  "timeout_s": 3600,
+  "subject_before": "tree:94510ceda2ccb73064f003d7912719f47859db62acdb6c31038849940710e5aa",
+  "subject": "tree:94510ceda2ccb73064f003d7912719f47859db62acdb6c31038849940710e5aa",
+  "stdout_tail": "t Mod Loadout restores VSR 3532748119\n  ✓ T-36 UI: Live-Swap selector includes Off/Object A/Object B/Weapon/Auto\n  ✓ T-36 UI: Weapons Lab has rigid StaticBody3D floor\n  ✓ T-36 UI: Particle Lab has rigid StaticBody3D floor\n  ✓ T-36 UI: Particle Lab exposes >=10 ready emitter presets\n  ✓ T-36 UI: Titan fire_once spawns live world-space BoltBeamNode lightning\n  ✓ T-36 UI: Titan lightning persists in effect_root after hitscan shot completes\n  ✓ T-36 UI: Titan fire_alt (garc_a Arc Stream) spawns BoltBeamNode\n  ✓ T-36 UI: Live-Swap Weapon mode swaps active weapon on Object A to garc_a\n  ✓ T-36 UI: Moving Target wiggle mode active\n  ✓ T-36 UI: wiggling Moving Target updates 3D position live\n  ✓ T-36 UI: Shooter Aim mode switches to Lead Target\n  ✓ T-36 UI: Sandbox Wall, Terrain Ramp, and Pillar create rigid StaticBody3D props\n  ✓ T-36 UI: Reset Scene clears sandbox props and restores manual aim\n  ✓ T-36 UI: Particle Lab Texture Browser indexes >=20 real BZCC FX textures (120)\n  ✓ T-36 UI: Particle Lab emitter inspection computes rate and cost tier\n  ✓ T-36 UI: Particle Lab Mute toggle mutes emitter\n  ✓ T-36 UI: Particle Lab Solo toggle isolates emitter\n  ✓ T-36 UI: open_texture_browser populates >=20 visual texture items\n  ✓ T-36 UI: RMB on HoudiniScrubber slider resets value to default (50.0)\n  ✓ T-36 UI: RMB on WeaponLab distance_slider resets range to default (120 m)\n  ✓ T-34 UI: save_loadout_profile persisted ModLoadout JSON\n  ✓ T-34 UI: list_loadout_profiles lists saved ModLoadout profile\n  ✓ T-34 UI: load_loadout_profile restores multi-package priority [3532748119, 3820486276]\n  ✓ T-34 UI: save_camera_bookmark persists camera state\n  ✓ T-34 UI: save_scene_preset persists sandbox actors, motion, aim, and props\n  ✓ T-34 UI: scene reset cleared obstacles before reload\n  ✓ T-34 UI: load_scene_preset restores Wall+Ramp obstacles, orbit motion, and track aim\n  ✓ T-34 UI: apply_camera_bookmark restores saved camera view\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nALL TESTS PASSED\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T18:49:09Z",
+  "verdict": "PASS",
+  "problems": []
+}

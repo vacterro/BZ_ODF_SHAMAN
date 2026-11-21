@@ -1,0 +1,23 @@
+{
+  "op_id": "scope-b5bf04e5a6484402998811655cd14cc3",
+  "paths": {
+    "project.godot": "1ae64aed83f3e1a7333e602389fb598d48a79c60103a575a9653f6a954512f60",
+    "scripts/core/resource_index.gd": "fedd2c46db3d0c87e1e37a8e73d96356930bd016b12d964ccf763211ad9d6f64",
+    "scripts/core/wintage_theme.gd": "549a2f6d826095d8b0d5f0c69ef5650f4253391327da5cdbec1d6dacd493b32b",
+    "scripts/lab/effect_runtime.gd": "bbcbefb660bc1cf013b3e669d780c42a8805259945865f34acc6cc91a993a154",
+    "scripts/lab/particle_lab.gd": "a199a1dc251b835fe7a5afc27805235117cf8af74db690f197ae099a9a701e78",
+    "scripts/lab/weapon_lab.gd": "3ef301a0eeafa6ffc57f38887f1e70eb2dc2c998eb69e1a0c0dc74422f120e5e",
+    "scripts/ui/houdini_scrubber.gd": "0ee62180594e7c16ce52045948f4fbe5dd9528d5e9595a791e414400305197f2",
+    "scripts/ui/main_window.gd": "6da21aabf029cb32928d9e65dddb6b2cd0e13fa71b57a2f2ca825823f3fe0259",
+    "tests/test_runner.gd": "0f2598c312721f5f04f81b2e56e50cce26c1dd5caad1ba3f19adf079f8d05bbb",
+    "tests/ui_smoke.gd": "a93a53e4978394191c086f346e2d47806aa90e0b19d8910b4774ea87a0f3a24a",
+    "tools/build_windows.cmd": "779a214bd43dcb19dce84008c04d42ddc65e624870103555b72c87a7b401a38b"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T16:01:54Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:3ce4be74044da15c0815ba7179ace93110ce8cc4536ca2f6a126cc8730e6eda2",
+  "ticket": "T-29"
+}

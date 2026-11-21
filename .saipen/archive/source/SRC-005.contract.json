@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-005:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "P0 safety hardening: isolate test workspace, atomic saves, persistent workspace overrides with conflict status, full override export; revision-aware inheritance cache; in-place raw text apply"
+    }
+  },
+  "derived_at": "2026-11-21T06:29:12Z",
+  "derived_from": "SRC-005",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "04949475670293ab4875c6959332bbf4f1786351810566d0047d462876766c8c"
+}

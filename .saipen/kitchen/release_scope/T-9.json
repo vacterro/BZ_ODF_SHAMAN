@@ -1,0 +1,23 @@
+{
+  "op_id": "scope-5bebf435cdde442b8e966399bf71c917",
+  "paths": {
+    "README.md": "c6e186e2748c080416093aa468ad135de1aae68d2b4b68e0db81f19e579d3637",
+    "docs/ARCHITECTURE.md": "9e6e22004b69e4ad3f7a15f2d461819763b49c0e7f341c3bf16592703afa6448",
+    "docs/EVIDENCE.md": "3c9f787962afcbcc63575fbe30724a00a926c02a369c678a98905e95f45e7154",
+    "docs/KNOWN_LIMITATIONS.md": "6921960c61d3c081897856d21f4d83e8ac0f5666728a89f48367643c372f72f3",
+    "docs/PREVIEW_FIDELITY.md": "5c2173934b8fb9ddc6aaaa0c35426ce776ec17040b9ece5c28b065ec44fc6232",
+    "docs/TESTING.md": "e9e121d6483763bc9e3802ce4a4eb690d28c3af09dbb6ccf9bdb7ab9f59900bf",
+    "scripts/lab/effect_burst.gd": "63b7e99dac01ba76044f42f26847b0e4cc37bf05a76828cdef8149030a357538",
+    "scripts/lab/effect_runtime.gd": "92ef1596834b082065cdf5686cd325350c114ab5f09c84e7410f8d426df939b1",
+    "scripts/lab/weapon_lab.gd": "cf4e9ced45ea52786cfdd20f4e3c8e4518dba237cf72b3b27ceae1fe5444cc1a",
+    "tests/test_runner.gd": "16571f0b78cb610b60cb5b7c2433b42d1b32087ad12cfc5acfaa68d6a9d0d174",
+    "tests/ui_smoke.gd": "eb3a6fcb9673f02f99221d3d6fbc495e44a6fedef37fc72cc04780c6b559c00f"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T07:31:32Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:705a2efd1305585f6c699242389feaefe5071ad165604d19f76351565dc9de6b",
+  "ticket": "T-9"
+}

@@ -1,0 +1,28 @@
+{
+  "op_id": "scope-fb6ce4c0fcf24cff9cbd973159f258b7",
+  "paths": {
+    "BZ_ODF_SHAMAN.exe": "37412e16e06e4d2e844e339794067e931e5ecc8b3a5089584fb84a94b4bd7793",
+    "build/BZ_ODF_SHAMAN.exe": "37412e16e06e4d2e844e339794067e931e5ecc8b3a5089584fb84a94b4bd7793",
+    "scripts/core/bz_mesh_reader.gd": "ef9869241e3865f566e8efcbcbb22fc36c567d2756334229ebd348082ca5e140",
+    "scripts/core/resource_index.gd": "4e7856704345e154c2df6235923312d4dc42b3bc85ed92473c92af3c19d77663",
+    "scripts/core/wintage_theme.gd": "bcb1032a2024d15cf853d918780008e5eaa8893f317a35ef61174f9b20e842fc",
+    "scripts/core/workspace_store.gd": "70572275a0a59f0d4b36e8b862874991240ed30cea0f8ac4ab75c78fad1f153e",
+    "scripts/lab/particle_lab.gd": "44c861a238c6cbb920da20c08d6e7bb970d217398ddef621d23c0f3532c852ef",
+    "scripts/lab/weapon_lab.gd": "72497917784ab6b88a8c687a00053330dba36bf1b91de15a41442df734b9a2cc",
+    "scripts/native/native_experiment_runner.gd": "2f44ec583f54a75a4e9207fd483c8e25ee1692691450855dfd02b56be6b424e9",
+    "scripts/native/native_resource_closure.gd": "756b9a0e168fa41a4dc33c11211535e163350f572b677067a5554c026e73756e",
+    "scripts/sim/projectile_sim.gd": "f988bb1f27c2336bf74c1bb7b3f6f1ea652baf41ddb5ddb8779300653d0299cb",
+    "scripts/sim/weapon_profile.gd": "834ee47215a4bc9023b5b3445ed2807f9985c8f8bdc631e4f1b282f12692ecdd",
+    "scripts/ui/houdini_scrubber.gd": "508d8236198160d35a1ad160a42c6b10ec994b59e5a77033e111d0628fcc8fea",
+    "scripts/ui/main_window.gd": "b192237f91c50e360622935a821e51fb6b82b8e4154687ac203b51d874118e34",
+    "tests/test_runner.gd": "0cbdd61a69459795d295cf15b97f0af82368291c6eedbdf3a83fcefd6d58b2d9",
+    "tests/ui_smoke.gd": "4574fbee114f833dad927d83a407968ca5f94fd845ea4ba5949d4bdf77d8c789"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T17:32:23Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:5cb30bbeb479650d54d984f09ed12a649c9c5153392275680c1eb3131cb61a8b",
+  "ticket": "T-31"
+}

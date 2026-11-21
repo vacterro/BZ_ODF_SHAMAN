@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-003:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-3 closed with verification evidence in LOG: verify -> PASS [target: T-3] conf: high -- tools/run_tests.cmd: core 126 checks / 0 failures, UI 31 checks / 0 failures, ALL TESTS PASSED; real VSR alt resolves gatstabvsr_a -> atstabvsr_a and FIRE ALT telemetry names it.",
+      "text": "Alternate weapon chain (altName): resolve and fire the morph/alternate WeaponClass",
+      "verification": "the Work this request created reached its own verification gate; see the T-3 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-3"
+    }
+  },
+  "schema_version": 1
+}

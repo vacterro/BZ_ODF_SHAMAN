@@ -1,0 +1,21 @@
+{
+  "op_id": "scope-2b284ec38c93479ebb9c359f9382f41c",
+  "paths": {
+    "README.md": "8658146b6c22adbd82bf44c1c89b07cb52bd3348ad35c258e7032b518096006b",
+    "docs/ARCHITECTURE.md": "7d588090de66bafbb91f1d7cb7bd1e832a0c88ea446457eb77e536585f66cad0",
+    "docs/EVIDENCE.md": "db7f0b93e14227d990368fcd72172201d58586dc85976d65f59c7cef232feea7",
+    "docs/KNOWN_LIMITATIONS.md": "78a42d44ac3b7c95cfad3902d960b5e188ad475a788994aa8b542c1b82c420af",
+    "docs/NATIVE_TESTING.md": "932dec241302638ef674cffaee529505908b432675d88a8c979d993faa67db69",
+    "docs/PARTICLE_GRAPH.md": "873aee02e749763900f35d7966047d5726d752507a591f152e2b99871e714c9a",
+    "docs/TESTING.md": "24315786823d3529bdc0eb5fa524d1c5481508ad2813f3a6b80cb9d046ec7be8",
+    "scripts/ui/main_window.gd": "129276df758e93768bde0822a1882f63a6a3be7a1ded120c2522d1c88270dbc7",
+    "tools/build_coverage.py": "4f1c154e324f7f2c9f63ae38b2844ad403181b4cf9e868683c213f85e4d286a3"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T18:54:20Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:1211e74083b00a1e0e198feef63e6968df035cbceb6aef492a006b82d38616b9",
+  "ticket": "T-35"
+}

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 21.5,
+  "timeout_s": 3600,
+  "subject_before": "tree:01a65b86a33b9c205e4ce1d9f92e574d2a4ea9cc8a99c67fb738e7052f044818",
+  "subject": "tree:01a65b86a33b9c205e4ce1d9f92e574d2a4ea9cc8a99c67fb738e7052f044818",
+  "stdout_tail": "te\n  ✓ graph connection persisted as a real ODF reference\n  ✓ particle and audio labs share the live document revision\n  ✓ graph edit marks the document dirty\n  ✓ connect+disconnect restores byte-exact ODF\n  ✓ graph edit saved to the workspace\n  ✓ graph link restored after save + cache clear\n  ✓ graph duplicate created a real header: Core_copy\n  ✓ duplicate header has editable property lines\n  ✓ graph delete removed the duplicate header\n  ✓ graph undo restored the deleted header\n  ✓ graph redo removed it again\n  ✓ cycle detection sees the existing Core -> Shock edge\n  ✓ graph layout saved in the workspace\n  ✓ graph layout restored after reload\n  ✓ external file.header references become graph nodes\n  ✓ external node resolves to a real indexed file\n  ✓ external node offers an OPEN control\n  ✓ OPEN navigates to the referenced file\n  ✓ duplicate occurrences are labelled as a merged effective view\n  ✓ NEW NODE created a real render header\n  ✓ created node uses a documented renderBase value\n  ✓ RENAME renamed the render header\n  ✓ renamed header replaces the old name\n  ✓ rename is undoable\n  ✓ raw editor populated\n  ✓ schema registry loaded: 1490 properties\n  ✓ Wintage theme applied\n  ✓ manual rescan rebuilt the index (17028 ODFs)\n  ✓ workspace overrides restored after cache clear\n  ✓ saved damage 200 restored into the editor\n  ✓ restored document shows OVERRIDE state\n  ✓ settings stay inside the test root\n  ✓ saved-revision test found the damage entry\n  ✓ edit saved before export\n  ✓ export after save writes the saved 250 bytes\n  ✓ export report write is confirmed before success is announced\n  ✓ export report records the exported file hash\n  ✓ two exports in the same second get distinct stage directories\n  ✓ second edit saved\n  ✓ second export uses the newer saved revision\n  ✓ restart serves the last saved edit (275)\n  ✓ original game ODF has no saved override content\n  ✓ original game ODF is unchanged since the save\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nALL TESTS PASSED\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T12:26:06Z",
+  "verdict": "PASS",
+  "problems": []
+}

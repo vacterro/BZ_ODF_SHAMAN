@@ -1,0 +1,21 @@
+{
+  "op_id": "scope-9f35ec2c475441668e016c112af67714",
+  "paths": {
+    "README.md": "d77587937f8fcb9155df09f7e76f8f8e0af5689e388878ea03fd2d467e4e8f11",
+    "docs/ARCHITECTURE.md": "50ee61370382c7b5c708a7926c245dae33804fd268c890876198677e4badcf9d",
+    "docs/EVIDENCE.md": "2589855b85b6bfd4c4eb231425c79480463cfdb236db6b627f9a7b97b8972473",
+    "docs/KNOWN_LIMITATIONS.md": "d07df0dea3b39c537b43e3952dbdeb06998539592c0b15087640c1f22ce57fb1",
+    "docs/TESTING.md": "2d53eceb4079080f3ab4fb3d79ddeb522054370a27919030d91d91cfbd4e959a",
+    "scripts/core/odf_document.gd": "cc430de275d94db4799c6a872322030fc70987deda59a3b4e72013772c6884b8",
+    "scripts/ui/main_window.gd": "e9927e8d85a825214410a20622604314d580f72d9aed2974527a758357bc32eb",
+    "tests/test_runner.gd": "0b919f692c73d321e246c65d1d43c98c3f1593552dfc59ddc9cf04cd2176d497",
+    "tests/ui_smoke.gd": "7b5686ed630189d615df3e9d015030ebb9e74853560d24fb606c8f3def1d180e"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T05:18:50Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:a4a93ea685a895c439b281f47861050b3f8b53009558b22b3399a47cfe71cc99",
+  "ticket": "T-4"
+}

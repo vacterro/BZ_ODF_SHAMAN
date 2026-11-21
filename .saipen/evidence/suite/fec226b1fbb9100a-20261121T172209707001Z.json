@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 49.9,
+  "timeout_s": 3600,
+  "subject_before": "tree:3796deecd9892baef225eef308f7bf7a262c2cb91cadb63fb1bf2c2b514b6023",
+  "subject": "tree:3796deecd9892baef225eef308f7bf7a262c2cb91cadb63fb1bf2c2b514b6023",
+  "stdout_tail": "dana_m1 at 12px default\n  ✓ T-30 UI: Weapons Lab E2E combat chain bar (A -> Wpn -> Ord -> Xpl | B) present\n  ✓ T-30 UI: Weapons Lab bottom workbench consolidated into 5 focused tabs\n  ✓ T-30 UI: clicking E2E chain Ordnance button opens atstabvsr_c.odf in Right Inspector\n  ✓ T-30 UI: Right Inspector displays E2E chain breadcrumb navigation strip\n  ✓ T-30 UI: Inspector property filter and Explorer Send to Lab action present\n  ✓ T-30 UI: 1-click [+ Override] promotes inherited property into local ODF\n  ✓ T-31 UI: Reset All, Reset UI, and Reset ODF buttons present\n  ✓ T-31 UI: Weapons Lab Reset A/B, Reset Aim, and Reset Scene buttons present\n  ✓ T-31 UI: Particle Lab RESET ODF and RESET VIEW buttons present\n  ✓ T-31 P0-01 UI: distinct LAUNCH BZCC, MANUAL STEAM HANDOFF, and COMPARE controls present\n  ✓ T-31 P1-08 UI: Loadout selector active with VSR 3532748119 package\n  ✓ T-31 UI: Weapons Lab chain buttons display in-game names (Tank / Scavenger)\n  ✓ T-31 UI: 125% UI scale selects 15px 1bpp Verdana_m1 strike at 1:1 native pixels\n  ✓ T-31 UI: 85% UI scale selects 10px 1bpp Verdana_m1 strike at 1:1 native pixels\n  ✓ T-31 UI: Reset UI restores 12px 100% Golden Default\n  ✓ T-31 UI: per-property Reset restores factory default value\n  ✓ T-31 UI: Particle Lab auto-configures context effects from active ODF/chain\n  ✓ T-31 UI: clicking NEW NODE immediately creates render node and populates Quick Render Inspector\n  ✓ T-31 P1-05: forced failure on 2nd file reports PARTIAL_SAVE_RECOVERABLE\n  ✓ T-31 P1-05: recover_partial_save_group restored pre-save revision cleanly\n  ✓ T-31 P1-06: HoudiniScrubber preserves exact high-precision ODF representation\n  ✓ T-31 H-01: physical MMB press opens Houdini Value Ladder overlay\n  ✓ T-31 H-02/H-03: physical mouse motion selects sensitivity rung and scrubs value\n  ✓ T-31 H-04: physical MMB release outside control closes Value Ladder\n  ✓ T-31 UI: RMB on HoudiniScrubber resets value to default (0.0)\nUI smoke: 12 failure(s)\nRESULT: FAIL\n\nTESTS FAILED\n",
+  "stderr_tail": "acktrace (most recent call first):\n       [0] save_with_external_dependencies (res://scripts/lab/particle_lab.gd:1080)\n       [1] _ready (res://tests/ui_smoke.gd:642)\nERROR: Condition \"ret.is_empty()\" is true. Returning: ret\n   at: raw_to_base64 (core/core_bind.cpp:1352)\n   GDScript backtrace (most recent call first):\n       [0] save_with_external_dependencies (res://scripts/lab/particle_lab.gd:1080)\n       [1] _ready (res://tests/ui_smoke.gd:642)\nSCRIPT ERROR: Invalid access to property or key 'undo_stack' on a base object of type 'RefCounted (OdfDocument)'.\n   at: revert_document (res://scripts/core/workspace_store.gd:741)\n   GDScript backtrace (most recent call first):\n       [0] revert_document (res://scripts/core/workspace_store.gd:741)\n       [1] recover_partial_save_group (res://scripts/lab/particle_lab.gd:1141)\n       [2] _ready (res://tests/ui_smoke.gd:644)\nSCRIPT ERROR: Invalid access to property or key 'undo_stack' on a base object of type 'RefCounted (OdfDocument)'.\n   at: revert_document (res://scripts/core/workspace_store.gd:741)\n   GDScript backtrace (most recent call first):\n       [0] revert_document (res://scripts/core/workspace_store.gd:741)\n       [1] recover_partial_save_group (res://scripts/lab/particle_lab.gd:1141)\n       [2] _ready (res://tests/ui_smoke.gd:644)\nFAIL: V5: live startColor edit visible in Weapons Lab shot\nFAIL: edited damage applied by simulation (200.00)\nFAIL: undo propagated to the next simulated shot (100.00)\nFAIL: redo propagated to the next simulated shot (200.00)\nFAIL: sweep baseline uses the live 200 damage edit\nFAIL: sweep top point applies 250 damage\nFAIL: 3D Lab: baseline shot snapshot captured\nFAIL: T-26 UI: STAGE materialized isolated native stage\nFAIL: T-26 UI: LAUNCH / HANDOFF prepared workflow cleanly\nFAIL: T-26 UI: CLEANUP safely cleaned staged files\nFAIL: T-31 UI: per-property Reset removes local override and reverts to inherited parent value\nFAIL: T-31 UI: Particle Lab RESET ODF restores factory render headers\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T17:22:09Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

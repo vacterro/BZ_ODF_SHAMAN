@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-001:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-1 closed with verification evidence in LOG: verify -> PASS [target: T-1] conf: high -- tools/run_tests.cmd: core 99 checks / 0 failures PASS, UI smoke 26 checks / 0 failures PASS, ALL TESTS PASSED; Windows export + headless boot exit 0.",
+      "text": "Autonomous shift: ODF non-inherited semantics, Weapons Lab parameter sweep, Windows packaged build",
+      "verification": "the Work this request created reached its own verification gate; see the T-1 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-1"
+    }
+  },
+  "schema_version": 1
+}

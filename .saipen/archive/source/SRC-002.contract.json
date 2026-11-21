@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-002:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Night shift wave 2: fuzzy resource search, sweep CSV report, benchmark evidence"
+    }
+  },
+  "derived_at": "2026-11-21T05:08:20Z",
+  "derived_from": "SRC-002",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "aced8a3e025182948816f75b7b8c821aabe4af881fd83d56bf7c49fc152ab465"
+}

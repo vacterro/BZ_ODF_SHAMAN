@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 53.7,
+  "timeout_s": 3600,
+  "subject_before": "tree:557592ba51e2d2e4e00a7ea58bf85f8974f706e4200baa7b1ab5683289f134c6",
+  "subject": "tree:557592ba51e2d2e4e00a7ea58bf85f8974f706e4200baa7b1ab5683289f134c6",
+  "stdout_tail": "l | B) present\n  ✓ T-30 UI: Weapons Lab bottom workbench consolidated into 5 focused tabs\n  ✓ T-30 UI: clicking E2E chain Ordnance button opens atstabvsr_c.odf in Right Inspector\n  ✓ T-30 UI: Right Inspector displays E2E chain breadcrumb navigation strip\n  ✓ T-30 UI: Inspector property filter and Explorer Send to Lab action present\n  ✓ T-30 UI: 1-click [+ Override] promotes inherited property into local ODF\n  ✓ T-31 UI: Reset All, Reset UI, and Reset ODF buttons present\n  ✓ T-31 UI: Weapons Lab Reset A/B, Reset Aim, and Reset Scene buttons present\n  ✓ T-31 UI: Particle Lab RESET ODF and RESET VIEW buttons present\n  ✓ T-31 P0-01 UI: distinct LAUNCH BZCC, MANUAL STEAM HANDOFF, and COMPARE controls present\n  ✓ T-31 P1-08 UI: Loadout selector active with VSR 3532748119 package\n  ✓ T-31 UI: Weapons Lab chain buttons display in-game names (Tank / Scavenger)\n  ✓ T-31 UI: 125% UI scale selects 15px 1bpp Verdana_m1 strike at 1:1 native pixels\n  ✓ T-31 UI: 85% UI scale selects 10px 1bpp Verdana_m1 strike at 1:1 native pixels\n  ✓ T-31 UI: Reset UI restores 12px 100% Golden Default\n  ✓ T-31 UI: per-property Reset restores factory default value\n  ✓ T-31 UI: per-property Reset removes local override and reverts to inherited parent value\n  ✓ T-31 UI: Particle Lab auto-configures context effects from active ODF/chain\n  ✓ T-31 UI: clicking NEW NODE immediately creates render node and populates Quick Render Inspector\n  ✓ T-31 P1-05: forced failure on 2nd file reports PARTIAL_SAVE_RECOVERABLE\n  ✓ T-31 P1-05: recover_partial_save_group restored pre-save revision cleanly\n  ✓ T-31 P1-06: HoudiniScrubber preserves exact high-precision ODF representation\n  ✓ T-31 H-01: physical MMB press opens Houdini Value Ladder overlay\n  ✓ T-31 H-02/H-03: physical mouse motion selects sensitivity rung and scrubs value\n  ✓ T-31 H-04: physical MMB release outside control closes Value Ladder\n  ✓ T-31 UI: RMB on HoudiniScrubber resets value to default (0.0)\nUI smoke: 1 failure(s)\nRESULT: FAIL\n\nTESTS FAILED\n",
+  "stderr_tail": "  ✗ T-31 UI: Particle Lab RESET ODF restores factory render headers\nFAIL: T-31 UI: Particle Lab RESET ODF restores factory render headers\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T17:29:27Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

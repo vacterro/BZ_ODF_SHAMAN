@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-007:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-8 closed with verification evidence in LOG: verify -> PASS [target: T-8] conf: high -- particle graph drag creates real emitName/renderNameN, disconnect restores byte-exact bytes, link survives save+cache clear; core 161/0, UI 47/0, build+boot exit 0.",
+      "text": "cc all",
+      "verification": "the Work this request created reached its own verification gate; see the T-8 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-8"
+    }
+  },
+  "schema_version": 1
+}

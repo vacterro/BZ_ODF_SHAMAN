@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-009:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "cc all"
+    }
+  },
+  "derived_at": "2026-11-21T07:37:00Z",
+  "derived_from": "SRC-009",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "ad6f36587e7c13a9839af4f640c24b67012727500f60d93625ea273e0f89335f"
+}

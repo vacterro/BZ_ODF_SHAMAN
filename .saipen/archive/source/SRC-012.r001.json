@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-012:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Replace numeric SpinBox arrows with Houdini-style default sliders and Value Ladder scrubbers across Inspector, Weapons Lab, and Particle Lab"
+    }
+  },
+  "derived_at": "2026-11-21T16:01:59Z",
+  "derived_from": "SRC-012",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "8c0b5e3466ec1f18a55de11ff5e3e6b533897818d0a7fcf715663cde080ba9c0"
+}

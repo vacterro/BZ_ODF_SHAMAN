@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 21.1,
+  "timeout_s": 3600,
+  "subject_before": "tree:0bb8efbfee2324c17b68a99bafe8af2a16db82da8eaa4f3786b93d79060e96b8",
+  "subject": "tree:0bb8efbfee2324c17b68a99bafe8af2a16db82da8eaa4f3786b93d79060e96b8",
+  "stdout_tail": "ULTIPLY to prevent whitewash (expected 1, got 1)\n  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)\n  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)\n  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)\n  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)\n  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)\n  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)\n  ✓ T-31: verified emissive material on ivtank00.msh\n  ✓ T-31: projectile hits target 3D BBOX hitbox (expected vehicle, got vehicle)\n  ✓ T-31: impact occurs at front BBOX face (z=-55.50) instead of center (-60.0)\n  ✓ T-31 R-02: active loadout 3532748119 resolves VSR closure without ambiguity\n  ✓ T-31 P0-03: closure records source-aware ResourceIdentity entries\n  ✓ T-31 R-07: duplicate output filenames from distinct sources report STAGING_RESOURCE_COLLISION (expected STAGING_RESOURCE_COLLISION, got STAGING_RESOURCE_COLLISION)\n  ✓ T-31 P0-04: closure_status reports OUTPUT_PATH_COLLISION (expected OUTPUT_PATH_COLLISION, got OUTPUT_PATH_COLLISION)\n  ✓ T-31 N-03: missing shooter fails preflight_passed\n  ✓ T-31 N-04: failed preflight rejects launchable staging\n  ✓ T-31 N-03: failed preflight rejects launch\n  ✓ T-31 S-01: sessions recovered after restart\n  ✓ T-31 S-01: recovered preflight session stages cleanly from durable snapshot\n  ✓ T-31 N-02: Steam PID without game process reports game_process_detected=false and STEAM_LAUNCH_REQUESTED\n  ✓ T-31 N-05: tampered staged file invalidates launch preflight\n  ✓ T-31 S-05: modified source ODF after preflight rejected as SOURCE_DRIFT_DETECTED\n  ✓ T-31 S-04: valid sessions recovered while 1 corrupt entry counted\n  ✓ T-31 S-04: corrupted ledger record quarantined without losing raw evidence\n\n701 checks, 5 failure(s), 19975 ms\nRESULT: FAIL\n\nTESTS FAILED\n",
+  "stderr_tail": "  ✗ S6: no steam_appid.txt written into read-only BZ2R\n  ✗ N-R1: all 4 base-game ODFs classified\n  ✗ N-R2: staged ODF recorded in stage_owned_overrides (expected 1, got 2)\n  ✗ T-31: fvscav.odf resolves in-game name Scavenger (expected Scavenger, got Distributor)\n  ✗ T-31: fvscavcpu.odf resolves in-game name Scavenger (expected Scavenger, got Distributor)\nFAIL: Steam launch / capability routes and classification (S1..S6): S6: no steam_appid.txt written into read-only BZ2R\nFAIL: NativeResourceClosureBuilder / transitive ODF & Workshop closure (N-R1..N-R7): N-R1: all 4 base-game ODFs classified\nFAIL: NativeResourceClosureBuilder / transitive ODF & Workshop closure (N-R1..N-R7): N-R2: staged ODF recorded in stage_owned_overrides (expected 1, got 2)\nFAIL: T-29 Houdini scrubber, BZCC .dds particle textures, and categorized catalog: T-31: fvscav.odf resolves in-game name Scavenger (expected Scavenger, got Distributor)\nFAIL: T-29 Houdini scrubber, BZCC .dds particle textures, and categorized catalog: T-31: fvscavcpu.odf resolves in-game name Scavenger (expected Scavenger, got Distributor)\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T17:11:45Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-013:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Complete UI/UX refactor for E2E logical workflows and embed pixel-perfect Verdana_m1 font by default"
+    }
+  },
+  "derived_at": "2026-11-21T16:36:28Z",
+  "derived_from": "SRC-013",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "2ddf613ba0344c10058c4591512285e1a80ac3b8a312dbe0dd9bc9d985e62043"
+}

@@ -1,0 +1,47 @@
+{
+  "op_id": "scope-a2cfa6714edb4fb98ce4f057589beef8",
+  "operation": "scope",
+  "created_at": "2026-11-21T14:11:07Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "4668a14659de3268",
+  "preconditions": {
+    ".saipen/STATE.md": "061a8aedfb82812c",
+    ".saipen/LOG.md": "a3d4187aa022baa8"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "5927b18f5405fcee",
+    ".saipen/logs": "tree-missing-v1",
+    ".": "source-identity-v1:3d9e581d137e25978da0c250a7be3b5a9e87ca196c68b126e90666a139b1cc3e"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 3,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "a3d4187aa022baa8",
+      "after_hash": "2bf1b661193c1025",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "061a8aedfb82812c",
+      "after_hash": "193b7777777c6fc1",
+      "applied": true
+    },
+    {
+      "path": ".saipen/kitchen/release_scope/T-23.json",
+      "role": "report",
+      "action": "write",
+      "before_hash": "",
+      "after_hash": "00b29f6a0f1dcda2",
+      "applied": true
+    }
+  ]
+}

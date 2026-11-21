@@ -1,0 +1,17 @@
+{
+  "op_id": "scope-2623b0f30c5c4b73963464b1d782a048",
+  "paths": {
+    "scripts/core/bz_mesh_reader.gd": "446a43df6a9665a64c00ed1daa62c12dbb8e4427b81c8f86b2792f4b38689551",
+    "scripts/core/resource_index.gd": "210b2084fe3e20ceb7385b9941ea5a0a0b81c2101af24751a769eee31659cfea",
+    "scripts/lab/weapon_lab.gd": "605c37515377101ec9685616abce9145a639544f022b820a24046136a78faa2a",
+    "tests/test_runner.gd": "36cc68ca99bd85a90840936e788d16f9bc2c1f1a067a70f20c302b59fa0d9f94",
+    "tests/ui_smoke.gd": "7291434f63930e7c53b3e2029e412579db513b0e3528c316e62bad3ec8273e83"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T13:36:34Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:f1947776b8baf1113c155f9bc16c931d244bc58c679eb977c614d4fdef847fd5",
+  "ticket": "T-18"
+}

@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-005:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-5 closed with verification evidence in LOG: verify -> PASS [target: T-5] conf: high -- final re-run after docs: core 156/0, UI 40/0, build exit 0, headless boot exit 0.",
+      "text": "P0 safety hardening: isolate test workspace, atomic saves, persistent workspace overrides with conflict status, full override export; revision-aware inheritance cache; in-place raw text apply",
+      "verification": "the Work this request created reached its own verification gate; see the T-5 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-5"
+    }
+  },
+  "schema_version": 1
+}

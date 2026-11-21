@@ -1,0 +1,33 @@
+{
+  "op_id": "scope-9b14836cd2eb499c8f3a54a553a2c923",
+  "paths": {
+    "README.md": "17cb4170a01f2403bae981dd6aafe76d41282b8abb11732d011c9ef1971e7b08",
+    "docs/ARCHITECTURE.md": "a8baf8b705482d5048941148da50933b3d427098aa44d0b1a4cce8652b9e7d93",
+    "docs/EVIDENCE.md": "dd35735f2e72b678b2461d974153d158b13b62c46ed594d1cac70ecac594c7fd",
+    "docs/KNOWN_LIMITATIONS.md": "60c7eb820d3140b00d59c2e4d002117b361c3112757b3fd702a9d2602f431f7b",
+    "docs/NATIVE_TESTING.md": "68a726c16cd04a45fe3f3647062b2ae043d872f2812313f763f3159c4735be93",
+    "docs/PARTICLE_GRAPH.md": "bd2ba835b47c0517d7c69d68f71eba5f5884866a1630f8b29b0752e5c095544a",
+    "docs/PREVIEW_FIDELITY.md": "875fcb22885d34941e3b9a3556afbd69a590c176e56760b5cc32f93cbfc3e2a0",
+    "docs/RESOURCE_RESOLUTION.md": "1ccdddf442d0f31ca3a373bbcac1239434cce35df2bba22ab04873b54e47b051",
+    "docs/TESTING.md": "a424eebc98646d22839b5ce0874557f90b52709c5775f8a188a8c74836b49e87",
+    "scripts/core/bz_mesh_reader.gd": "446a43df6a9665a64c00ed1daa62c12dbb8e4427b81c8f86b2792f4b38689551",
+    "scripts/core/resource_index.gd": "210b2084fe3e20ceb7385b9941ea5a0a0b81c2101af24751a769eee31659cfea",
+    "scripts/core/workspace_store.gd": "1bfc986d1c1e23926b9c578ae14d7ec348b28fcea7b551bd983c76ef3c2ac806",
+    "scripts/lab/effect_runtime.gd": "bbe1e4c9d81665259d8ae333fe8110666af1417355f9794a342962bf28de2f9d",
+    "scripts/lab/weapon_lab.gd": "605c37515377101ec9685616abce9145a639544f022b820a24046136a78faa2a",
+    "scripts/native/native_test_adapter.gd": "1eda5c937ad2ae57ab50956d04f0d394f32d1aa2d07775e21689116faf77bcdb",
+    "scripts/native/safe_stage_manager.gd": "2ca88431d314da69575c134d00073d691fb5834b9887ea12deafb784e8a4b7f9",
+    "scripts/ui/main_window.gd": "771264128024e5adfb71e7d03171ddf89d92b2a45bf968522bb5cc8886b3ec94",
+    "tests/recovery_worker.gd": "1b5c4b1d98f0680cd12287f16c616168afd494e3be738fa357f1d6f3ff90d3bb",
+    "tests/test_runner.gd": "36cc68ca99bd85a90840936e788d16f9bc2c1f1a067a70f20c302b59fa0d9f94",
+    "tests/ui_smoke.gd": "7291434f63930e7c53b3e2029e412579db513b0e3528c316e62bad3ec8273e83",
+    "tools/build_windows.cmd": "6f60cc3924c3d0e2d8799cd41fbea3cf8fc8a41d674dd6fb60020bd9b3f5168c"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T13:28:19Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:f1947776b8baf1113c155f9bc16c931d244bc58c679eb977c614d4fdef847fd5",
+  "ticket": "T-17"
+}

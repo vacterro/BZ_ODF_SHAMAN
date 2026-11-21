@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-006:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-7 closed with verification evidence in LOG: verify -> PASS [target: T-7] conf: high -- settings no longer written on startup; UI smoke 41/0 keeps production settings SHA-256 unchanged; core 161/0 includes real parent-edit FIRE; build+boot exit 0.",
+      "text": "Close post-review regressions: startup must not wipe saved settings; test settings isolated; real parent-edit FIRE regression test",
+      "verification": "the Work this request created reached its own verification gate; see the T-7 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-7"
+    }
+  },
+  "schema_version": 1
+}

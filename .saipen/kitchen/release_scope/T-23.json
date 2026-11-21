@@ -1,0 +1,14 @@
+{
+  "op_id": "scope-a2cfa6714edb4fb98ce4f057589beef8",
+  "paths": {
+    "scripts/native/safe_stage_manager.gd": "bd6d75bed4c5d40e57493034f190f412e61ca40bcc17aae1ca413e4fad207b39",
+    "tests/test_runner.gd": "ec6a4317bdbe211d9ab5677e77ad992e4ed72425f3137b70612e6079f1cc8016"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T14:11:06Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:8cd4c2ec1c6c8cc4388de4cd73da6b854d74b0ec4d5d5a74febd03caad9c3445",
+  "ticket": "T-23"
+}

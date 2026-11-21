@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-012:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-29 closed with verification evidence in LOG: UI check packaged GUI -> PASS [target: T-29] conf: high -- windowed GPU run of BZ_ODF_SHAMAN.exe (1920x1061 goldendefault, font_aa=none, ui_scale=1.0, master_volume=0.85, hud_tags=2, collections Stock:1478/VSR:1103/VRV:21/Mods:14426) visually verified via exe_weapons_lab.png and exe_particle_lab.png",
+      "text": "Replace numeric SpinBox arrows with Houdini-style default sliders and Value Ladder scrubbers across Inspector, Weapons Lab, and Particle Lab",
+      "verification": "the Work this request created reached its own verification gate; see the T-29 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-29"
+    }
+  },
+  "schema_version": 1
+}

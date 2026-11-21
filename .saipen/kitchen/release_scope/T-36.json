@@ -1,0 +1,23 @@
+{
+  "op_id": "scope-86e35c7b21c948d0907622dfb1342c1d",
+  "paths": {
+    "scripts/lab/bolt_beam_node.gd": "9bed8efd978a1405ab80e4a32802300720a803ea141a1c806d30ba07b5bd328f",
+    "scripts/lab/effect_burst.gd": "a06015d53223b68377250897de606a899bd34e4d4224973161fb8f3f148d5cc9",
+    "scripts/lab/effect_runtime.gd": "7be40ad9ea151f8e9f509396c6a4f3e6fb6a6cc30175caef4eda66ac50d08ccf",
+    "scripts/lab/particle_lab.gd": "78369780376a15c74d53a9dfc44525570fbbcc870b38bb4f4a4d7e5c365100a9",
+    "scripts/lab/weapon_lab.gd": "37e18c0d94c441ac26037940aab923ecb7d68e573d9bf36065f05b5e658629ab",
+    "scripts/sim/projectile_sim.gd": "8dc2c73cdb15fd3c4bab4fc37cc7863723cf44d9cb75c9fca8e2f21033a59aa6",
+    "scripts/sim/weapon_profile.gd": "3a7fd5db896b61c77e51b1f4ecb421a7a1cd20f7ffb7286f0d18998ea8bd8bec",
+    "scripts/ui/houdini_scrubber.gd": "f6e1bbe69c0aff943d02e5a60c3366a1f933df73997cbca26c579168d26112c7",
+    "scripts/ui/main_window.gd": "00ca6797b715c05c106c151f1e845d4bdbc9aea7d8449e5f6ea546304c4ad566",
+    "tests/test_runner.gd": "1f3e48f4279053cddf8abb9abb0a853d55c08a84e381a093503e842357ffd59f",
+    "tests/ui_smoke.gd": "b544194dfbd0b48659364e028e481a23d7b4064298321a65b457002aa9ca90a9"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T18:43:03Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:d13fdc9ec460fb0ba4b05df8850cab0551ca5051ef91cbb4c6a341f8fc96e7f5",
+  "ticket": "T-36"
+}

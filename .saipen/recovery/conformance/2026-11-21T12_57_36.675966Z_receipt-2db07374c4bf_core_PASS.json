@@ -1,0 +1,30 @@
+{
+  "blocking_findings": {
+    "problem_count": 0,
+    "problems": [],
+    "ruleset_fingerprint": "9a47d608ed3f3a833348aaeeca5cd9e9076f3bf53b1ef92b6ade46958e3e3fec",
+    "ruleset_version": 2,
+    "status": "complete",
+    "warning_count": 0
+  },
+  "board_hash": "b9ff65035452d271",
+  "canonical_next_command": null,
+  "content_hash": "2779d2f5c65cae56",
+  "exit_code": 0,
+  "external_actions": [],
+  "gate": "core",
+  "install_fingerprint": "install-v1:dfe26497032c36ba32d7fcddb3a0a0db2e97bb9131f5932849ba0b3ba0ba0f30",
+  "install_home": "C:\\ProgramData\\SAI\\SAIPEN\\runtime\\9718c86a379121fa",
+  "kind": "conformance_receipt",
+  "log_hash": "4b3665b74498b91c",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "receipt_id": "receipt-2db07374c4bf",
+  "remediation_commands": [],
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:9d0b5f6b891a07d910e8a0c394d667e91791cff5b6363d842213989a5a2581c6",
+  "state_hash": "5231908e3b6bec0a",
+  "timestamp_utc": "2026-11-21T12:57:36.675966Z",
+  "validator_protocol_version": "1",
+  "verdict": "PASS"
+}

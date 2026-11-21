@@ -1,0 +1,21 @@
+{
+  "op_id": "scope-68eefae94081447d91df1d643d0dafbb",
+  "paths": {
+    "README.md": "df404062c11fa702d74c1a530b1a99d54056d52a4aecf7ca0c1b74966c59b83d",
+    "docs/ARCHITECTURE.md": "fc48e15455530ca0c32d408d2c34512b76cc414e6e9f426ae5f5f4204356d084",
+    "docs/EVIDENCE.md": "5f680d1282e0071ce3dc7697620c3e366f887938453f69fe43fa8aade375090a",
+    "docs/KNOWN_LIMITATIONS.md": "758582c1fb0d0b4164a58565c97ae6a343b7bf18df32eba13bdbcd43dbed4b2d",
+    "docs/TESTING.md": "b6d7cc1a185a2588b1b7e25066877327ba38acdbf16f823d5c60bbd772fe5ee3",
+    "scripts/core/odf_document.gd": "38690a8219724ccc039efa69325f0cc06a8054e50fbcfd83410776cdedf344f5",
+    "scripts/lab/particle_lab.gd": "4f001bb7a7d8f89aafd3df6ff1820539e47d4320c3810d3cb2b636ead5fe8db2",
+    "tests/test_runner.gd": "b2d7f8918de3c87f58fc07026ca6edec147a874a2d06ce8ba31066b874b00dd2",
+    "tests/ui_smoke.gd": "3f1badbbe7686c174c721a8a12e0ea604e3222f4a2ecc8324439b1d9c2f863d1"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T07:36:57Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:4f20421147b2c167d3764338d9365644de980e00b68e3265e0c6c56afb14b309",
+  "ticket": "T-10"
+}

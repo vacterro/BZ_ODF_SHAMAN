@@ -1,0 +1,16 @@
+{
+  "op_id": "scope-39814b5f913b4cab947caf2f7fba7f2e",
+  "paths": {
+    "scripts/core/resource_index.gd": "2755a689fc26e8db54439a30ffa0be0abf478e2412149224839fe6769420c5eb",
+    "scripts/native/native_experiment_runner.gd": "2ffb7395450c152a92f7fdcc9a48f5269c7340cc4bac6ce485bb413717485d66",
+    "scripts/native/native_test_adapter.gd": "3f7fd30860f15a6ec64ed699cccb4cfdfd323807538b147fb86f890c10d13c8e",
+    "tests/test_runner.gd": "967f9523e5ab7c02ee880e5ebf7f3cce3944f301db19cd9b4242a029682473bf"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T18:21:00Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:e456b8b95dc681a42bf9c4f9168f670b726a88756a9f570bbe1e985ce204f33b",
+  "ticket": "T-33"
+}

@@ -1,0 +1,25 @@
+{
+  "op_id": "scope-fc026c6cce9148e793251c76952306c5",
+  "paths": {
+    "README.md": "17cb4170a01f2403bae981dd6aafe76d41282b8abb11732d011c9ef1971e7b08",
+    "docs/ARCHITECTURE.md": "a8baf8b705482d5048941148da50933b3d427098aa44d0b1a4cce8652b9e7d93",
+    "docs/EVIDENCE.md": "dd35735f2e72b678b2461d974153d158b13b62c46ed594d1cac70ecac594c7fd",
+    "docs/KNOWN_LIMITATIONS.md": "60c7eb820d3140b00d59c2e4d002117b361c3112757b3fd702a9d2602f431f7b",
+    "docs/NATIVE_TESTING.md": "68a726c16cd04a45fe3f3647062b2ae043d872f2812313f763f3159c4735be93",
+    "docs/PARTICLE_GRAPH.md": "bd2ba835b47c0517d7c69d68f71eba5f5884866a1630f8b29b0752e5c095544a",
+    "docs/PREVIEW_FIDELITY.md": "875fcb22885d34941e3b9a3556afbd69a590c176e56760b5cc32f93cbfc3e2a0",
+    "docs/RESOURCE_RESOLUTION.md": "1ccdddf442d0f31ca3a373bbcac1239434cce35df2bba22ab04873b54e47b051",
+    "docs/TESTING.md": "a424eebc98646d22839b5ce0874557f90b52709c5775f8a188a8c74836b49e87",
+    "scripts/core/resource_index.gd": "210b2084fe3e20ceb7385b9941ea5a0a0b81c2101af24751a769eee31659cfea",
+    "scripts/lab/weapon_lab.gd": "605c37515377101ec9685616abce9145a639544f022b820a24046136a78faa2a",
+    "scripts/ui/main_window.gd": "771264128024e5adfb71e7d03171ddf89d92b2a45bf968522bb5cc8886b3ec94",
+    "tools/build_windows.cmd": "6f60cc3924c3d0e2d8799cd41fbea3cf8fc8a41d674dd6fb60020bd9b3f5168c"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T13:32:11Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:f1947776b8baf1113c155f9bc16c931d244bc58c679eb977c614d4fdef847fd5",
+  "ticket": "T-21"
+}

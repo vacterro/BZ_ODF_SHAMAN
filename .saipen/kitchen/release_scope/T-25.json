@@ -1,0 +1,23 @@
+{
+  "op_id": "scope-805b07637ef14de8bbc98cfa0e8c3a51",
+  "paths": {
+    "scripts/core/resource_index.gd": "2020a768d197d6edbdf3dbdf61ad24d54ff8d292c9575e858ab33ed1cac14287",
+    "scripts/core/schema_registry.gd": "4115edb7158ecb382636eb5fbf55ae165ea59ea382314b52cc40778518ef0573",
+    "scripts/core/wintage_theme.gd": "354a605b729908573ff6ae60b094f6887056cc7c4b9a457ae4cac749c08adfa0",
+    "scripts/core/workspace_store.gd": "cb60bc57368a2b15fbaf22aa09d1356ac54673fb6e8f9a0defc7ca1f394847f4",
+    "scripts/lab/particle_lab.gd": "b9978228b99be420a95087e79f5544c8391c2cf406dae32542225669ea49e8b4",
+    "scripts/native/native_experiment_session.gd": "fa227bf69f865156f5afcd5bc565d6813e15d0271a7f9b2ca17f6a3967173c3a",
+    "scripts/native/native_resource_closure.gd": "7a651036505838903aea595573b107722cc54a5923c9250b3d2146df71e89a95",
+    "scripts/native/native_test_adapter.gd": "914a29cc0daa2e2bcd041248dcee08d7e7b2f42d98b36b2fb23b6fa67052b3f9",
+    "scripts/native/safe_stage_manager.gd": "f55f0c59f733b649893cc3c79a0c8e6ef653877205041368885720b09cd5b6e0",
+    "scripts/ui/main_window.gd": "551c24af00bd561959ddb7f2dad67fcc828822e23588fd6ed833c70bf592be90",
+    "tests/test_runner.gd": "2b06bd09a3c9b230e8e13030c09ec99ddd1f2c42bae9f93d154f12c04456189e"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T14:50:12Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:d7c8e214f9143d96b4d676842ebc4a7bff590663ffbc4ff6150044ec86bda967",
+  "ticket": "T-25"
+}

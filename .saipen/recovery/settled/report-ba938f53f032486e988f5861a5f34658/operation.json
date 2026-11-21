@@ -1,0 +1,26 @@
+{
+  "op_id": "report-ba938f53f032486e988f5861a5f34658",
+  "operation": "report",
+  "created_at": "2026-11-21T07:40:42Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "d346e9aec7d4d77d",
+  "preconditions": {
+    ".saipen/improve/imp-_bz_odf_shaman-20261121-6/saipen-01/saipen_improve_SAIPEN.md": "c040adc869549867"
+  },
+  "read_preconditions": {},
+  "verification_policy": "improve_atomic_file",
+  "status": "COMMITTED",
+  "progress_index": 1,
+  "targets": [
+    {
+      "path": ".saipen/improve/imp-_bz_odf_shaman-20261121-6/saipen-01/saipen_improve_SAIPEN.md",
+      "role": "generic",
+      "action": "write",
+      "before_hash": "c040adc869549867",
+      "after_hash": "00ae39938d5a2264",
+      "applied": true
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "op_id": "scope-02008543b4ce4a6e889773e21c5576c2",
+  "paths": {
+    "README.md": "84a952468bade93d25f06c3ea8a8dff1184878963ab1d76763b12f31622d668f",
+    "docs/ARCHITECTURE.md": "a72de60fdc82cab3e1dd67e468d30f9bf70086b0955049821329d1c6406f9e76",
+    "docs/EVIDENCE.md": "56589c3a2f66d7e6896476ab63474b61796f59e100119cfb4118285f890092e1",
+    "docs/KNOWN_LIMITATIONS.md": "47736b1052643871d5ac9202b9847a54a936a08e2382257358eba26f20055c86",
+    "docs/PREVIEW_FIDELITY.md": "4923dfc70736de1700c921b24a0db3bdaf104875b9d37119f1e78c1b71f77316",
+    "docs/RESOURCE_RESOLUTION.md": "42f2c9b3b89aa5d679d47478d4cce3dbe3bbbf91fa839ad861aa596a2060420c",
+    "docs/TESTING.md": "8a178b894e260ce74ebdf5251f3a70205d180aa03f231cca9c362c829a3b6f3b",
+    "scripts/core/resource_index.gd": "93ec44ac3e2f58445530680b564d844afd60df72e9eeaf81f1554261b70d041f",
+    "scripts/lab/weapon_lab.gd": "e7bb1cbb04086a3f741686f6a0d390e9760fb7a91cae6befe5e9ac9fda8fa65f",
+    "scripts/sim/parameter_sweep.gd": "02bc065fc67690d508409693d1f938668a29fdf321332c8eb6b41f4295fb7fb3",
+    "scripts/ui/main_window.gd": "03bc8b5bbe4bff8fd4ac5600650b9093eec01a51a12816898a46418c2fafdd71",
+    "tests/bench.gd": "b407ac8141157f9d252218d0c6b276e8eca48c8160649f7226f7ee8de1280ac6",
+    "tests/test_runner.gd": "b91e6ce7ab435d8bb8bdad10431239d12878d68b7f69609a6674ca7844b7209f",
+    "tests/ui_smoke.gd": "7d7e9cc04403b21791530224b04a1215739279cbfd95f620d58ff9fa83f7ddaf",
+    "tools/run_bench.cmd": "c71285c8f6a922b9103becdc7ac0db8fa019a54d1a781b839e339d5186776ecf"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T05:08:13Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:afe30aa1acd4ecd5e3a200e2dc01ab440b34a3c0b322c85b3cd0b2529850533e",
+  "ticket": "T-2"
+}

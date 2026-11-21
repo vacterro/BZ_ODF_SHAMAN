@@ -1,0 +1,27 @@
+{
+  "op_id": "scope-5141e18d18e9426a820585fbcfada3e1",
+  "paths": {
+    "README.md": "5621b1df13509d95a70c4bd0b2ae1f27e061db7020d82b99ffc0b082d417b5a9",
+    "docs/ARCHITECTURE.md": "112cd32488461a3b1eb1368ec06310e70037be06964c5a5afa70a75d1b519a52",
+    "docs/EVIDENCE.md": "f50f8a553b15119117c37cffdcbd6e5fe232c49e216d7d1285ca30b0e0d967b5",
+    "docs/KNOWN_LIMITATIONS.md": "4efaf69cbdcf853d8e91aa51e1a11f688137e495540233d7a1cf71860d18b823",
+    "docs/ODF_COMPATIBILITY.md": "0e05cb7ff8b550e67dd4a4f5d17c3ea6a95dad71518747e81c59a2d2601a4da3",
+    "docs/PREVIEW_FIDELITY.md": "81c639f6feefd4a9b5006ae1fb877a878304549df8126979a9bc852662a81af9",
+    "docs/TESTING.md": "db2b591e08b35bf35f9591b40a1d32c74f5021a6b2398e5dec0e061585fff2ad",
+    "export_presets.cfg": "a59eabdbcc7762543f542022b7a9a4388fca11d30d1b5bed85a56fd2c4c68954",
+    "scripts/core/odf_inheritance.gd": "5b3053e9507b3b7f3ede9339e9a1b4712d65fba5edb4c261d367004dc14b8f9f",
+    "scripts/lab/weapon_lab.gd": "d5e480e31acfd5522ae4bf76857ebe3aa9ab3eea857e888784bb392212529f4d",
+    "scripts/sim/parameter_sweep.gd": "1fed20bfc16b083d5c05c3c24eb0eb03c01d4d45879e9a90061b6b852571dc95",
+    "scripts/sim/parameter_sweep.gd.uid": "7d38302a733cf7d04d2bc3a6651ad17c1c40d6a934e4fcbbbe9ed143edd3a76e",
+    "scripts/sim/weapon_profile.gd": "04bcab54c173fdf75c9999e9d292c36e52e536f85d9635e71bdc97d7f57563be",
+    "tests/test_runner.gd": "7680a8738712adcd5363992e5d0ab863dc8336e732b7516ec62426a084b786f1",
+    "tests/ui_smoke.gd": "25bb2dd6e426931907a95b315303876bf5fd8c4100aad3bdb07b2a15356fe378"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T04:58:08Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:8814585b2b9b96b90f2fcbcf7cb193ca5dd373ad04f494c50fa1b3e2e6ef7165",
+  "ticket": "T-1"
+}

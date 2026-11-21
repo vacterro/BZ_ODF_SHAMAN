@@ -1,0 +1,26 @@
+{
+  "op_id": "scope-d4d09682824244b1b624ea31d1d268fa",
+  "paths": {
+    "BZ_ODF_SHAMAN.exe": "c2ad501bf337996a56ccdf325a6ab067a158b85d985db331754c714cfd764411",
+    "build/BZ_ODF_SHAMAN.exe": "c2ad501bf337996a56ccdf325a6ab067a158b85d985db331754c714cfd764411",
+    "export_presets.cfg": "dfacca14a608044946b81166a9b0168f9e1136521478ea036bf13bb072bf3f4c",
+    "project.godot": "96edc84ea396f7b634f62c5559e9d2c12c7ca5b073c4c756f284d42ce214b627",
+    "scripts/core/wintage_theme.gd": "7697e5be4a3fd54551bee2d9775234a3728c4615fdbba3ab489a1b4ff25242ea",
+    "scripts/lab/weapon_lab.gd": "55dc458a1dbceff837969d9b43d98d8f9539ac311acf2800ad9d825831f43e56",
+    "scripts/ui/houdini_scrubber.gd": "b9259140cfb4bd16f5d9ac00be9218eb20c141e3a0d642990f0c52df1c06dcfb",
+    "scripts/ui/main_window.gd": "2538a039e24566cf8f83cc0bdaa08746ae3ec2f80cb306211e848b2049fb5214",
+    "tests/test_runner.gd": "1d2a18a9397214f655b4cbf63a734aa30125ce05eded3ab637e404c38707916d",
+    "tests/ui_smoke.gd": "f88b378f43ed3edc43da4064c97353ad107d7c9103bb756418644b1c411ba9bb",
+    "themes/fonts/Verdana_m1-Bold.ttf": "cfae74c10920f80f243013a50a27ab16e1fb475af8e3e205b4d8e91603a7d120",
+    "themes/fonts/Verdana_m1-Bold.ttf.import": "fab9fb0ff3d19dbb65be6f7c7f16330e3ec445ac8a0f2da290cec1f4da0e30e2",
+    "themes/fonts/Verdana_m1.ttf": "e53a54c6812200485c19fd76da7240645f66ce3d0745b6b0e38cd3beb59735e9",
+    "themes/fonts/Verdana_m1.ttf.import": "27853cb9b60b923644769fd58259171284290aaa7f5fef70d7f6580e67f4bb6b"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T16:36:20Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:285b1e83e9bb076ecafa4fb4bdafc661e1299c74a939882799c78fe2f57b04d7",
+  "ticket": "T-30"
+}

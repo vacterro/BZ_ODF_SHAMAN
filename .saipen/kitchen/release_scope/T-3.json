@@ -1,0 +1,21 @@
+{
+  "op_id": "scope-67993fcb00fa49af9f74b94cccc09f50",
+  "paths": {
+    "README.md": "1333b3aa80db6b4f9e2f841488f26ce48b8c9c5065244bfe067d7ceb57de2b4e",
+    "docs/EVIDENCE.md": "9cd3c1f2a47dee727a1d23c0e234f60c50fe28f379951fcca55a24a9a34a4f9f",
+    "docs/KNOWN_LIMITATIONS.md": "38b201ae23a7b92e6f2dcaeb64dd08e39602d3f10ca14ac7b4505684289701cb",
+    "docs/PREVIEW_FIDELITY.md": "ff67dde1e5db1bcaa3d6e9b5c4ca713418275e4d508f64211e09b38b9155e901",
+    "docs/TESTING.md": "1f77f65c0a9de0bd565cd3794acb203021b327351b66e4032b6ed3bd64a5e126",
+    "scripts/lab/weapon_lab.gd": "9df9c112be2e8f4ef41f4ddb4af11c1dd83fda85289c1fa67ab8d549e384d069",
+    "scripts/sim/weapon_profile.gd": "1cb079319030c1d695c8ee6979efbb7aa1d03113185f099c59efa603f6340707",
+    "tests/test_runner.gd": "eb17521513eb614da99e5c7bb7668eaa81b5b6db5ab654bd0bfdef377a55b257",
+    "tests/ui_smoke.gd": "0a44104bfcdf62dadee8b3f14844e184fba1c1f8fbbf870ccc953b2b7f849be9"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T05:13:32Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:8be1bf6670aa6fb53b87643cc903cd30218c6f1ca0130f896a07af3fb475d876",
+  "ticket": "T-3"
+}

@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-004:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-4 closed with verification evidence in LOG: verify -> PASS [target: T-4] conf: high -- tools/run_tests.cmd: core 130 checks / 0 failures, UI 35 checks / 0 failures, ALL TESTS PASSED (review re-run identical); save-all + rescan exercised in UI smoke.",
+      "text": "Workspace hygiene: save all edited documents and manual resource rescan",
+      "verification": "the Work this request created reached its own verification gate; see the T-4 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-4"
+    }
+  },
+  "schema_version": 1
+}

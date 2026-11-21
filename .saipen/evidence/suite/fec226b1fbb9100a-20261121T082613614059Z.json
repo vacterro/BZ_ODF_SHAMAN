@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 32.5,
+  "timeout_s": 3600,
+  "subject_before": "tree:c933af7dc3dba52024645b7e1af449f3dc8a0e7c634f3178bb54a6ee96b45114",
+  "subject": "tree:c933af7dc3dba52024645b7e1af449f3dc8a0e7c634f3178bb54a6ee96b45114",
+  "stdout_tail": "edited damage applied by simulation (200.00)\n  ✓ editing never modified the original game file\n  ✓ undo propagated to the next simulated shot (100.00)\n  ✓ redo propagated to the next simulated shot (200.00)\n  ✓ staged export file written\n  ✓ exported ODF contains the edit\n  ✓ save-all saved the edited document(s)\n  ✓ save-all wrote the workspace file\n  ✓ save-all cleared the dirty flag\n  ✓ saved document bytes equal the current working revision\n  ✓ smoke workspace is the isolated test root\n  ✓ saved file stays inside the test root\n  ✓ sweep offers a damageValue property for the target armor\n  ✓ parameter sweep produced 5 rows\n  ✓ sweep baseline uses the live 200 damage edit\n  ✓ sweep top point applies 250 damage\n  ✓ sweep results rendered in the UI\n  ✓ sweep rolled back: edit still reads 200\n  ✓ sweep CSV saved to workspace\n  ✓ sweep CSV header present\n  ✓ Audio Lab lists inherited weapon sound references\n  ✓ particle graph populated from real render ODF\n  ✓ found an unused render link to create\n  ✓ graph connection persisted as a real ODF reference\n  ✓ graph edit marks the document dirty\n  ✓ connect+disconnect restores byte-exact ODF\n  ✓ graph edit saved to the workspace\n  ✓ graph link restored after save + cache clear\n  ✓ graph duplicate created a real header: Core_copy\n  ✓ duplicate header has editable property lines\n  ✓ graph delete removed the duplicate header\n  ✓ graph undo restored the deleted header\n  ✓ graph redo removed it again\n  ✓ cycle detection sees the existing Core -> Shock edge\n  ✓ graph layout saved in the workspace\n  ✓ graph layout restored after reload\n  ✓ inspector populated\n  ✓ raw editor populated\n  ✓ schema registry loaded: 1490 properties\n  ✓ Wintage theme applied\n  ✓ manual rescan rebuilt the index (17028 ODFs)\n  ✓ workspace overrides restored after cache clear\n  ✓ saved damage 200 restored into the editor\n  ✓ restored document shows OVERRIDE state\n  ✓ settings stay inside the test root\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nALL TESTS PASSED\n",
+  "stderr_tail": "Unicode parsing error, some characters were replaced with � (U+FFFD): Unexpected NUL character\nUnicode parsing error, some characters were replaced with � (U+FFFD): Unexpected NUL character\nUnicode parsing error, some characters were replaced with � (U+FFFD): Unexpected NUL character\nWARNING: 22 ObjectDB instances were leaked at exit (run with `--verbose` for details).\n   at: cleanup (core/object/object.cpp:2536)\nUnicode parsing error, some characters were replaced with � (U+FFFD): Unexpected NUL character\nUnicode parsing error, some characters were replaced with � (U+FFFD): Unexpected NUL character\nUnicode parsing error, some characters were replaced with � (U+FFFD): Unexpected NUL character\nUnicode parsing error, some characters were replaced with � (U+FFFD): Unexpected NUL character\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T08:26:13Z",
+  "verdict": "PASS",
+  "problems": []
+}

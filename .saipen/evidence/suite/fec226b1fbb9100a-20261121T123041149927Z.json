@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 7.2,
+  "timeout_s": 3600,
+  "subject_before": "tree:a15754a9898386fb90f46aa608b951c71880dec189dbdc9da132270df62ef866",
+  "subject": "tree:a15754a9898386fb90f46aa608b951c71880dec189dbdc9da132270df62ef866",
+  "stdout_tail": "abvsr_c)\n  ✓ ordnance resolved (expected atstabvsr_c, got atstabvsr_c)\n  ✓ shotSpeed read from real ordnance ODF (expected 120.0, got 120.0)\n  ✓ lifeSpan read from real ordnance ODF (expected 0.834, got 0.834)\n  ✓ target armorClass inherited from parent ivscav.odf (expected H, got H)\n  ✓ target maxHealth inherited from parent ivscav.odf (expected 3000.0, got 3000.0)\n  ✓ damageValue(H) inherited from parent atstab_c.odf (expected 100.0, got 100.0)\n  ✓ shotRadius from bullet.odf is NOT inherited (documented rule); editor fallback 0.5 (expected 0.5, got 0.5)\n  ✓ real VSR chain resolves its inherited altName\n  ✓ alternate weapon resolves inside the VSR package (expected gatstabvsr_a, got gatstabvsr_a)\n  ✓ alternate ordnance resolves inside the VSR package (expected atstabvsr_a, got atstabvsr_a)\n  ✓ alternate profile does not recurse\n  ✓ range derived from lifeSpan * shotSpeed\n  ✓ projectile hits the target sphere (expected vehicle, got vehicle)\n  ✓ damage applied equals inherited damageValue(H) (expected 100.0, got 100.0)\n  ✓ time of flight matches distance / shotSpeed\n  ✓ target hull decreased\n  ✓ telemetry recorded several events\n  ✓ telemetry timestamps are monotonic\n  ✓ replay hits identically (expected vehicle, got vehicle)\n  ✓ replay damage identical (expected 100.0, got 100.0)\n  ✓ replay timing deterministic (expected 0.65, got 0.65)\n  ✓ ordnance inheritance chain has a parent\n  ✓ parent declares damageValue(H)\n  ✓ parent edit visible in child without clear_cache (expected 200.0, got 200.0)\n  ✓ FIRE uses the parent-edited value (expected 200.0, got 200.0)\n  ✓ parent edit reverted (expected 100.0, got 100.0)\n  ✓ raw replace keeps WeaponProfile document identity\n  ✓ raw replace bumps ordnance revision\n  ✓ raw replace reaches WeaponProfile after refresh (expected 200.0, got 200.0)\n  ✓ next shot uses the raw-edited value (expected 200.0, got 200.0)\n  ✓ raw edit reverted cleanly (expected 100.0, got 100.0)\n\n336 checks, 3 failure(s), 6201 ms\nRESULT: FAIL\n\nTESTS FAILED\n",
+  "stderr_tail": "  ✗ to_bytes after save returns saved 200 bytes\n  ✗ saved bytes carry the edited value\n  ✗ second save keeps 250 bytes current\nFAIL: Workspace save / current bytes, not stale source: to_bytes after save returns saved 200 bytes\nFAIL: Workspace save / current bytes, not stale source: saved bytes carry the edited value\nFAIL: Workspace save / current bytes, not stale source: second save keeps 250 bytes current\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T12:30:41Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

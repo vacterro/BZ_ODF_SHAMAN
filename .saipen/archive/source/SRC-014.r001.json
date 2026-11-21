@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-014:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Add Reset to Default buttons across Inspector (per-property, per-ODF, all ODFs), Weapons Lab (actors, aim, scene), Particle Lab, and UI settings; display in-game names (unitName/wpnName, e.g. ivscav -> Scavenger) in Resource Explorer, Actor Picker, Weapons Lab chain/HUD, and Inspector"
+    }
+  },
+  "derived_at": "2026-11-21T17:32:29Z",
+  "derived_from": "SRC-014",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "2f518335ae56b50684dd674697702de3575211b7983326dc15a33db4cb728ed3"
+}

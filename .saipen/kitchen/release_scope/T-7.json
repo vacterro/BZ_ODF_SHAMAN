@@ -1,0 +1,18 @@
+{
+  "op_id": "scope-079a454259e241dd9e5597de2cc4793f",
+  "paths": {
+    "README.md": "7ef0fb59d307df9eb1cae8f410094d659819c7fe41f64c92e879f34f41e405d8",
+    "docs/EVIDENCE.md": "5275df1ec043e4d16b6e331771c66dddb6c6b7525d7cac4516fa26f2f484d950",
+    "docs/TESTING.md": "a3b92a9a5ae5f88658c995b59c4252588871039d2aec7bcb4bcdb3ccf9d1eb5f",
+    "scripts/ui/main_window.gd": "bc5e45f102b2c28aab999a2b945d678d87da306189ad39b0af4461dc5853ad79",
+    "tests/test_runner.gd": "971c9cff828759be586ea14100cd9a085440aef236d0bc5dc94c1affdd7ca4d1",
+    "tests/ui_smoke.gd": "b5105eee0bdc3256b0776918556c1a084decef5fb6e0ffe3bf660fc7c34ec223"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T06:33:31Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:c9729ccef8fb026b70b1740ed2e4a37f3cda7a6f1a82b03f6b8542d16e174104",
+  "ticket": "T-7"
+}

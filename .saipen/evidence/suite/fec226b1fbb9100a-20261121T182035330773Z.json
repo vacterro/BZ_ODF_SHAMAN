@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 52.0,
+  "timeout_s": 3600,
+  "subject_before": "tree:e6f58d5df5a9d294241664a6995a549b1b8ff3ac8ca4ba1643b8ed22b65c1833",
+  "subject": "tree:e6f58d5df5a9d294241664a6995a549b1b8ff3ac8ca4ba1643b8ed22b65c1833",
+  "stdout_tail": "-31 UI: Particle Lab RESET ODF restores factory render headers\n  ✓ T-31 P1-05: forced failure on 2nd file reports PARTIAL_SAVE_RECOVERABLE\n  ✓ T-31 P1-05: recover_partial_save_group restored pre-save revision cleanly\n  ✓ T-31 P1-06: HoudiniScrubber preserves exact high-precision ODF representation\n  ✓ T-31 H-01: physical MMB press opens Houdini Value Ladder overlay\n  ✓ T-31 H-02/H-03: physical mouse motion selects sensitivity rung and scrubs value\n  ✓ T-31 H-04: physical MMB release outside control closes Value Ladder\n  ✓ T-31 UI: RMB on HoudiniScrubber resets value to default (0.0)\n  ✓ RST-01: Reset All requires explicit confirmation before mutating\n  ✓ RST-03: Reset All impact preview enumerates A (saved), B (dirty), and C (other package)\n  ✓ RST-02: Cancel Reset All preserves A, B, and C unchanged\n  ✓ RST-06: Reset current ODF restores B to factory 120\n  ✓ RST-06: Reset current ODF leaves A and C untouched\n  ✓ RST-08: deduplicated reset report accurately reports requested=2, succeeded=1, failed=1\n  ✓ RST-14 UI: confirmed Reset All creates durable recovery point\n  ✓ RST-01/13 UI: confirmed Reset All restores A, B, and C to factory defaults\n  ✓ RST-07: Particle Lab RESET ODF resets A only; external B and C remain unchanged\n  ✓ RST-07: Particle Lab RESET DEPENDENCY GRAPH requires explicit confirmation\n  ✓ RST-07: confirmed RESET DEPENDENCY GRAPH restores B and C with recovery point\n  ✓ RST-10: first reset uses original factory value 10\n  ✓ RST-10: second reset after external source change invalidates cache and uses 42\n  ✓ RST-11 UI: Particle Lab Reset Node restores factory header, removes customValue, keeps [Keep]\n  ✓ RST-12 setup: switched active loadout to VRV 3820486276\n  ✓ RST-12: Reset UI restores Golden Default, scale, and volume\n  ✓ RST-12: Reset UI preserves active mod loadout 3820486276\n  ✓ RST-12: explicit Reset Mod Loadout restores VSR 3532748119\n  ✓ UI: Live-Swap selector present in Resource Explorer\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nALL TESTS PASSED\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T18:20:35Z",
+  "verdict": "PASS",
+  "problems": []
+}

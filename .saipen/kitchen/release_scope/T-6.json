@@ -1,0 +1,22 @@
+{
+  "op_id": "scope-307b505699c44ef198b2ac2821d5389c",
+  "paths": {
+    "docs/ARCHITECTURE.md": "d745b177f5bf602e11cf2a97bd59c7dc888f1c9ca91b9c48e65821f284ce571f",
+    "docs/EVIDENCE.md": "36c8306a5171c4cf92dda62ef2b9521a1a10d9e98240bb741db86014a6ef9382",
+    "docs/TESTING.md": "3b35320e908e7e8b39797d23fd81879d15aaf3dab17672800204611fcf19de95",
+    "scripts/core/odf_document.gd": "64d04ddcf3426e4bc642ad94caadd0d8ab49d6962a65e4bd5bd77ae4f5768958",
+    "scripts/core/odf_inheritance.gd": "8eb7b0f13aa1a78646c93bb50e4ebe60f41bd5841d0acee1986a0606c607c78b",
+    "scripts/core/resource_index.gd": "bcc70d176858251f95f441f3962d8aab0868b73595371fa068099daac6127a44",
+    "scripts/lab/weapon_lab.gd": "bb5346370fb0beba083bf49e17850edef38cd2f0e2f8f77b7e1d3ecc32449be7",
+    "scripts/ui/main_window.gd": "06942008c4fe9e878e4a394bf3fe3102a505bb86af09851ecc30a3071c54db69",
+    "tests/test_runner.gd": "bba8818207b273d50b2dc10799b99faecc6a287849b94884fbd96ae50d8b1892",
+    "tests/ui_smoke.gd": "52a419e48a64a5c798bb12f75cf86338ebdc7a3d72d3602fc093505f844b7221"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T06:29:33Z",
+  "schema_version": 2,
+  "source_head": "no-git",
+  "source_tree_fingerprint": "no-git-tree-v1:cf2df8161416e2fa156c1d9cbf198d0af75e90179c45a635e754b81b8e0049a5",
+  "ticket": "T-6"
+}

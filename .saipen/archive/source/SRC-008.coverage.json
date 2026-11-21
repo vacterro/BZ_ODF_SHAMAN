@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-008:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-9 closed with verification evidence in LOG: verify -> PASS [target: T-9] conf: high -- impact spawns an APPROXIMATED burst from the real ExplosionClass ODF (4 particle classes + light, 8 s), telemetry records it, restart clears it; core 169/0, UI 52/0, build+boot exit 0.",
+      "text": "cc all",
+      "verification": "the Work this request created reached its own verification gate; see the T-9 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-9"
+    }
+  },
+  "schema_version": 1
+}

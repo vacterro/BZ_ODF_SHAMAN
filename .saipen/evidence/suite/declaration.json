@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-declaration",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "timeout_s": 3600,
+  "declared_utc": "2026-11-21T08:25:28Z"
+}

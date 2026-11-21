@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-013:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "E-367",
+      "text": "Complete UI/UX refactor for E2E logical workflows and embed pixel-perfect Verdana_m1 font by default",
+      "verification": "saipen test suite run T-30 -> PASS",
+      "work": "T-30"
+    }
+  },
+  "schema_version": 1
+}
