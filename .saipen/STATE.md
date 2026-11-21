@@ -1,7 +1,7 @@
 ---
 phase: DONE
 task: none
-next_action: "saipen continue"
+next_action: "saipen validate"
 blocker: none
 agent: saipen
 saipen_version: 8
@@ -10,8 +10,8 @@ style_contract: ded-069a4c52
 saipen_home: "C:/Users/vac34/AppData/Local/saipen/scheduled-source"
 mode: full
 transition_from: SHIP
-updated: "2026-11-21T22:51:38Z"
+updated: "2026-11-21T23:13:42Z"
+last_event: 658
 execution_intent: converge
-converge_target: done
-last_event: 638
+converge_target: crew
 ---

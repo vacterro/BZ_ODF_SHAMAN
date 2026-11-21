@@ -30,3 +30,5 @@
 {"at": "2026-11-21T22:13:46Z", "event_id": "finish-09b9bc9830b6467184a1ab3907461b21", "key": "T-20:finish-09b9bc9830b6467184a1ab3907461b21", "schema": 1, "state": "done", "ticket": "T-20"}
 {"at": "2026-11-21T22:51:39Z", "event_id": "finish-417b3424427b4233a110bf8550f44ffa", "key": "T-17:finish-417b3424427b4233a110bf8550f44ffa", "schema": 1, "state": "pending", "ticket": "T-17"}
 {"at": "2026-11-21T22:51:39Z", "event_id": "finish-417b3424427b4233a110bf8550f44ffa", "key": "T-17:finish-417b3424427b4233a110bf8550f44ffa", "schema": 1, "state": "done", "ticket": "T-17"}
+{"at": "2026-11-21T23:07:26Z", "event_id": "finish-f7e4072571c643a492afc2e1a8eb5006", "key": "T-43:finish-f7e4072571c643a492afc2e1a8eb5006", "schema": 1, "state": "pending", "ticket": "T-43"}
+{"at": "2026-11-21T23:07:27Z", "event_id": "finish-f7e4072571c643a492afc2e1a8eb5006", "key": "T-43:finish-f7e4072571c643a492afc2e1a8eb5006", "schema": 1, "state": "done", "ticket": "T-43"}

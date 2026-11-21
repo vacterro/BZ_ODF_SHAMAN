@@ -1,0 +1,32 @@
+{
+  "op_id": "sub-adopt-7bbb2609",
+  "operation": "sub_adopt",
+  "created_at": "2026-11-21T23:12:31Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "e93bfc50776cbf04",
+  "preconditions": {
+    ".saipen/extensions/subs/saitest/STATE.md": "5f12f54d97600a86"
+  },
+  "read_preconditions": {
+    ".saipen/extensions/subs/MANIFEST.md": "d5637f8e5dc73f63",
+    ".saipen/extensions/subs/saitest/BOARD.md": "2f404b252fd85214",
+    ".saipen/extensions/subs/saitest.md": "0a244a9bc0b9eafa",
+    ".saipen/extensions/subs/PROTOCOL.md": "6bf0daeb0746c94a",
+    "C:/Users/vac34/AppData/Local/saipen/scheduled-source/extensions/subs/saitest.md": "0a244a9bc0b9eafa"
+  },
+  "verification_policy": "sub_lifecycle",
+  "status": "COMMITTED",
+  "progress_index": 1,
+  "targets": [
+    {
+      "path": ".saipen/extensions/subs/saitest/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "5f12f54d97600a86",
+      "after_hash": "ddd221b8e773dd44",
+      "applied": true
+    }
+  ]
+}
