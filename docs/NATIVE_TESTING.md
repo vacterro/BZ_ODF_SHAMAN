@@ -5,12 +5,14 @@
 **Structurally valid LuaMission BZN generation, exact stage-to-BZCC mount mapping, Steam launch
 capability routing, controlled `WriteToFile` LuaMission scripting, process-local trusted session
 attestation, and MD5-verified staging cleanup are implemented and regression-tested.**
-No live native BZCC execution or calibration is claimed (`NATIVE_VERIFIED: 0`). The original
-isolated Windows session was `BLOCKED` by `STEAM_USER_NOT_LOGGED_IN` (`ActiveUser = 0x0`; Steam client is present at
-`V:\__STORE_V\_SOFT\Steam\steam.exe` and direct `battlezone2.exe` launch exits `53` to trigger
-`SteamAPI_RestartAppIfNecessary`). A later `T-42` GUI verification observed a different Steam
-session state and reported `STRUCTURALLY_VALID` / `STEAM_MANAGED`; this is only structural validation,
-not a live attested run. Nothing claims `NATIVE_VERIFIED`.
+No live native BZCC execution or calibration is claimed (`NATIVE_VERIFIED: 0`). T-20 reproduced the
+full staged launch: logged-in Steam client, `steam_appid.txt` present in read-only `BZ2R`, and
+`steam.exe -applaunch 624970` spawning `battlezone2.exe` with the staged `/config` and
+`shaman_shot.bzn`. BZCC 2.0.185 then exited roughly four seconds after startup, before any
+`Config: 'AddDirRecurse'` or mission initialization line, and no session-bound LuaMission
+observation artifact appeared. Evidence: `.saipen/evidence/native/T-20-native-probe-1136976.json`.
+The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was session-specific and is no longer the
+current blocker. Nothing claims `NATIVE_VERIFIED`.
 
 Implemented in `scripts/native/` (`native_experiment_session.gd`, `native_resource_closure.gd`,
 `safe_stage_manager.gd`, `native_test_adapter.gd`, `native_experiment_runner.gd`,
@@ -95,11 +97,11 @@ What already existed and still applies:
 | Persistent `ModLoadout` explicit conflict winner shared identically by `ResourceIndex` and `NativeResourceClosureBuilder` | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `T-34` |
 | Checked durable session transitions (`STATE_PERSIST_FAILED` / `RECOVERY_PENDING`) | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `ND-11..ND-15` (`T-40`) |
 | Bounded asynchronous `NativeProcessMonitor` with PID/exe verification, mission/probe state machine, restart recovery, timeout/cancel | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `SM-01..SM-07` (`T-40`) |
-| Live Steam BZCC execution & engine health-delta calibration | `NOT_VERIFIED` (`NATIVE_VERIFIED: 0`) | Original session blocked (`ActiveUser = 0x0` -> `STEAM_USER_NOT_LOGGED_IN`); later preflight `STRUCTURALLY_VALID` / `STEAM_MANAGED`; original `BZ2R` untouched |
+| Live Steam BZCC execution & engine health-delta calibration | `NOT_VERIFIED` (`NATIVE_VERIFIED: 0`) | T-20 reproduced staged `STEAM_MANAGED` launch; engine exits before mission init; no Lua observation artifact; original `BZ2R` untouched |
 
-## Remaining adapter work (when a logged-in Steam session is available)
+## Remaining adapter work (when the engine reaches mission initialization)
 
-1. **Operator / Steam live execution (`BLOCKED_EXTERNAL`)** — run the already-implemented `PREPARE EXPERIMENT` → `STAGE RESOURCES` → `LAUNCH BZCC` (or `MANUAL STEAM HANDOFF`) pipeline inside a logged-in Steam session for AppID 624970.
+1. **Engine-side mission initialization** — diagnose why BZCC 2.0.185 terminates after reading the staged `/config` and before any `Config: 'AddDirRecurse'` line; this is outside the Godot project's code.
 2. **Engine observation & calibration (`NOT_IMPLEMENTED` until live run completes)** — confirm real `battlezone2.exe` process + LuaMission load + resource probe + `WriteToFile` output, then compare Godot vs native BZCC before marking any scenario `NATIVE_VERIFIED`.
 
 ## Reload semantics (must be stated per change)

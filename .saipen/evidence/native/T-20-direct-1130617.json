@@ -1,0 +1,593 @@
+{
+  "artifacts": {
+    "observation_exists": false,
+    "observation_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/Logs/shaman_obs_shaman_sess_1530247_1.json",
+    "startup_log_exists": false,
+    "startup_log_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/battlezone.log"
+  },
+  "cleanup": {
+    "ok": true,
+    "state": "CLEANED_UP"
+  },
+  "discovery": {
+    "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+    "exe_md5": "e2fa7458cf2604315f48915acd288689",
+    "ok": true
+  },
+  "finished_at": "2026-11-21T23:59:35",
+  "launch": {
+    "command": {},
+    "game_pid": 0,
+    "ok": false,
+    "process_id": 0,
+    "reason": "UNSUPPORTED_LAUNCH_ROUTE",
+    "route": "DIRECT_EXECUTABLE",
+    "state": "FAILED"
+  },
+  "logs_dir": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/Logs",
+  "monitor": {
+    "game_exe_verified": false,
+    "game_pid": 0,
+    "mission_observed": false,
+    "polls": 0,
+    "reason": "NO_ACTIVE_MONITOR",
+    "resource_probe_confirmed": false,
+    "state": "NO_ACTIVE_MONITOR",
+    "waited_s": 150.0
+  },
+  "preexisting_game_pids": [
+    34000
+  ],
+  "preflight": {
+    "launch_ready": true,
+    "ok": true,
+    "reason": "",
+    "session_id": "shaman_sess_1530247_1",
+    "state": "PREFLIGHT_OK"
+  },
+  "reason": "No session-bound observation artifact within 150 s",
+  "route": "DIRECT_EXECUTABLE",
+  "schema": 2,
+  "session_record": {
+    "cleanup": {},
+    "created_at": "2026-11-21T23:57:05",
+    "discovery": {
+      "addon_root": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/Addon",
+      "build_id": "3807009",
+      "build_id_error": "",
+      "build_id_valid": true,
+      "data_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Data",
+      "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+      "exe_bytes": 5316976,
+      "exe_md5": "e2fa7458cf2604315f48915acd288689",
+      "game_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R",
+      "limitations": [
+        "Live BZCC launch via Steam requires an active logged-in Steam client session for AppID 624970.",
+        "Application-level trusted receipts verify runner provenance in-process, not cryptographic tamper resistance.",
+        "ODF resource reload timing in BZCC requires a fresh mission start.",
+        "Workshop mount order in the editor is an editor policy until verified per-mod in BZCC."
+      ],
+      "luamission_dll_present": true,
+      "missions_dll_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Missions",
+      "ok": true,
+      "res_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res",
+      "steam": {
+        "active_pid": 17380,
+        "active_user": 105534692,
+        "detail": "Steam client running and logged in (pid=17380, ActiveUser=0x64a54e4)",
+        "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+        "steam_logged_in": true,
+        "steam_present": true,
+        "steam_running": true,
+        "supported_routes": [
+          "STEAM_MANAGED",
+          "STEAM_LAUNCH_OPTIONS",
+          "OPERATOR_MANUAL",
+          "DIRECT_EXECUTABLE"
+        ]
+      },
+      "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+      "workshop_root": "V:/__STORE_V/_SOFT/Steam/steamapps/workshop/content/624970"
+    },
+    "evidence": {
+      "comparison": {},
+      "created": "2026-11-21T23:57:05",
+      "difference": "",
+      "expected_odf_hashes": {
+        "assets/ODF/atstabvsr_c.odf": {
+          "md5": "0c97a4e23fcfee65eac594e658701825",
+          "odf_name": "atstabvsr_c.odf",
+          "rel": "assets/ODF/atstabvsr_c.odf",
+          "role": "staged_odf",
+          "source": "staged_disk_md5"
+        },
+        "assets/ODF/shaman_mount_marker.odf": {
+          "md5": "aac36e0568722b78f79d468c6e49d3cf",
+          "odf_name": "shaman_mount_marker.odf",
+          "rel": "assets/ODF/shaman_mount_marker.odf",
+          "role": "mount_marker",
+          "source": "staged_disk_md5"
+        }
+      },
+      "game": {
+        "addon_root": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/Addon",
+        "build_id": "3807009",
+        "build_id_error": "",
+        "build_id_valid": true,
+        "data_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Data",
+        "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+        "exe_bytes": 5316976,
+        "exe_md5": "e2fa7458cf2604315f48915acd288689",
+        "game_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R",
+        "limitations": [
+          "Live BZCC launch via Steam requires an active logged-in Steam client session for AppID 624970.",
+          "Application-level trusted receipts verify runner provenance in-process, not cryptographic tamper resistance.",
+          "ODF resource reload timing in BZCC requires a fresh mission start.",
+          "Workshop mount order in the editor is an editor policy until verified per-mod in BZCC."
+        ],
+        "luamission_dll_present": true,
+        "missions_dll_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Missions",
+        "ok": true,
+        "res_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res",
+        "steam": {
+          "active_pid": 17380,
+          "active_user": 105534692,
+          "detail": "Steam client running and logged in (pid=17380, ActiveUser=0x64a54e4)",
+          "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+          "steam_logged_in": true,
+          "steam_present": true,
+          "steam_running": true,
+          "supported_routes": [
+            "STEAM_MANAGED",
+            "STEAM_LAUNCH_OPTIONS",
+            "OPERATOR_MANUAL",
+            "DIRECT_EXECUTABLE"
+          ]
+        },
+        "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+        "workshop_root": "V:/__STORE_V/_SOFT/Steam/steamapps/workshop/content/624970"
+      },
+      "godot_prediction": {
+        "armor": "H",
+        "damage": 100.0,
+        "life_span": 0.0,
+        "shot_speed": 0.0
+      },
+      "launch_nonce": "709fa38d00616f65",
+      "launch_record": {
+        "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+        "executed": false,
+        "exit_code": -1,
+        "launch_args": [],
+        "launched_at": "",
+        "mission_loaded_at": "",
+        "process_id": 0,
+        "process_start_time": "",
+        "route": "UNSUPPORTED"
+      },
+      "limitations": [
+        "Live BZCC launch via Steam requires an active logged-in Steam client session for AppID 624970.",
+        "Application-level trusted receipts verify runner provenance in-process, not cryptographic tamper resistance.",
+        "ODF resource reload timing in BZCC requires a fresh mission start.",
+        "Workshop mount order in the editor is an editor policy until verified per-mod in BZCC."
+      ],
+      "mount_marker": "SHAMAN_MNT_709fa38d00616f65",
+      "mount_plan": {
+        "assets_mount_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/assets",
+        "assets_mount_win": "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\assets",
+        "bzcc_config_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/shaman_native.cfg",
+        "bzcc_config_win": "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\shaman_native.cfg",
+        "bzcc_logs_dir": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/Logs",
+        "bzcc_mydocs_tag": "SHAMAN_t20_direct_1530007_19810",
+        "bzcc_writable_profile_dir": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810",
+        "launch_nonce": "709fa38d00616f65",
+        "mission_bzn": "shaman_shot.bzn",
+        "mission_lua": "shaman_shot.lua",
+        "mount_marker": "SHAMAN_MNT_709fa38d00616f65",
+        "observation_expected_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/Logs/shaman_obs_shaman_sess_1530247_1.json",
+        "observation_filename": "shaman_obs_shaman_sess_1530247_1.json",
+        "session_id": "shaman_sess_1530247_1",
+        "stage_absolute_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076",
+        "stage_id": "t20_direct_1530007_1981081076",
+        "startup_log_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/battlezone.log"
+      },
+      "native_observation": {},
+      "observed_odf_hashes": {},
+      "resources_mounted": false,
+      "scenario": {
+        "godot_prediction": {
+          "armor": "H",
+          "damage": 100.0,
+          "life_span": 0.0,
+          "shot_speed": 0.0
+        },
+        "id": "scn_gatstabvsr_c",
+        "launch_nonce": "709fa38d00616f65",
+        "ordnance": "atstabvsr_c",
+        "revision": 1,
+        "session_id": "shaman_sess_1530247_1",
+        "shooter": "ivtank_vsr",
+        "stage_id": "t20_direct_1530007_1981081076",
+        "target": "ivscav_vsr",
+        "weapon": "gatstabvsr_c"
+      },
+      "scenario_hash": "f9a23379b2f821cc7163f8bfe2baaaee",
+      "schema": 4,
+      "session_id": "shaman_sess_1530247_1",
+      "session_receipt": {},
+      "stage_id": "t20_direct_1530007_1981081076",
+      "staged": [
+        {
+          "bytes": 71,
+          "md5": "1e9e045fcf3882731e922b9327dd8675",
+          "rel": "assets/Config/bzshell_init.cfg"
+        },
+        {
+          "bytes": 4902,
+          "md5": "8996a3a952c84d2cca4b6069beba362a",
+          "rel": "assets/Missions/shaman_shot.bzn"
+        },
+        {
+          "bytes": 57,
+          "md5": "5845b403c45af57e6459babd32b410dd",
+          "rel": "assets/Missions/shaman_shot.inf"
+        },
+        {
+          "bytes": 5159,
+          "md5": "20f532fed3b2b92cc49e46770dd0648a",
+          "rel": "assets/Missions/shaman_shot.lua"
+        },
+        {
+          "bytes": 79,
+          "md5": "0c97a4e23fcfee65eac594e658701825",
+          "rel": "assets/ODF/atstabvsr_c.odf"
+        },
+        {
+          "bytes": 98,
+          "md5": "aac36e0568722b78f79d468c6e49d3cf",
+          "rel": "assets/ODF/shaman_mount_marker.odf"
+        },
+        {
+          "bytes": 469,
+          "md5": "11d94056402bfa50592cbe6843d5fad9",
+          "rel": "shaman_native.cfg"
+        }
+      ],
+      "staging_manifest": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/stage_manifest.json",
+      "status": "STAGED"
+    },
+    "evidence_state": "STAGED",
+    "launch": {},
+    "launch_eligible": true,
+    "launch_route": "STEAM_MANAGED",
+    "preflight": {
+      "blockers": [],
+      "discovery": {
+        "addon_root": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/Addon",
+        "build_id": "3807009",
+        "build_id_error": "",
+        "build_id_valid": true,
+        "data_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Data",
+        "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+        "exe_bytes": 5316976,
+        "exe_md5": "e2fa7458cf2604315f48915acd288689",
+        "game_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R",
+        "limitations": [
+          "Live BZCC launch via Steam requires an active logged-in Steam client session for AppID 624970.",
+          "Application-level trusted receipts verify runner provenance in-process, not cryptographic tamper resistance.",
+          "ODF resource reload timing in BZCC requires a fresh mission start.",
+          "Workshop mount order in the editor is an editor policy until verified per-mod in BZCC."
+        ],
+        "luamission_dll_present": true,
+        "missions_dll_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Missions",
+        "ok": true,
+        "res_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res",
+        "steam": {
+          "active_pid": 17380,
+          "active_user": 105534692,
+          "detail": "Steam client running and logged in (pid=17380, ActiveUser=0x64a54e4)",
+          "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+          "steam_logged_in": true,
+          "steam_present": true,
+          "steam_running": true,
+          "supported_routes": [
+            "STEAM_MANAGED",
+            "STEAM_LAUNCH_OPTIONS",
+            "OPERATOR_MANUAL",
+            "DIRECT_EXECUTABLE"
+          ]
+        },
+        "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+        "workshop_root": "V:/__STORE_V/_SOFT/Steam/steamapps/workshop/content/624970"
+      },
+      "issues": [],
+      "launch_args": [
+        "/nointro",
+        "/win",
+        "/logconsole",
+        "/config",
+        "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\shaman_native.cfg",
+        "shaman_shot.bzn"
+      ],
+      "launch_command": {
+        "args": [
+          "-applaunch",
+          "624970",
+          "/nointro",
+          "/win",
+          "/logconsole",
+          "/config",
+          "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\shaman_native.cfg",
+          "shaman_shot.bzn"
+        ],
+        "executable": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+        "game_args": [
+          "/nointro",
+          "/win",
+          "/logconsole",
+          "/config",
+          "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\shaman_native.cfg",
+          "shaman_shot.bzn"
+        ],
+        "game_version": "3807009",
+        "route": "STEAM_MANAGED",
+        "steam_app_id": "624970",
+        "supported": true
+      },
+      "launch_ready": true,
+      "launch_route": "STEAM_MANAGED",
+      "mission_package": {
+        "bzn_file": "shaman_shot.bzn",
+        "bzn_rel": "assets/Missions/shaman_shot.bzn",
+        "dll_name": "luamission.dll",
+        "errors": [],
+        "lua_rel": "assets/Missions/shaman_shot.lua",
+        "ok": true,
+        "reason": "",
+        "terrain": "test",
+        "terrain_files": {
+          "ter": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/datapak/test.ter",
+          "trn": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/datapak/test.trn"
+        },
+        "version": 1192
+      },
+      "mount_validation": {
+        "expected_assets": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/assets",
+        "mounted_dirs": [
+          "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\assets",
+          "@rootdir\\bz2r_res"
+        ],
+        "ok": true,
+        "reason": ""
+      },
+      "ok": true,
+      "reason": "",
+      "resource_closure": {},
+      "session_consistency": {
+        "errors": [],
+        "lua_launch_nonce": "709fa38d00616f65",
+        "lua_mount_marker": "SHAMAN_MNT_709fa38d00616f65",
+        "lua_obs_file": "shaman_obs_shaman_sess_1530247_1.json",
+        "lua_session_id": "shaman_sess_1530247_1",
+        "ok": true,
+        "reason": ""
+      },
+      "status": "STRUCTURALLY_VALID",
+      "steam": {
+        "active_pid": 17380,
+        "active_user": 105534692,
+        "detail": "Steam client running and logged in (pid=17380, ActiveUser=0x64a54e4)",
+        "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+        "steam_logged_in": true,
+        "steam_present": true,
+        "steam_running": true,
+        "supported_routes": [
+          "STEAM_MANAGED",
+          "STEAM_LAUNCH_OPTIONS",
+          "OPERATOR_MANUAL",
+          "DIRECT_EXECUTABLE"
+        ]
+      },
+      "structurally_valid": true
+    },
+    "preflight_file_hashes": {
+      "assets/Config/bzshell_init.cfg": {
+        "byte_length": 71,
+        "md5": "1e9e045fcf3882731e922b9327dd8675"
+      },
+      "assets/Missions/shaman_shot.bzn": {
+        "byte_length": 4902,
+        "md5": "8996a3a952c84d2cca4b6069beba362a"
+      },
+      "assets/Missions/shaman_shot.inf": {
+        "byte_length": 57,
+        "md5": "5845b403c45af57e6459babd32b410dd"
+      },
+      "assets/Missions/shaman_shot.lua": {
+        "byte_length": 5159,
+        "md5": "20f532fed3b2b92cc49e46770dd0648a"
+      },
+      "assets/ODF/atstabvsr_c.odf": {
+        "byte_length": 79,
+        "md5": "0c97a4e23fcfee65eac594e658701825"
+      },
+      "assets/ODF/shaman_mount_marker.odf": {
+        "byte_length": 98,
+        "md5": "aac36e0568722b78f79d468c6e49d3cf"
+      },
+      "shaman_native.cfg": {
+        "byte_length": 469,
+        "md5": "11d94056402bfa50592cbe6843d5fad9"
+      }
+    },
+    "preflight_package_md5": "674c23d4449436ad4b4db0935aaab3f9",
+    "preflight_passed": true,
+    "reason": "",
+    "restart_resumable": true,
+    "schema": 1,
+    "session": {
+      "bzn_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/assets/Missions/shaman_shot.bzn",
+      "closure_report": {},
+      "config_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/shaman_native.cfg",
+      "created_at": "2026-11-21T23:57:05",
+      "evidence_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/native_evidence.json",
+      "expected_odf_hashes": {
+        "assets/ODF/atstabvsr_c.odf": {
+          "md5": "0c97a4e23fcfee65eac594e658701825",
+          "odf_name": "atstabvsr_c.odf",
+          "rel": "assets/ODF/atstabvsr_c.odf",
+          "role": "staged_odf",
+          "source_path": ""
+        },
+        "assets/ODF/shaman_mount_marker.odf": {
+          "md5": "aac36e0568722b78f79d468c6e49d3cf",
+          "odf_name": "shaman_mount_marker.odf",
+          "rel": "assets/ODF/shaman_mount_marker.odf",
+          "role": "mount_marker",
+          "source_path": ""
+        }
+      },
+      "game_build_id": "3807009",
+      "game_executable_hash": "e2fa7458cf2604315f48915acd288689",
+      "godot_prediction": {
+        "armor": "H",
+        "damage": 100.0,
+        "life_span": 0.0,
+        "shot_speed": 0.0
+      },
+      "launch_command": {
+        "args": [
+          "-applaunch",
+          "624970",
+          "/nointro",
+          "/win",
+          "/logconsole",
+          "/config",
+          "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\shaman_native.cfg",
+          "shaman_shot.bzn"
+        ],
+        "executable": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+        "game_args": [
+          "/nointro",
+          "/win",
+          "/logconsole",
+          "/config",
+          "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\shaman_native.cfg",
+          "shaman_shot.bzn"
+        ],
+        "game_version": "3807009",
+        "route": "STEAM_MANAGED",
+        "steam_app_id": "624970",
+        "supported": true
+      },
+      "launch_nonce": "709fa38d00616f65",
+      "launch_route": "STEAM_MANAGED",
+      "lua_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/assets/Missions/shaman_shot.lua",
+      "mission_basename": "shaman_shot",
+      "mount_marker": "SHAMAN_MNT_709fa38d00616f65",
+      "mount_plan": {
+        "assets_mount_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/assets",
+        "assets_mount_win": "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\assets",
+        "bzcc_config_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/shaman_native.cfg",
+        "bzcc_config_win": "C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_direct_1530007_1981081076\\shaman_native.cfg",
+        "bzcc_logs_dir": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/Logs",
+        "bzcc_mydocs_tag": "SHAMAN_t20_direct_1530007_19810",
+        "bzcc_writable_profile_dir": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810",
+        "launch_nonce": "709fa38d00616f65",
+        "mission_bzn": "shaman_shot.bzn",
+        "mission_lua": "shaman_shot.lua",
+        "mount_marker": "SHAMAN_MNT_709fa38d00616f65",
+        "observation_expected_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/Logs/shaman_obs_shaman_sess_1530247_1.json",
+        "observation_filename": "shaman_obs_shaman_sess_1530247_1.json",
+        "session_id": "shaman_sess_1530247_1",
+        "stage_absolute_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076",
+        "stage_id": "t20_direct_1530007_1981081076",
+        "startup_log_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/battlezone.log"
+      },
+      "observation_expected_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_direct_1530007_19810/Logs/shaman_obs_shaman_sess_1530247_1.json",
+      "observation_filename": "shaman_obs_shaman_sess_1530247_1.json",
+      "recovery_checkpoints": [
+        {
+          "at": "2026-11-21T23:57:05",
+          "detail": "Session initialized with immutable identifiers",
+          "state": "CREATED"
+        },
+        {
+          "at": "2026-11-21T23:57:05",
+          "detail": "Preflight finished: route=STEAM_MANAGED reason=",
+          "state": "PREFLIGHT_OK"
+        },
+        {
+          "at": "2026-11-21T23:57:05",
+          "detail": "Staged 7 file(s) under C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076",
+          "state": "STAGED"
+        },
+        {
+          "at": "2026-11-21T23:57:05",
+          "detail": "Staged via SafeStageManager",
+          "state": "STAGED"
+        }
+      ],
+      "scenario": {
+        "godot_prediction": {
+          "armor": "H",
+          "damage": 100.0,
+          "life_span": 0.0,
+          "shot_speed": 0.0
+        },
+        "id": "scn_gatstabvsr_c",
+        "launch_nonce": "709fa38d00616f65",
+        "ordnance": "atstabvsr_c",
+        "revision": 1,
+        "session_id": "shaman_sess_1530247_1",
+        "shooter": "ivtank_vsr",
+        "stage_id": "t20_direct_1530007_1981081076",
+        "target": "ivscav_vsr",
+        "weapon": "gatstabvsr_c"
+      },
+      "scenario_hash": "f9a23379b2f821cc7163f8bfe2baaaee",
+      "scenario_id": "scn_gatstabvsr_c",
+      "scenario_revision": 1,
+      "schema": 1,
+      "session_id": "shaman_sess_1530247_1",
+      "stage_id": "t20_direct_1530007_1981081076",
+      "stage_manifest_hash": "e485423777f2e6a4a7bb5768f1ad5cbc",
+      "stage_manifest_path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/stage_manifest.json",
+      "stage_root": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076",
+      "state": "STAGED",
+      "terrain_name": "test",
+      "updated_at": "2026-11-21T23:57:05"
+    },
+    "session_id": "shaman_sess_1530247_1",
+    "source_revisions": {},
+    "stage_id": "t20_direct_1530007_1981081076",
+    "stage_root": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076",
+    "staged": {
+      "file_count": 7,
+      "launch_eligible": true,
+      "manifest": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/native_evidence.json",
+      "stage": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076",
+      "stage_id": "t20_direct_1530007_1981081076",
+      "stage_manifest": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_direct_1530007_1981081076/stage_manifest.json",
+      "staged_file_hashes": {
+        "assets/Config/bzshell_init.cfg": "1e9e045fcf3882731e922b9327dd8675",
+        "assets/Missions/shaman_shot.bzn": "8996a3a952c84d2cca4b6069beba362a",
+        "assets/Missions/shaman_shot.inf": "5845b403c45af57e6459babd32b410dd",
+        "assets/Missions/shaman_shot.lua": "20f532fed3b2b92cc49e46770dd0648a",
+        "assets/ODF/atstabvsr_c.odf": "0c97a4e23fcfee65eac594e658701825",
+        "assets/ODF/shaman_mount_marker.odf": "aac36e0568722b78f79d468c6e49d3cf",
+        "shaman_native.cfg": "11d94056402bfa50592cbe6843d5fad9"
+      }
+    },
+    "state": "STAGED",
+    "updated_at": "2026-11-21T23:57:05"
+  },
+  "stage": {
+    "ok": true,
+    "state": "STAGED"
+  },
+  "started_at": "2026-11-21T23:57:05",
+  "ticket": "T-20",
+  "verdict": "BLOCKED",
+  "workspace_root": "user://t20_native_direct_1130341"
+}

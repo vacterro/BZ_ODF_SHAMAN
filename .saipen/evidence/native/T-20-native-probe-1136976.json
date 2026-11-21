@@ -1,0 +1,99 @@
+{
+  "cleanup": {
+    "ok": true,
+    "state": "CLEANED_UP"
+  },
+  "diagnostics": {
+    "blocker_summary": "BZCC accepted staged /config and mission command line but terminated before filesystem/mission initialization; no session-bound LuaMission observation artifact (session=shaman_sess_1335814_1)",
+    "bzcc_startup_log": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/Battlezone-Crashed 2026-11-22 00.10.17.7546.log",
+    "bzcc_startup_tail": "DIAG|             cmdline:1039 |00:10:18|807    |Commandline param (9/11): '/nointro'\nDIAG|             cmdline:1039 |00:10:18|807    |Commandline param (10/11): '/tps'\nDIAG|             cmdline:1039 |00:10:18|807    |Commandline param (11/11): '30'\nDIAG|         localizewin:20   |00:10:18|808    |System Language Preference 1:en-US\nDIAG|         localizewin:24   |00:10:18|808    |Supported System Language Preference is ENGLISH\nDIAG|               setup:80   |00:10:18|808    |Drive type : Fixed\nDIAG|               setup:164  |00:10:18|808    |Startup directory : V:\\__STORE_V\\_SOFT\\Steam\\steamapps\\common\\BZ2R\nDIAG|              i76win:1209 |00:10:18|816    |Command line /config used, skipping global config mod setup :\n\nDIAG|               input:1418 |00:10:18|816    |Handling Window OnActivate\nDIAG|               input:243  |00:10:18|816    |Disabling Clip\nDIAG|               input:1418 |00:10:18|847    |Handling Window OnActivate\nDIAG|               input:243  |00:10:18|847    |Disabling Clip\n",
+    "staged_observation_files": [],
+    "steam_launch_lines": [
+      "[2026-11-22 00:10:15] ExecCommandLine: \"V:\\__STORE_V\\_SOFT\\Steam\\steam.exe -applaunch 624970 /nointro /win /logconsole /config C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_real_1335624_1270940189\\shaman_native.cfg shaman_shot.bzn\"",
+      "[2026-11-22 00:10:17] Game process added : AppID 624970 \"V:\\__STORE_V\\_SOFT\\Steam\\steamapps\\common\\BZ2R\\battlezone2.exe /nointro /win /logconsole /config C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_real_1335624_1270940189\\shaman_native.cfg shaman_shot.bzn /disablemipmaps /nointr\", ProcID 15280, IP 0.0.0.0:0",
+      "[2026-11-22 00:10:17] Game process updated : AppID 624970 \"V:\\__STORE_V\\_SOFT\\Steam\\steamapps\\common\\BZ2R\\battlezone2.exe /nointro /win /logconsole /config C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_real_1335624_1270940189\\shaman_native.cfg shaman_shot.bzn /disablemipmaps /nointr\", ProcID 15280, IP 0.0.0.0:0",
+      "[2026-11-22 00:10:17] Game process updated : AppID 624970 \"V:\\__STORE_V\\_SOFT\\Steam\\steamapps\\common\\BZ2R\\battlezone2.exe /nointro /win /logconsole /config C:\\Users\\vac34\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\t20_real_1335624_1270940189\\shaman_native.cfg shaman_shot.bzn /disablemipmaps /nointr\", ProcID 15280, IP 0.0.0.0:0"
+    ]
+  },
+  "discovery": {
+    "addon_root": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/Addon",
+    "build_id": "3807009",
+    "build_id_error": "",
+    "build_id_valid": true,
+    "data_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Data",
+    "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+    "exe_bytes": 5316976,
+    "exe_md5": "e2fa7458cf2604315f48915acd288689",
+    "game_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R",
+    "limitations": [
+      "Live BZCC launch via Steam requires an active logged-in Steam client session for AppID 624970.",
+      "Application-level trusted receipts verify runner provenance in-process, not cryptographic tamper resistance.",
+      "ODF resource reload timing in BZCC requires a fresh mission start.",
+      "Workshop mount order in the editor is an editor policy until verified per-mod in BZCC."
+    ],
+    "luamission_dll_present": true,
+    "missions_dll_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Missions",
+    "ok": true,
+    "res_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res",
+    "steam": {
+      "active_pid": 17380,
+      "active_user": 105534692,
+      "detail": "Steam client running and logged in (pid=17380, ActiveUser=0x64a54e4)",
+      "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+      "steam_logged_in": true,
+      "steam_present": true,
+      "steam_running": true,
+      "supported_routes": [
+        "STEAM_MANAGED",
+        "STEAM_LAUNCH_OPTIONS",
+        "OPERATOR_MANUAL",
+        "DIRECT_EXECUTABLE"
+      ]
+    },
+    "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+    "workshop_root": "V:/__STORE_V/_SOFT/Steam/steamapps/workshop/content/624970"
+  },
+  "finished_at": "2026-11-22T00:11:46",
+  "launch": {
+    "game_pid": 0,
+    "ok": true,
+    "process_id": 34256,
+    "reason": "",
+    "route": "STEAM_MANAGED",
+    "state": "STEAM_PROCESS_STARTED"
+  },
+  "monitor": {
+    "game_exe_verified": false,
+    "game_pid": 0,
+    "mission_observed": false,
+    "polls": 179,
+    "reason": "MONITOR_TIMEOUT",
+    "resource_probe_confirmed": false,
+    "state": "TIMEOUT",
+    "waited_s": 89.5
+  },
+  "observation": {
+    "exists": false,
+    "expected_path": "C:/Users/vac34/Documents/My Games/Battlezone Combat Commander/SHAMAN_t20_real_1335624_1270940/Logs/shaman_obs_shaman_sess_1335814_1.json",
+    "reason": "OBSERVATION_ARTIFACT_MISSING"
+  },
+  "preflight": {
+    "launch_ready": true,
+    "launch_route": "",
+    "ok": true,
+    "reason": "",
+    "session_id": "shaman_sess_1335814_1",
+    "state": "PREFLIGHT_OK"
+  },
+  "reason": "BZCC accepted staged /config and mission command line but terminated before filesystem/mission initialization; no session-bound LuaMission observation artifact (session=shaman_sess_1335814_1)",
+  "schema": 1,
+  "stage": {
+    "ok": true,
+    "stage_root": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/t20_real_1335624_1270940189",
+    "state": "STAGED"
+  },
+  "started_at": "2026-11-22T00:10:15",
+  "ticket": "T-20",
+  "verdict": "BLOCKED",
+  "workspace_root": "user://t20_native_probe_1136684"
+}

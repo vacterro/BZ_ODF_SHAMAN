@@ -4,18 +4,21 @@ Ordered by impact. None of these is silently removed from scope.
 
 ## Native game integration
 
-- **Live BZCC launch requires a logged-in Steam client session for AppID 624970.** `NativeTestAdapter`
-  generates structurally validated ASCII v1192 `luamission.dll` `.bzn` scenarios with verified stock
-  `test` terrain, exact `<stage>/assets` `AddDirRecurse` mount configs, controlled `WriteToFile` Lua
-  state-machine scripts, Steam launch capability routing (`STEAM_MANAGED`, `STEAM_LAUNCH_OPTIONS`,
-  `OPERATOR_MANUAL`, `DIRECT_EXECUTABLE`, `UNSUPPORTED`), and separated schema-vs-trusted-session
-  evidence attestation. In the isolated Windows agent session (`ActiveUser = 0x0`), Steam is present
-  but in the original isolated agent session it was logged off, so direct `battlezone2.exe` launch
-  triggered legitimate Steam handoff (exit 53) and preflight reported `BLOCKED`
-  (`STEAM_USER_NOT_LOGGED_IN`, route `OPERATOR_MANUAL`). A later `T-42` GUI verification observed a
-  different Steam session state and reported `STRUCTURALLY_VALID` / `STEAM_MANAGED`; neither outcome
-  is a live launch or calibration. Read-only `BZ2R` is never modified, and native verified count
-  remains `0`.
+- **Live BZCC launch is reproducible, but the engine exits before mission initialization.**
+  `NativeTestAdapter` generates structurally validated ASCII v1192 `luamission.dll` `.bzn` scenarios
+  with verified stock `test` terrain, exact `<stage>/assets` `AddDirRecurse` mount configs, controlled
+  `WriteToFile` Lua state-machine scripts, Steam launch capability routing (`STEAM_MANAGED`,
+  `STEAM_LAUNCH_OPTIONS`, `OPERATOR_MANUAL`, `DIRECT_EXECUTABLE`, `UNSUPPORTED`), and separated
+  schema-vs-trusted-session evidence attestation. T-20 observed a logged-in Steam client,
+  `steam_appid.txt` present in read-only `BZ2R`, and `steam.exe -applaunch 624970` successfully
+  spawning `battlezone2.exe` with the staged `/config` and `shaman_shot.bzn`. BZCC 2.0.185 then
+  terminated roughly four seconds after startup, before any `Config: 'AddDirRecurse'` or mission
+  initialization line, and never produced the session-bound LuaMission observation artifact.
+  The exact launch and shutdown are recorded in
+  `.saipen/evidence/native/T-20-native-probe-1136976.json` and the BZCC startup log it names.
+  No live engine measurement or calibration is claimed; read-only `BZ2R` is never modified, and
+  native verified count remains `0`. The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was
+  a session-specific condition and is no longer the current blocker.
 - Reload requirements inside BZCC (scene/mission/full restart) are not measured.
 - No supported live modification inside the running game is claimed.
 

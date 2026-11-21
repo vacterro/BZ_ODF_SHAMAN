@@ -27,10 +27,13 @@
      write that field name next to a concrete id anywhere in this file. -->
 
 ## DOING
+- [/] T-17 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-011 | owner: saipen | claim_time: 2026-11-21T22:22:21Z
 
 ## TODO
 
 ## DONE
+- [x] T-20 [P2] Wave D: First real native BZCC experiment (preflight, launch, observation, comparison) (P2-01) | verify: reproducible staged native BZCC scenario executed or exact engine blocker documented with real evidence artifacts | owner: saipen | claim_time: 2026-11-21T22:13:44Z | closure_mode: own_patch | publication_state: pending
+- [x] T-16 [P0] Battery test scaffolding | verify: n/a | owner: saipen | claim_time: 2026-11-21T21:44:20Z | closure_mode: finding_invalidated | implementation_delta: none | invalidation_evidence: E-603
 - [x] T-37 [P1] GitHub publication: initialize/verify git repo, verify .gitignore excludes build/.godot/ephemeral state, and push BZ_ODF_SHAMAN cleanly to https://github.com/vacterro/BZ_ODF_SHAMAN | verify: git status && git ls-remote origin | owner: saipen | claim_time: 2026-11-21T21:40:02Z | closure_mode: own_patch | publication_state: pending
 - [x] T-41 [P2] Wave E: Visual Laboratory & Simulation upgrade — Damage/Shield/Ammo vertical slice with 3D shield glow and hit normals, Live Parameter Inspection panel, animated ribbon trails & particle curves, and real BZCC .msha/.skeleton animation inspection | regression: required | verify: cmd /c tools\\\\run_tests.cmd | owner: saipen | claim_time: 2026-11-21T21:30:03Z | closure_mode: own_patch | publication_state: pending
 - [x] T-42 [P2] Wave F: Release hardening — full regression matrix, Windows build, GPU GUI self-verification, performance benchmark, read-only GitHub pre-push audit, and full 9-doc synchronization | verify: cmd /c tools\\\\run_tests.cmd && cmd /c tools\\\\build_windows.cmd | owner: saipen | claim_time: 2026-11-21T20:43:27Z | closure_mode: own_patch | publication_state: pending
@@ -72,6 +75,3 @@
 - [x] T-1 [P2] Autonomous shift: ODF non-inherited semantics, Weapons Lab parameter sweep, Windows packaged build | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-001 | owner: saipen | claim_time: 2026-11-21T04:58:11Z | closure_mode: own_patch | publication_state: pending
 
 ## BLOCKED
-- [ ] T-20 [P2] Wave D: First real native BZCC experiment (preflight, launch, observation, comparison) (P2-01) | verify: reproducible staged native BZCC scenario executed or exact engine blocker documented with real evidence artifacts | blocker: Phase A preflight + /config + LuaMission staging + strict evidence gate verified; live battlezone2.exe launch blocked by missing steam_appid.txt in read-only BZ2R (exit 53) | blocker_scope: ticket
-- [ ] T-17 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-011 | owner: saipen | claim_time: 2026-11-21T13:28:22Z | blocker: Waves A,B,C,E verified (481 core + 97 UI + Win exe + GPU GUI); live BZCC launch blocked by missing steam_appid.txt in read-only BZ2R (exit 53); P1-07 deferred | blocker_scope: ticket
-- [ ] T-16 [P0] Battery test scaffolding | verify: n/a | blocker: created accidentally with placeholder verify; superseded by T-12..T-15, no implementation | blocker_scope: ticket
