@@ -10,9 +10,12 @@ Ordered by impact. None of these is silently removed from scope.
   state-machine scripts, Steam launch capability routing (`STEAM_MANAGED`, `STEAM_LAUNCH_OPTIONS`,
   `OPERATOR_MANUAL`, `DIRECT_EXECUTABLE`, `UNSUPPORTED`), and separated schema-vs-trusted-session
   evidence attestation. In the isolated Windows agent session (`ActiveUser = 0x0`), Steam is present
-  but logged off, so direct `battlezone2.exe` launch triggers legitimate Steam handoff (exit 53) and
-  preflight explicitly reports `BLOCKED` (`STEAM_USER_NOT_LOGGED_IN`, route `OPERATOR_MANUAL`).
-  Read-only `BZ2R` is never modified, and native verified count remains `0`.
+  but in the original isolated agent session it was logged off, so direct `battlezone2.exe` launch
+  triggered legitimate Steam handoff (exit 53) and preflight reported `BLOCKED`
+  (`STEAM_USER_NOT_LOGGED_IN`, route `OPERATOR_MANUAL`). A later `T-42` GUI verification observed a
+  different Steam session state and reported `STRUCTURALLY_VALID` / `STEAM_MANAGED`; neither outcome
+  is a live launch or calibration. Read-only `BZ2R` is never modified, and native verified count
+  remains `0`.
 - Reload requirements inside BZCC (scene/mission/full restart) are not measured.
 - No supported live modification inside the running game is claimed.
 
@@ -32,7 +35,7 @@ Ordered by impact. None of these is silently removed from scope.
 
 - Rigid flat floor (`StaticBody3D` at `y = 0`) plus placeable sandbox Walls, Pillars, Boxes, and sloped 3D Terrain Ramps (`shape="ramp"`) with ray-vs-wedge and particle-bounce collision; no full heightmap terrain, water, or mesh-accurate building colliders.
 - Oriented 3D bounding-box (OBB) and sphere/ramp collision; ignores exact hull mesh triangles, collision layers, and `boxCollide`.
-- No shields, deflection/absorption, damage-over-time, status effects, mines, deployables, or friendly fire (`NOT_IMPLEMENTED`).
+- Shield absorption is an APPROXIMATED preview: `shieldClass` ratio and `DamageShield` multiplier are applied before hull spill, but no real shield mesh/texture animation, deflection angle, or regeneration is simulated. Damage-over-time, status effects, mines, deployables, and friendly fire remain `NOT_IMPLEMENTED`.
 - Approximated beam/lightning (`BoltBeamNode` for `draw_bolt`/`draw_beam`/`ArcCannonClass`), homing missile turning (`omegaTurn`), seeded `shotVariance` spread, recoil kick, moving shooter velocity inheritance, configurable Moving Target patterns (`Strafe`/`Wiggle`/`Orbit`/`Approach`), and Shooter Aim modes (`Manual`/`Track`/`Lead`/`Fixed Forward`) are implemented as `APPROXIMATED` preview models, not native engine formulas.
 - Salvos/bursts use `salvoCount`/`salvoDelay`; `altName` alternate fire is previewable via FIRE ALT, but the `switchMask`/deploy transition itself, ammo cost, and morph timing are not modelled.
 - Multi-target splash falloff is linear (`APPROXIMATED`) across primary and secondary targets on vehicle/obstacle/ground impacts.
@@ -71,9 +74,8 @@ Ordered by impact. None of these is silently removed from scope.
   play resolved PCM explosion WAVs through the bounded 8-channel audio pool; particle counts and
   sizes are editor-scaled and expansion curves are simplified. `xplExpire` falls back to the ground
   explosion when the ODF declares none.
-- Preview maps a subset of documented fields across 11 render bases; exact engine trail ribbons,
-  LOD and light attenuation remain approximations.
-- No particle selection/lifetime inspection per particle.
+- Preview maps a subset of documented fields across 11 render bases; animated crossed-ribbon trails approximate `draw_trail`/`draw_twirl_trail`, while exact engine ribbon geometry, LOD, and light attenuation remain approximations.
+- Live Parameter Inspection reports parsed ODF values vs aggregate node counts, lifetime and radius-curve points; per-particle selection/lifetime inspection is still not implemented.
 - `draw_billboard` is unknown/unsupported (not in local docs); kept editable as raw text.
 
 ## Resources
@@ -124,8 +126,10 @@ Ordered by impact. None of these is silently removed from scope.
   and mid-overwrite rollback, durable session ledger across restart, split native GUI controls,
   validated `luamission.dll` `.bzn` + exact-mount `/config` + `WriteToFile` Lua contract
   (`contract_version: 1`), expected-vs-observed ODF hash verification, and strict separation of
-  synthetic vs runner-attested receipts. Live launch reports `BLOCKED` (`STEAM_USER_NOT_LOGGED_IN`)
-  when no logged-in Steam session is active (`NATIVE VERIFIED` count remains `0`).
+  synthetic vs runner-attested receipts, checked durable transitions, and the bounded async
+  `NativeProcessMonitor`. Live launch reports `BLOCKED` (`STEAM_USER_NOT_LOGGED_IN`) when no logged-in
+  Steam session is active; a later GUI session reported `STRUCTURALLY_VALID` / `STEAM_MANAGED`,
+  which is still not a live attested run (`NATIVE VERIFIED` count remains `0`).
 
 ## Build
 

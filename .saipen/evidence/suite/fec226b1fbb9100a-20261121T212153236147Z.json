@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 29.2,
+  "timeout_s": 3600,
+  "subject_before": "tree:0523709bd3ac39ea37ba0227607baf79574a9f3833d1c0f9e6e3951ed7b87f7e",
+  "subject": "tree:0523709bd3ac39ea37ba0227607baf79574a9f3833d1c0f9e6e3951ed7b87f7e",
+  "stdout_tail": "ield parsed from target ODF (expected 80.0, got 80.0)\n  ✓ DS-01: shieldClass parsed from target ODF (expected D, got D)\n  ✓ DS-01: maxAmmo parsed from target ODF (expected 5, got 5)\n  ✓ DS-02: damageValue(D) selected for shielded target (expected 200.0, got 200.0)\n  ✓ DS-02: BZCC shieldRatio D=0.5 applied (expected 0.5, got 0.5)\n  ✓ DS-02: shot reaches shielded target (expected vehicle, got vehicle)\n  ✓ DS-02: shield absorbed 80 of 100 effective shield damage (expected 80.0, got 80.0)\n  ✓ DS-02: shield fully depleted (expected 0.0, got 0.0)\n  ✓ DS-02: spill damage reaches hull after shield ratio (expected 40.0, got 40.0)\n  ✓ DS-02: hull health reflects shield spill only (expected 960.0, got 960.0)\n  ✓ DS-03: ammoCost consumed from declared reserve (expected 2, got 2)\n  ✓ DS-04: hit normal is a unit-ish outward vector\n  ✓ DS-04: front hit normal points back toward shooter\n  ✓ DS-05: shield absorption is explicitly logged as APPROXIMATED\n  ✓ DS-05: unshielded target falls back to armor damageValue(H) (expected 100.0, got 100.0)\n  ✓ DS-05: unshielded hull damage unchanged (expected 100.0, got 100.0)\n  ✓ DS-05: unshielded hull health unchanged (expected 900.0, got 900.0)\n\n[T-41 Wave E Animated Ribbon Trails & BZCC animation inspection (TR-01..TR-04)]\n  ✓ TR-01: trail header preview holder built\n  ✓ TR-01: animated ribbon trail node created for draw_twirl_trail\n  ✓ TR-01: ribbon sampled path has 25 points (expected 25, got 25)\n  ✓ TR-02: ribbon mesh generated\n  ✓ TR-02: ribbon mesh rebuilds under animation\n  ✓ TR-02: curved trail path sampled deterministically (expected 13, got 13)\n  ✓ TR-03: real baked .msh resolved for animation inspection\n  ✓ TR-03: animation metadata inspected from real DOCB model\n  ✓ TR-03: bone/pose/node count fields reported\n  ✓ TR-03: animation_count reported honestly even when zero\n  ✓ TR-04: non-DOCB .msha rejected (expected [\"not a DOCB .msha file\"], got [\"not a DOCB .msha file\"])\n\n926 checks, 1 failure(s), 27664 ms\nRESULT: FAIL\n\nTESTS FAILED\n",
+  "stderr_tail": "  ✗ SM-01/SM-03: preexisting battlezone2.exe PID 1111 ignored at launch -> STEAM_PROCESS_STARTED (expected STEAM_PROCESS_STARTED, got GAME_PROCESS_DETECTED)\nFAIL: T-40 Wave D Durable Transitions & Async NativeProcessMonitor (P1-02, P1-03; ND-11..15, SM-01..07): SM-01/SM-03: preexisting battlezone2.exe PID 1111 ignored at launch -> STEAM_PROCESS_STARTED (expected STEAM_PROCESS_STARTED, got GAME_PROCESS_DETECTED)\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T21:21:53Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

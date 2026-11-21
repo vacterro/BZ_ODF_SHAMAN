@@ -74,6 +74,7 @@ var _selected_external_path: String = ""
 var _selected_headers: Array[String] = []
 static var _clipboard_nodes: Array[Dictionary] = []
 var _emitters: Array = []
+var _live_inspection_label: Label = null
 var _preview_nodes: Array = []
 ## GraphNode name -> {path, header} for nodes representing another ODF file.
 var _external_nodes: Dictionary = {}
@@ -1129,6 +1130,42 @@ func inspect_emitter_metrics(header: String) -> Dictionary:
 	}
 
 
+## Live Parameter Inspection: parsed ODF values plus the actual values on the
+## live CPUParticles3D nodes and the current 3D preview state. Never writes to
+## the document; safe to call once per frame.
+func inspect_emitter_live_state(header: String) -> Dictionary:
+	var out := inspect_emitter_metrics(header)
+	if out.is_empty():
+		return {}
+	out["live_particle_count"] = 0
+	out["live_lifetime"] = 0.0
+	out["live_speed"] = 0.0
+	out["live_scale_curve_points"] = 0
+	out["normalised_age"] = 0.0
+	var holder: Node = null
+	if _header_preview_nodes is Dictionary and (_header_preview_nodes as Dictionary).has(header):
+		holder = _header_preview_nodes[header] as Node
+	if holder == null:
+		return out
+	var stack: Array[Node] = [holder]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is CPUParticles3D:
+			var p := n as CPUParticles3D
+			out["live_particle_count"] = int(out.get("live_particle_count", 0)) + p.amount
+			out["live_lifetime"] = maxf(float(out.get("live_lifetime", 0.0)), p.lifetime)
+			if p.direction.length() > 0.001:
+				out["live_speed"] = maxf(float(out.get("live_speed", 0.0)), p.initial_velocity_min)
+			if p.scale_amount_curve != null:
+				out["live_scale_curve_points"] = maxi(int(out.get("live_scale_curve_points", 0)), p.scale_amount_curve.get_point_count())
+		for c in n.get_children():
+			stack.append(c)
+	var life := maxf(0.001, float(out.get("life_time", 1.0)))
+	var loop_t := fmod(float(Time.get_ticks_msec()) / 1000.0, life)
+	out["normalised_age"] = clampf(loop_t / life, 0.0, 1.0)
+	return out
+
+
 func _build_texture_browser_dialog() -> void:
 	_texture_dialog = ConfirmationDialog.new()
 	_texture_dialog.title = "BZCC Particle Texture Browser"
@@ -1355,6 +1392,13 @@ func _rebuild_quick_inspector() -> void:
 	stat_lbl.add_theme_color_override("font_color", Color("#9C9371"))
 	stat_lbl.clip_text = true
 	quick_inspector_box.add_child(stat_lbl)
+	var live_lbl := Label.new()
+	live_lbl.text = "LIVE: particles 0/0 · t=0.00"
+	live_lbl.add_theme_font_size_override("font_size", 10)
+	live_lbl.add_theme_color_override("font_color", Color("#B8D890"))
+	live_lbl.clip_text = true
+	quick_inspector_box.add_child(live_lbl)
+	_live_inspection_label = live_lbl
 
 	# 1. renderBase dropdown (RMB resets to factory)
 	var rb_row := HBoxContainer.new()
@@ -2449,6 +2493,13 @@ func _process(_delta: float) -> void:
 		if is_instance_valid(e):
 			n += int(e.amount)
 	counter_label.text = "preview particles: %d    emitters: %d" % [n, _emitters.size()]
+	if _live_inspection_label != null and is_instance_valid(_live_inspection_label) and _selected_header != "":
+		var live := inspect_emitter_live_state(_selected_header)
+		_live_inspection_label.text = "LIVE: particles %d/~%d · life %.2f/%.2f · t=%.2f · curve=%d" % [
+			int(live.get("live_particle_count", 0)), int(live.get("active_particles", 0)),
+			float(live.get("live_lifetime", 0.0)), float(live.get("life_time", 1.0)),
+			float(live.get("normalised_age", 0.0)), int(live.get("live_scale_curve_points", 0)),
+		]
 
 
 func _vec(v: String) -> Vector3:

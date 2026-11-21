@@ -1,0 +1,25 @@
+{
+ "accounting_matches": true,
+ "agent": "saipen",
+ "blockers": [
+  {
+   "code": "GIT_GUARD_FAILED",
+   "detail": "GIT_COMMAND_FAILED: git rev-parse --is-inside-work-tree exited 128: fatal: detected dubious ownership in repository at 'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN'\n'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.git' is owned by:\n\tDESKTOP-TTH0L52/SAIAG_9fabb0d5 (S-1-5-21-6247072-3065140091-1424061869-1019)\nbut the current user is:\n\tDESKTOP-TTH0L52/vac34 (S-1-5-21-6247072-3065140091-1424061869-1002)\nTo add an exception for this directory, call:\n\n\tgit config --global --a; nothing was deleted"
+  }
+ ],
+ "bytes_planned": 0,
+ "bytes_reclaimed": 0,
+ "finished": "2026-11-21T20:43:34Z",
+ "git_guard": {
+  "code": "GIT_COMMAND_FAILED",
+  "detail": "git rev-parse --is-inside-work-tree exited 128: fatal: detected dubious ownership in repository at 'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN'\n'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.git' is owned by:\n\tDESKTOP-TTH0L52/SAIAG_9fabb0d5 (S-1-5-21-6247072-3065140091-1424061869-1019)\nbut the current user is:\n\tDESKTOP-TTH0L52/vac34 (S-1-5-21-6247072-3065140091-1424061869-1002)\nTo add an exception for this directory, call:\n\n\tgit config --global --a",
+  "ok": false
+ },
+ "kept": 0,
+ "protected_bytes": 0,
+ "recovered_runs": [],
+ "run_id": "20261121T204334-463bdd50",
+ "schema": 1,
+ "started": "2026-11-21T20:43:34Z",
+ "targets": []
+}

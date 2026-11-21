@@ -234,14 +234,14 @@ Command:
 tools\run_bench.cmd
 ```
 
-Result (measurement only, no thresholds, 2026-11-21 Wave G `T-35` release hardening run, Godot `4.7.2-stable`):
+Result (measurement only, no thresholds, 2026-11-21 Wave F `T-42` release hardening run, Godot `4.7.2-stable`):
 
 ```
-index: 17028 ODFs, 37161 asset names in 1321.0 ms
-parse: 500 ODFs, 0.55 MB in 633.4 ms (0.9 MB/s)
-inheritance: 100 cold merges of ivtank_vsr in 88.6 ms (0.89 ms each, 131 rows)
-sim: 500 shots in 3763.5 ms (7.53 ms each, 500 hits)
-memory: 147.6 MB static
+index: 17028 ODFs, 37161 asset names in 1323.1 ms
+parse: 500 ODFs, 0.55 MB in 606.3 ms (0.9 MB/s)
+inheritance: 100 cold merges of ivtank_vsr in 110.1 ms (1.10 ms each, 131 rows)
+sim: 500 shots in 4250.0 ms (8.50 ms each, 500 hits)
+memory: 147.9 MB static
 ```
 
 ## Windows package
@@ -252,18 +252,20 @@ Command:
 tools\build_windows.cmd
 ```
 
-Result: exit 0, `build/BZ_ODF_SHAMAN.exe` (`112,043,976` bytes, MD5 `399e0901f543848f404fdd72fa0574e1`,
+Result: exit 0, `build/BZ_ODF_SHAMAN.exe` (`112,090,664` bytes, MD5 `f0c33c0a40926e104419dd7641e61e95`,
 x86_64, embedded PCK, Godot 4.7.2 templates resolved from self-contained `editor_data/export_templates`),
-rebuilt 2026-11-21 after Waves B/C/E/F/G (`T-32`, `T-33`, `T-36`, `T-34`, `T-35`).
+rebuilt 2026-11-21 after Waves B/C/E/F/G (`T-32`, `T-33`, `T-36`, `T-34`, `T-35`, `T-39`, `T-40`, `T-42`).
+The embedded PCK now includes `scripts/native/native_process_monitor.gd` and the checked native
+transition changes.
 
 Interactive windowed GPU verification (`TESTED_GUI`, `BZ_SHAMAN_VERIFY_GUI_DIR`, isolated `BZ_SHAMAN_WORKSPACE_ROOT`):
 - Exit code `0`, `theme=goldendefault`, `font_aa=none`, `ui_scale=1.0`, `master_volume=0.85`, viewport `1920x1061`
-- Indexed `17028 ODFs, 37161 asset names` in `1101 ms`
+- Indexed `17028 ODFs, 37161 asset names` in `1276 ms`
 - Authentic base-game `ivtank00.msh` (`1110` tris), `fvtitan_skel.msh` (`6458` tris, `27` nodes, `fvatank00_d.dds`, `hp_cannon_1`/`hp_cannon_2`), and `ivscav00.msh` (`1942` tris) rendered with non-whitewashed `EMISSION_OP_MULTIPLY` materials, rigid `StaticBody3D` floors (`rigid_floor_weapon_lab=true`, `rigid_floor_particle_lab=true`), Wall & sloped Terrain Ramp props, and 1bpp crisp `Verdana_m1` Golden Default chrome
 - `titan_bolt_rendered=true`: Titan `fvatank` → `garc_c` → `arcbolt` rendered animated forked cyan `BoltBeamNode` (`draw_bolt`, `86.0 m`, `0.80 s`) + `garc_c.flash` muzzle + `xarccar_a.odf` impact burst + `arc02.wav`/`lhit.wav` SFX on bounded 8-channel pool (`plays=4`, `steals=0`, `timeline_events=7`)
 - Particle Lab rendered `xstabcar_c.odf` 8-node graph + Quick Render Inspector (`M`/`S` Mute/Solo, rate/CPU/GPU cost metrics, ColorPickers, `renderBase`/`simulateBase`/`textureBlend` dropdowns, `120` Texture Browser FX textures, `11` emitter presets, `save_deps_button=true`), `live_swap_modes=5`
-- `NATIVE PREFLIGHT` honestly reported `status=BLOCKED`, `route=OPERATOR_MANUAL`, `reason=STEAM_USER_NOT_LOGGED_IN` (`BLOCKED_EXTERNAL`, `NATIVE_VERIFIED: 0`)
-- Original `BZ2R/battlezone2.exe` MD5 verified unchanged (`e2fa7458cf2604315f48915acd288689`)
+- `NATIVE PREFLIGHT` reported `status=STRUCTURALLY_VALID`, `route=STEAM_MANAGED` in this isolated GUI session; it is still only structural validation and never claims `NATIVE_VERIFIED` without a live attested run
+- Original `BZ2R/battlezone2.exe` MD5 verified unchanged (`e2fa7458cf2604315f48915acd288689`); `steam_appid.txt` now exists in the read-only game root but no live launch was attempted in this ticket
 - Captured & visually inspected screenshots: `.saipen/evidence/gui_verify/exe_weapons_lab.png`, `exe_particle_lab.png`, `exe_titan_lightning.png`, `gui_verify_report.txt`
 
 The exported binary also headless-boots cleanly (`build\BZ_ODF_SHAMAN.exe --headless --quit-after 120`, exit 0).

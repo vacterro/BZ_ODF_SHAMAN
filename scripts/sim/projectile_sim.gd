@@ -48,6 +48,15 @@ class Shot:
 	var hit_target_id: String = ""
 	var hit_obstacle_id: String = ""
 	var damage_applied: float = 0.0
+	var hit_normal: Vector3 = Vector3.ZERO
+	var target_shield_max: float = 0.0
+	var target_shield: float = 0.0
+	var target_shield_class: String = ""
+	var shield_damage_ratio: float = 1.0
+	var shield_damage_applied: float = 0.0
+	var damage_to_hull: float = 0.0
+	var ammo_cost: int = 0
+	var ammo_spent: int = 0
 	var splash_hits: Array[Dictionary] = []
 	var extra_targets: Array = []
 	var obstacles: Array = []
@@ -93,8 +102,14 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
 	s.speed = maxf(profile.shot_speed, s.velocity.length())
 	s.life_span = profile.life_span
 	s.radius = profile.shot_radius
-	s.damage_value = profile.expected_damage()
+	s.damage_value = profile.expected_damage_for_target()
 	s.damage_radius = profile.damage_radius
+	s.target_shield_max = profile.target_shield_max
+	s.target_shield = profile.target_shield_max
+	s.target_shield_class = profile.target_shield_class
+	s.shield_damage_ratio = profile.shield_damage_ratio()
+	s.ammo_cost = profile.ammo_cost
+	s.ammo_spent = mini(s.ammo_cost, profile.target_ammo_max if profile.target_ammo_max > 0 else s.ammo_cost)
 	s.gravity = GRAVITY if profile.is_arcing else 0.0
 	s.omega_turn = profile.omega_turn
 	s.is_homing = profile.is_homing
@@ -259,6 +274,7 @@ func _check_shot(s: Shot, step: float) -> void:
 	s.position = s.previous + delta * clampf(best_t, 0.0, 1.0)
 	s.hit_target_id = hit_tid
 	s.hit_obstacle_id = hit_oid
+	s.hit_normal = _hit_normal(s, kind)
 	_finish(s, kind)
 
 
@@ -271,24 +287,28 @@ func _finish(s: Shot, kind: String) -> void:
 		_log("explosion", "Explosion ODF selected: %s" % (xpl if xpl != "" else "(none declared)"))
 		var applied := s.damage_value
 		s.damage_applied = applied
+		var to_hull := _apply_shield(s, applied)
+		s.damage_to_hull = to_hull
 		if s.hit_target_id != "" and s.hit_target_id != "primary":
 			var matched_extra: Dictionary = {}
 			for et in s.extra_targets:
 				if et is Dictionary and str(et.get("id", "")) == s.hit_target_id:
 					var hp_cur := float(et.get("health", s.target_health_max))
 					var hp_max := float(et.get("max_health", s.target_health_max))
-					et["health"] = maxf(0.0, hp_cur - applied)
+					et["health"] = maxf(0.0, hp_cur - to_hull)
 					matched_extra = et
-					_log("damage", "Damage calculated on %s: %.2f (armor class %s) -> hull %.2f / %.2f" % [
-						str(et.get("name", s.hit_target_id)), applied, str(et.get("armor", s.target_armor)), float(et["health"]), hp_max
+					_log("damage", "Damage calculated on %s: %.2f (armor class %s, shield class %s) -> hull %.2f / %.2f" % [
+						str(et.get("name", s.hit_target_id)), applied, str(et.get("armor", s.target_armor)),
+						s.target_shield_class, float(et["health"]), hp_max
 					])
 					break
 			if matched_extra.is_empty():
-				s.target_health = max(0.0, s.target_health - applied)
+				s.target_health = max(0.0, s.target_health - to_hull)
 		else:
-			s.target_health = max(0.0, s.target_health - applied)
-			_log("damage", "Damage calculated: %.2f (armor class %s) -> target hull %.2f / %.2f" % [
-				applied, s.target_armor, s.target_health, s.target_health_max
+			s.target_health = max(0.0, s.target_health - to_hull)
+			_log("damage", "Damage calculated: %.2f (armor class %s, shield class %s) -> target hull %.2f / %.2f" % [
+				applied, s.target_armor, s.target_shield_class if s.target_shield_class != "" else "none",
+				s.target_health, s.target_health_max
 			])
 		if s.damage_radius > 0.0:
 			_apply_multi_target_splash(s, s.hit_target_id)
@@ -316,10 +336,56 @@ func _finish(s: Shot, kind: String) -> void:
 		"position": s.position,
 		"age": s.age,
 		"damage": s.damage_applied,
+		"damage_to_hull": s.damage_to_hull,
+		"shield_damage": s.shield_damage_applied,
+		"shield_remaining": s.target_shield,
+		"shield_class": s.target_shield_class,
+		"hit_normal": s.hit_normal,
+		"ammo_cost": s.ammo_cost,
+		"ammo_spent": s.ammo_spent,
 		"splash_hits": s.splash_hits,
 		"target_health": s.target_health,
 		"ordnance": s.ordnance_name,
 	})
+
+
+## Consume shield before hull. Shield ratio follows the documented BZCC
+## mapping (N/A=1, S=0.75, D=0.5) multiplied by ordnance DamageShield; this is
+## an APPROXIMATED preview model, not native engine damage.
+func _apply_shield(s: Shot, raw_damage: float) -> float:
+	if s.target_shield_max <= 0.0 or s.target_shield_class == "":
+		return raw_damage
+	var shield_hit := raw_damage * s.shield_damage_ratio
+	var absorbed := minf(s.target_shield, shield_hit)
+	s.target_shield = maxf(0.0, s.target_shield - absorbed)
+	s.shield_damage_applied = absorbed
+	var spill := maxf(0.0, shield_hit - absorbed)
+	var hull_damage := raw_damage * spill / maxf(0.0001, shield_hit)
+	_log("damage", "Shield class %s absorbed %.2f (ratio %.2f), spill to hull %.2f, shield %.2f / %.2f (APPROXIMATED)" % [
+		s.target_shield_class, absorbed, s.shield_damage_ratio, hull_damage, s.target_shield, s.target_shield_max
+	])
+	return hull_damage
+
+
+## Collision normal from the resolved impact point. Spheres/BBoxes use the
+## outward vector from the hit centre; ground uses +Y.
+func _hit_normal(s: Shot, kind: String) -> Vector3:
+	if kind == "ground":
+		return Vector3.UP
+	if kind == "expire":
+		return Vector3.ZERO
+	var center := s.target_position
+	if kind == "vehicle" and s.target_half_extents.length_squared() > 0.0001:
+		center = s.target_bbox_center
+	elif kind == "obstacle":
+		for obs in s.obstacles:
+			if obs is Dictionary and str(obs.get("id", "")) == s.hit_obstacle_id:
+				center = obs.get("position", center)
+				break
+	var outward := s.position - center
+	if outward.length_squared() < 0.000001:
+		return -s.velocity.normalized()
+	return outward.normalized()
 
 
 func _apply_multi_target_splash(s: Shot, skip_target_id: String) -> void:
@@ -465,6 +531,13 @@ static func run_once(profile: WeaponProfile, origin: Vector3, direction: Vector3
 		"hit_target_id": s.hit_target_id,
 		"hit_obstacle_id": s.hit_obstacle_id,
 		"damage": s.damage_applied,
+		"damage_to_hull": s.damage_to_hull,
+		"shield_damage": s.shield_damage_applied,
+		"shield_remaining": s.target_shield,
+		"shield_class": s.target_shield_class,
+		"hit_normal": s.hit_normal,
+		"ammo_cost": s.ammo_cost,
+		"ammo_spent": s.ammo_spent,
 		"target_health": s.target_health,
 		"time": s.age,
 		"events": sim.events,

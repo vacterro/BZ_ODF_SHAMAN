@@ -1,0 +1,50 @@
+{
+  "board_sha256": "c4425f2b9eaaafc5",
+  "bound_work": "T-37",
+  "bound_work_phase": "SCOUT",
+  "created_at": "2026-11-21T21:36:10Z",
+  "findings_digest": "61260888c2e44ce7afe8548aaf40b75dd9fa086e5e246a68413534714d590011",
+  "gate": "core",
+  "journal_op_id": "debt.snapshot-16de96268b25",
+  "log_fingerprint": "18bbc0d81f9e9f00",
+  "problem_count": 0,
+  "problems": [],
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "reason": "pre-BUILD debt baseline for T-37",
+  "ruleset_fingerprint": "9a47d608ed3f3a833348aaeeca5cd9e9076f3bf53b1ef92b6ade46958e3e3fec",
+  "ruleset_version": 2,
+  "schema_version": 1,
+  "snapshot_id": "DEBT-000041",
+  "source_head": "83a8c8e9aa70c7c4b9eabd4252ea8777b227f4c6",
+  "source_tree_fingerprint": "git-delta-v1:09a5379b2bbc440cd1b9fd6280f57b83a905edd8c0386c9414aa64eb4f2d0bf6",
+  "state_sha256": "b5b83f5813b58bf7",
+  "validator_protocol_version": "1",
+  "warning_count": 2,
+  "warnings": [
+    {
+      "category": "log-soft-cap",
+      "credential": false,
+      "detail": ".saipen/LOG.md is <n> / <n>, past the <n> / <n> cap -- `saipen transition CLEAN` seals it into the next .saipen/logs/LOG-<NNN>.md (phases/clean.md step 4)",
+      "detail_hash": "dfb4bf66467774ab",
+      "finding_key": "64be00fb9de17a5d",
+      "rule_id": "log_soft_cap",
+      "severity": "warning",
+      "subject_id": null,
+      "subject_kind": "global",
+      "subject_ref": null
+    },
+    {
+      "category": "changelog-unarchived",
+      "credential": false,
+      "detail": "CHANGELOG.md carries <n> while it states it keeps the most recent ~10 -- the overflow belongs in CHANGELOG_ARCHIVE.md, moved verbatim the way LOG segments are sealed, so the top of the file stays the part anyone actually reads",
+      "detail_hash": "434b52b44ae55366",
+      "finding_key": "a0424a3e4cacc44c",
+      "rule_id": "changelog_unarchived",
+      "severity": "warning",
+      "subject_id": null,
+      "subject_kind": "global",
+      "subject_ref": null
+    }
+  ]
+}

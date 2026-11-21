@@ -5,13 +5,16 @@
 **Structurally valid LuaMission BZN generation, exact stage-to-BZCC mount mapping, Steam launch
 capability routing, controlled `WriteToFile` LuaMission scripting, process-local trusted session
 attestation, and MD5-verified staging cleanup are implemented and regression-tested.**
-Live native BZCC execution on this host is explicitly `BLOCKED` by `STEAM_USER_NOT_LOGGED_IN`
-(`ActiveUser = 0x0` in the isolated Windows session; Steam client is present at
+No live native BZCC execution or calibration is claimed (`NATIVE_VERIFIED: 0`). The original
+isolated Windows session was `BLOCKED` by `STEAM_USER_NOT_LOGGED_IN` (`ActiveUser = 0x0`; Steam client is present at
 `V:\__STORE_V\_SOFT\Steam\steam.exe` and direct `battlezone2.exe` launch exits `53` to trigger
-`SteamAPI_RestartAppIfNecessary`). Native verified count remains `0` and nothing claims otherwise.
+`SteamAPI_RestartAppIfNecessary`). A later `T-42` GUI verification observed a different Steam
+session state and reported `STRUCTURALLY_VALID` / `STEAM_MANAGED`; this is only structural validation,
+not a live attested run. Nothing claims `NATIVE_VERIFIED`.
 
 Implemented in `scripts/native/` (`native_experiment_session.gd`, `native_resource_closure.gd`,
-`safe_stage_manager.gd`, `native_test_adapter.gd`, `native_experiment_runner.gd`):
+`safe_stage_manager.gd`, `native_test_adapter.gd`, `native_experiment_runner.gd`,
+`native_process_monitor.gd`):
 
 - **Single immutable experiment identity (`NativeExperimentSession`)** — binds `session_id`,
   `launch_nonce`, `scenario_hash`, `stage_root`, `observation_path`, `expected_odf_hashes`, and
@@ -26,7 +29,14 @@ Implemented in `scripts/native/` (`native_experiment_session.gd`, `native_resour
   recovers active/staged/awaiting sessions across restart (`recover_sessions()`), and exposes
   five explicit controls in Weapons Lab (`PREFLIGHT`, `STAGE`, `LAUNCH / HANDOFF`, `COLLECT`,
   `CLEANUP`) supporting both `STEAM_MANAGED` (`-applaunch 624970`) and `OPERATOR_MANUAL`
-  (`operator_instructions.txt` → `AWAITING_OPERATOR`) workflows;
+  (`operator_instructions.txt` → `AWAITING_OPERATOR`) workflows.
+  Checked transitions (`T-40` / P1-02) persist the session record and ledger before any
+  externally visible success; a failed persist returns `STATE_PERSIST_FAILED` /
+  `RECOVERY_PENDING` and is preserved on restart. The bounded asynchronous
+  `NativeProcessMonitor` (`P1-03`) captures preexisting game PIDs before Steam spawn, verifies a
+  new `battlezone2.exe` by path and MD5, advances through mission/probe states, bounds both poll
+  count and timeout, persists across restart (`resume_monitor`), and never promotes synthetic or
+  unattested observations to `NATIVE_VERIFIED`;
 - **Game & Steam discovery** — resolves `battlezone2.exe`, `Missions/LuaMission.dll`, Data/Res
   roots, Workshop root, Addon folder, and `steam.exe` (`LauncherPath` in `appmanifest_624970.acf`),
   plus read-only Steam active session status (`HKCU\Software\Valve\Steam\ActiveProcess`);
@@ -83,7 +93,9 @@ What already existed and still applies:
 | Durable preflight package persistence, byte-exact MD5 hash verification (`UTF-8`/`BOM`/`UTF-16LE`), fail-closed staging/launch | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `N-D01..N-D10` |
 | Production vs test evidence gate (fake PID/mission/probe options ignored, synthetic rejected, operator-imported unattested) | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `N-E01..N-E08` |
 | Persistent `ModLoadout` explicit conflict winner shared identically by `ResourceIndex` and `NativeResourceClosureBuilder` | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `T-34` |
-| Live Steam BZCC execution & engine health-delta calibration | `BLOCKED_EXTERNAL` (`NATIVE_VERIFIED: 0`) | Steam client logged out (`ActiveUser = 0x0` -> `STEAM_USER_NOT_LOGGED_IN`); original `BZ2R` untouched |
+| Checked durable session transitions (`STATE_PERSIST_FAILED` / `RECOVERY_PENDING`) | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `ND-11..ND-15` (`T-40`) |
+| Bounded asynchronous `NativeProcessMonitor` with PID/exe verification, mission/probe state machine, restart recovery, timeout/cancel | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `SM-01..SM-07` (`T-40`) |
+| Live Steam BZCC execution & engine health-delta calibration | `NOT_VERIFIED` (`NATIVE_VERIFIED: 0`) | Original session blocked (`ActiveUser = 0x0` -> `STEAM_USER_NOT_LOGGED_IN`); later preflight `STRUCTURALLY_VALID` / `STEAM_MANAGED`; original `BZ2R` untouched |
 
 ## Remaining adapter work (when a logged-in Steam session is available)
 

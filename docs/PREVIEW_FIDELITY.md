@@ -9,12 +9,12 @@ The UI shows one of the required labels: **NATIVE VERIFIED**, **DATA-DRIVEN**,
 | Weapon chain resolution | DATA-DRIVEN | shooter → weapon → ordnance → explosion, with inheritance |
 | Projectile flight | APPROXIMATED | metre-scale straight/arcing motion; BZCC units/tick model not reproduced |
 | Collision | APPROXIMATED | sphere vs sphere + swept ray-vs-AABB 3D obstacles + multi-target earliest-hit ordering; no model mesh or terrain slope collision |
-| Damage | APPROXIMATED | armor-class lookup + linear splash falloff + independent secondary targets; shields not modelled |
-| Particle preview | APPROXIMATED | documented fields mapped to CPUParticles3D across 11 render bases + live cross-file `file.header` preview |
+| Damage | APPROXIMATED | armor-class lookup + documented `damageValue(S/D/A)` for shielded targets, shieldRatio N/A=1/S=0.75/D=0.5, `DamageShield` multiplier, `ammoCost` accounting, outward hit normals, linear splash falloff and independent secondary targets; shield absorption is a preview model, not native engine damage |
+| Particle preview | APPROXIMATED | documented fields mapped to CPUParticles3D across 11 render bases + live cross-file `file.header` preview, animated crossed-ribbon trails for `draw_trail`/`draw_twirl_trail`, and Live Parameter Inspection of parsed vs actual node values |
 | Explosion effects | APPROXIMATED | real xpl particleClass/count/lifetime/colour/radius mapped to a one-shot burst + light + explosion WAV playback; exact engine curves absent |
 | Audio | DATA-DRIVEN (playback) | real PCM WAV decoded/played via bounded 8-channel multichannel pool (fire + explosion SFX) with synchronized interactive Timeline; no spatial attenuation or pitch model |
-| Models | DATA-DRIVEN (DOCB `.msh`) | baked `.msh` hierarchy, `.material`, DDS/TGA textures, `turret_y`/`turret_x` & `hp_*` hardpoints decoded; fallback `PLACEHOLDER MESH` if absent |
-| Native BZCC comparison | BLOCKED | `NativeExperimentSession` + `NativeResourceClosureBuilder` + `SafeStageManager` + `NativeExperimentRunner` durable ledger & split GUI controls built; live launch blocked (`STEAM_USER_NOT_LOGGED_IN`, `ActiveUser = 0x0`) |
+| Models | DATA-DRIVEN (DOCB `.msh`) | baked `.msh` hierarchy, `.material`, DDS/TGA textures, `turret_y`/`turret_x` & `hp_*` hardpoints decoded; embedded DOCB animation metadata (bones/poses/animation count) and companion `.msha` lookup reported honestly; skin weights/tracks not decoded; fallback `PLACEHOLDER MESH` if absent |
+| Native BZCC comparison | NOT_VERIFIED | `NativeExperimentSession` + `NativeResourceClosureBuilder` + `SafeStageManager` + `NativeExperimentRunner` durable ledger, checked transitions and bounded async `NativeProcessMonitor` built; original session was blocked (`STEAM_USER_NOT_LOGGED_IN`), later preflight was `STRUCTURALLY_VALID` / `STEAM_MANAGED`; no live-attested comparison has run |
 
 No scenario has been marked NATIVE VERIFIED.
 

@@ -14,6 +14,8 @@ const ASSET_EXTS := ["wav", "msh", "msha", "material", "dds", "tga", "png", "bmp
 
 const VSR_PACKAGE_IDS := ["1325933293", "3532748119"]
 const VRV_PACKAGE_IDS := ["3820486276"]
+const POLICY_STRICT_ACTIVE_LOADOUT := "STRICT_ACTIVE_LOADOUT"
+const POLICY_EDITOR_PREVIEW_FALLBACK := "EDITOR_PREVIEW_FALLBACK"
 
 const BUILTIN_STEM_NAMES := {
 	"ivscav": "Scavenger", "fvscav": "Scavenger", "evscav": "Scavenger", "cvscav": "Scavenger",
@@ -60,6 +62,12 @@ var active_packages: Array[String] = []
 ## Active persistent ModLoadout profile id and explicit per-ODF conflict winners.
 var active_loadout_profile_id: String = ""
 var explicit_resource_winners: Dictionary = {}  # filename.odf (lc) -> canonical path
+## P1-01 / ML-01..ML-05: Strict loadout isolation policy & diagnostics.
+var resolution_policy: String = POLICY_STRICT_ACTIVE_LOADOUT
+var strict_package_filter: bool = false
+var allow_base_game_fallback: bool = true
+var allow_disabled_explicit_winners: bool = false
+var last_resolution_diagnostics: Array[Dictionary] = []
 var _game_name_cache: Dictionary = {}
 
 
@@ -322,39 +330,54 @@ func cancel_scan() -> void:
 	_cancel = true
 
 
-func set_active_packages(pkgs: Array) -> void:
+func set_active_packages(pkgs: Array, strict: bool = true) -> void:
 	active_packages.clear()
 	for p in pkgs:
 		var s := str(p).strip_edges()
-		if s != "" and not active_packages.has(s):
+		if s != "" and s != "auto" and s != "all" and s != "stock" and s != "base" and not active_packages.has(s):
 			active_packages.append(s)
+	strict_package_filter = strict
+	last_resolution_diagnostics.clear()
 	generation += 1
 
 
 func set_active_package(pkg_id: String) -> void:
 	var s := pkg_id.strip_edges()
+	var low := s.to_lower()
 	active_loadout_profile_id = ""
 	explicit_resource_winners.clear()
-	if s == "" or s == "all" or s == "auto":
-		set_active_packages([])
+	resolution_policy = POLICY_STRICT_ACTIVE_LOADOUT
+	allow_base_game_fallback = true
+	allow_disabled_explicit_winners = false
+	if s == "" or low == "all" or low == "auto":
+		set_active_packages([], false)
+	elif low == "stock" or low == "base" or low == "none":
+		set_active_packages([], true)
 	else:
-		set_active_packages([s])
+		set_active_packages([s], true)
 
 
-## Apply a persistent ModLoadout profile (enabled packages, priority order, and
-## explicit per-ODF conflict winners) so editor, labs, and native staging share
-## the exact same effective resource identity.
+## Apply a persistent ModLoadout profile (enabled packages, priority order,
+## resolution policy, and explicit per-ODF conflict winners) so editor, labs,
+## and native staging share the exact same effective resource identity.
 func apply_loadout(loadout) -> Dictionary:
 	if loadout == null:
 		return {"ok": false, "error": "null loadout"}
 	active_loadout_profile_id = str(loadout.profile_id)
+	var pol := str(loadout.resolution_policy).strip_edges()
+	resolution_policy = pol if (pol == POLICY_STRICT_ACTIVE_LOADOUT or pol == POLICY_EDITOR_PREVIEW_FALLBACK) else POLICY_STRICT_ACTIVE_LOADOUT
+	allow_base_game_fallback = bool(loadout.allow_base_game_fallback)
+	allow_disabled_explicit_winners = bool(loadout.allow_disabled_explicit_winners)
 	explicit_resource_winners.clear()
 	for k in loadout.explicit_resource_winners:
 		explicit_resource_winners[str(k).to_lower()] = WorkspaceStore.canonical(str(loadout.explicit_resource_winners[k]))
-	set_active_packages(loadout.effective_package_order())
+	# Explicit ModLoadout ALWAYS enables strict package filtering (even if enabled_packages == []).
+	set_active_packages(loadout.effective_package_order(), true)
 	return {
 		"ok": true,
 		"profile_id": active_loadout_profile_id,
+		"resolution_policy": resolution_policy,
+		"strict_package_filter": strict_package_filter,
 		"active_packages": active_packages.duplicate(),
 		"explicit_winners": explicit_resource_winners.size(),
 	}
@@ -531,67 +554,257 @@ func candidates(name: String) -> Array[Dictionary]:
 	return out
 
 
-func resolve(name: String) -> Dictionary:
+func _record_resolution_diagnostic(diag: Dictionary) -> void:
+	if last_resolution_diagnostics.size() >= 100:
+		last_resolution_diagnostics.pop_front()
+	last_resolution_diagnostics.append(diag)
+
+
+## Canonical policy-aware ODF resolution (P1-01 / ML-01..ML-05).
+## Under STRICT_ACTIVE_LOADOUT (default for explicit loadouts & native):
+##   - Disabled Workshop packages are NEVER silently substituted.
+##   - Explicit winners pointing to disabled packages emit EXPLICIT_WINNER_DISABLED_PACKAGE.
+## Under EDITOR_PREVIEW_FALLBACK:
+##   - Fallback to a disabled package is allowed ONLY with explicit status
+##     RESOLVED_WITH_PREVIEW_FALLBACK and non-empty provenance warning.
+func resolve_ex(name: String, context_path: String = "", policy_override: String = "",
+		active_pkgs_override = null) -> Dictionary:
 	var clean := _clean_ref(name)
-	var list := candidates(clean)
-	if list.is_empty():
-		return {}
 	var lck := clean.to_lower()
+	var eff_policy := policy_override.strip_edges() if policy_override.strip_edges() != "" else resolution_policy
+	if eff_policy != POLICY_STRICT_ACTIVE_LOADOUT and eff_policy != POLICY_EDITOR_PREVIEW_FALLBACK:
+		eff_policy = POLICY_STRICT_ACTIVE_LOADOUT
+	var use_strict := strict_package_filter or (not active_packages.is_empty()) or (active_pkgs_override is Array)
+	var eff_pkgs: Array[String] = []
+	if active_pkgs_override is Array:
+		for p in active_pkgs_override:
+			var sp := str(p).strip_edges()
+			if sp != "" and not eff_pkgs.has(sp):
+				eff_pkgs.append(sp)
+	else:
+		eff_pkgs = active_packages.duplicate()
+
+	var list := candidates(clean)
+	if list.is_empty() and not explicit_resource_winners.has(lck):
+		return {
+			"found": false,
+			"entry": {},
+			"path": "",
+			"package": "",
+			"kind": "",
+			"rule": "not_found",
+			"status": "RESOURCE_NOT_FOUND",
+			"warning": "",
+			"blocked_disabled_packages": [],
+			"policy": eff_policy,
+		}
+
+	# 0. Explicit per-ODF conflict winner check (ML-03).
 	if explicit_resource_winners.has(lck):
 		var wanted := str(explicit_resource_winners[lck])
+		var matched: Dictionary = {}
 		for c in list:
 			if WorkspaceStore._same_canon_path(str(c.get("path", "")), wanted):
-				return c
-	if not active_packages.is_empty():
-		for pkg in active_packages:
-			for c in list:
-				if str(c.get("package", "")) == pkg:
-					return c
+				matched = c
+				break
+		if matched.is_empty() and FileAccess.file_exists(wanted):
+			var dpkg := package_of(wanted)
+			matched = {"path": wanted, "package": dpkg, "kind": "workshop" if dpkg != "" else "explicit"}
+		if not matched.is_empty():
+			var wpkg := str(matched.get("package", ""))
+			var wkind := str(matched.get("kind", ""))
+			var is_disabled_ws := use_strict and (wkind == "workshop" or wpkg != "") and not eff_pkgs.has(wpkg)
+			if is_disabled_ws and not allow_disabled_explicit_winners:
+				var warn_dw := "Explicit winner '%s' belongs to disabled Workshop package '%s'" % [lck, wpkg]
+				_record_resolution_diagnostic({
+					"resource": lck,
+					"status": "EXPLICIT_WINNER_DISABLED_PACKAGE",
+					"package": wpkg,
+					"path": wanted,
+					"policy": eff_policy,
+					"warning": warn_dw,
+				})
+				if eff_policy == POLICY_STRICT_ACTIVE_LOADOUT:
+					return {
+						"found": false,
+						"entry": {},
+						"path": "",
+						"package": wpkg,
+						"kind": wkind,
+						"rule": "explicit_winner_disabled",
+						"status": "EXPLICIT_WINNER_DISABLED_PACKAGE",
+						"warning": warn_dw,
+						"blocked_disabled_packages": [wpkg],
+						"policy": eff_policy,
+					}
+				return {
+					"found": true,
+					"entry": matched,
+					"path": str(matched.get("path", "")),
+					"package": wpkg,
+					"kind": wkind,
+					"rule": "explicit_winner_disabled_fallback",
+					"status": "RESOLVED_WITH_PREVIEW_FALLBACK",
+					"warning": warn_dw + " (allowed via EDITOR_PREVIEW_FALLBACK)",
+					"blocked_disabled_packages": [wpkg],
+					"policy": eff_policy,
+				}
+			return {
+				"found": true,
+				"entry": matched,
+				"path": str(matched.get("path", "")),
+				"package": wpkg,
+				"kind": wkind,
+				"rule": "explicit_winner",
+				"status": "RESOLVED",
+				"warning": "",
+				"blocked_disabled_packages": [],
+				"policy": eff_policy,
+			}
+
+	# 1. Partition candidates into allowed vs disabled Workshop vs base game / addon.
+	var allowed_ws: Array[Dictionary] = []
+	var disabled_ws: Array[Dictionary] = []
+	var blocked_pkgs: Array[String] = []
+	var base_game: Array[Dictionary] = []
+	var addon_list: Array[Dictionary] = []
+	var other_list: Array[Dictionary] = []
 	for c in list:
-		if str(c.get("kind", "")) == "game":
-			return c
-	return list[0]
+		var kind := str(c.get("kind", ""))
+		var cpkg := str(c.get("package", ""))
+		if kind == "workshop" or cpkg != "":
+			if not use_strict or eff_pkgs.has(cpkg):
+				allowed_ws.append(c)
+			else:
+				disabled_ws.append(c)
+				if cpkg != "" and not blocked_pkgs.has(cpkg):
+					blocked_pkgs.append(cpkg)
+		elif kind == "game":
+			base_game.append(c)
+		elif kind == "addon":
+			addon_list.append(c)
+		else:
+			other_list.append(c)
+
+	# 2. Active package priority order.
+	if not eff_pkgs.is_empty():
+		for ap in eff_pkgs:
+			for c in allowed_ws:
+				if str(c.get("package", "")) == ap:
+					return {
+						"found": true, "entry": c, "path": str(c.get("path", "")),
+						"package": ap, "kind": str(c.get("kind", "")),
+						"rule": "active_package:" + ap, "status": "RESOLVED",
+						"warning": "", "blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+					}
+
+	# 3. Same Workshop package as context document (ONLY when not disabled under strict filter!).
+	var ctx_pkg := package_of(context_path) if context_path != "" else ""
+	if ctx_pkg != "" and (not use_strict or eff_pkgs.has(ctx_pkg)):
+		for c in allowed_ws:
+			if str(c.get("package", "")) == ctx_pkg:
+				return {
+					"found": true, "entry": c, "path": str(c.get("path", "")),
+					"package": ctx_pkg, "kind": str(c.get("kind", "")),
+					"rule": "context_package:" + ctx_pkg, "status": "RESOLVED",
+					"warning": "", "blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+				}
+
+	# 4. Base game / addon / custom non-workshop roots.
+	if allow_base_game_fallback:
+		if not base_game.is_empty():
+			var bg: Dictionary = base_game[0]
+			return {
+				"found": true, "entry": bg, "path": str(bg.get("path", "")),
+				"package": "", "kind": "game", "rule": "base_game", "status": "RESOLVED",
+				"warning": "", "blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+			}
+		if not addon_list.is_empty():
+			var ad: Dictionary = addon_list[0]
+			return {
+				"found": true, "entry": ad, "path": str(ad.get("path", "")),
+				"package": "", "kind": "addon", "rule": "addon", "status": "RESOLVED",
+				"warning": "", "blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+			}
+		if not other_list.is_empty():
+			var ot: Dictionary = other_list[0]
+			return {
+				"found": true, "entry": ot, "path": str(ot.get("path", "")),
+				"package": "", "kind": str(ot.get("kind", "")), "rule": "other_root", "status": "RESOLVED",
+				"warning": "", "blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+			}
+
+	# 5. Unscoped Auto mode (all Workshop packages enabled).
+	if not use_strict and not allowed_ws.is_empty():
+		var aw: Dictionary = allowed_ws[0]
+		return {
+			"found": true, "entry": aw, "path": str(aw.get("path", "")),
+			"package": str(aw.get("package", "")), "kind": str(aw.get("kind", "")),
+			"rule": "auto_workshop", "status": "RESOLVED",
+			"warning": "", "blocked_disabled_packages": [], "policy": eff_policy,
+		}
+
+	# 6. Only disabled Workshop candidates remain: strict block OR explicit provenance-warned preview fallback.
+	if not disabled_ws.is_empty():
+		if eff_policy == POLICY_EDITOR_PREVIEW_FALLBACK:
+			var fb: Dictionary = disabled_ws[0]
+			var fb_pkg := str(fb.get("package", ""))
+			var fb_warn := "Resource '%s' not in active loadout; using disabled package '%s' via EDITOR_PREVIEW_FALLBACK" % [lck, fb_pkg]
+			_record_resolution_diagnostic({
+				"resource": lck,
+				"status": "RESOLVED_WITH_PREVIEW_FALLBACK",
+				"package": fb_pkg,
+				"path": str(fb.get("path", "")),
+				"policy": eff_policy,
+				"warning": fb_warn,
+			})
+			return {
+				"found": true, "entry": fb, "path": str(fb.get("path", "")),
+				"package": fb_pkg, "kind": str(fb.get("kind", "")),
+				"rule": "editor_preview_fallback", "status": "RESOLVED_WITH_PREVIEW_FALLBACK",
+				"warning": fb_warn, "blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+			}
+		var blk_warn := "Resource '%s' only exists in disabled Workshop package(s): %s" % [lck, ", ".join(blocked_pkgs)]
+		_record_resolution_diagnostic({
+			"resource": lck,
+			"status": "MISSING_OR_DISABLED_RESOURCE",
+			"blocked_packages": blocked_pkgs,
+			"policy": eff_policy,
+			"warning": blk_warn,
+		})
+		return {
+			"found": false, "entry": {}, "path": "", "package": "", "kind": "",
+			"rule": "blocked_disabled_package", "status": "MISSING_OR_DISABLED_RESOURCE",
+			"warning": blk_warn, "blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+		}
+
+	return {
+		"found": false, "entry": {}, "path": "", "package": "", "kind": "",
+		"rule": "base_game_fallback_disabled", "status": "MISSING_OR_DISABLED_RESOURCE",
+		"warning": "Base game fallback disabled and no enabled package provides '%s'" % lck,
+		"blocked_disabled_packages": blocked_pkgs, "policy": eff_policy,
+	}
+
+
+func resolve(name: String) -> Dictionary:
+	return resolve_ex(name, "").get("entry", {})
 
 
 func resolve_path(name: String) -> String:
-	var hit := resolve(name)
-	return str(hit.get("path", "")) if not hit.is_empty() else ""
+	var hit := resolve_ex(name, "")
+	return str(hit.get("path", "")) if bool(hit.get("found", false)) else ""
 
 
 ## Context-aware resolution used by dependency and inheritance chains.
-## Order: explicit ModLoadout winner, explicit active_packages loadout (when set),
-## then same Workshop package as the referring document, then base game data,
-## then other mod packages by priority.
+## Delegates to resolve_ex() so editor, labs, and native staging enforce one
+## consistent strict loadout policy.
 func resolve_from(name: String, context_path: String) -> Dictionary:
-	var clean := _clean_ref(name)
-	var list := candidates(clean)
-	if list.is_empty():
-		return {}
-	var lck := clean.to_lower()
-	if explicit_resource_winners.has(lck):
-		var wanted := str(explicit_resource_winners[lck])
-		for c in list:
-			if WorkspaceStore._same_canon_path(str(c.get("path", "")), wanted):
-				return c
-	var pkg := package_of(context_path)
-	if not active_packages.is_empty():
-		for ap in active_packages:
-			for c in list:
-				if str(c.get("package", "")) == ap:
-					return c
-	if pkg != "":
-		for c in list:
-			if str(c.get("package", "")) == pkg:
-				return c
-	for c in list:
-		if str(c.get("kind", "")) == "game":
-			return c
-	return list[0]
+	return resolve_ex(name, context_path).get("entry", {})
 
 
 func resolve_path_from(name: String, context_path: String) -> String:
-	var hit := resolve_from(name, context_path)
-	return str(hit.get("path", "")) if not hit.is_empty() else ""
+	var hit := resolve_ex(name, context_path)
+	return str(hit.get("path", "")) if bool(hit.get("found", false)) else ""
 
 
 func package_of(path: String) -> String:
@@ -818,7 +1031,8 @@ func find_asset_near(name: String, extensions: Array[String], context_path: Stri
 
 
 func find_asset(name: String, extensions: Array[String], context_path: String = "") -> String:
-	## Asset lookup against the indexed asset map (same package -> base game -> other mods).
+	## Asset lookup against the indexed asset map (active_packages -> same enabled package -> base game -> addon).
+	## Under STRICT_ACTIVE_LOADOUT with strict_package_filter, disabled Workshop packages are never substituted.
 	var clean := name.strip_edges().trim_prefix("\"").trim_suffix("\"")
 	if clean == "":
 		return ""
@@ -826,23 +1040,35 @@ func find_asset(name: String, extensions: Array[String], context_path: String = 
 		clean = clean.get_file()
 	var candidates := _asset_candidates(clean, extensions)
 	var pkg := package_of(context_path) if context_path != "" else ""
+	var use_strict := strict_package_filter or (not active_packages.is_empty())
 	for cand in candidates:
 		var list: Array = assets_by_name.get(cand.to_lower(), [])
 		if not list.is_empty():
-			if pkg != "":
+			if not active_packages.is_empty():
+				for ap in active_packages:
+					for item in list:
+						if str(item.get("package", "")) == ap:
+							return str(item.path)
+			if pkg != "" and (not use_strict or active_packages.has(pkg)):
 				for item in list:
 					if str(item.get("package", "")) == pkg:
 						return str(item.path)
 			for item in list:
 				if str(item.get("kind", "")) == "game":
 					return str(item.path)
-			var best: Dictionary = list[0]
 			for item in list:
-				if int(item.priority) > int(best.priority):
-					best = item
-			return str(best.path)
-	# Fall back to a direct filename scan of the common flat asset dirs.
+				if str(item.get("kind", "")) == "addon":
+					return str(item.path)
+			if not use_strict or resolution_policy == POLICY_EDITOR_PREVIEW_FALLBACK:
+				var best: Dictionary = list[0]
+				for item in list:
+					if int(item.priority) > int(best.priority):
+						best = item
+				return str(best.path)
+	# Fall back to a direct filename scan of the common flat asset dirs (non-workshop roots when strict).
 	for r in available_roots():
+		if use_strict and str(r.get("kind", "")) == "workshop":
+			continue
 		var root := str(r.get("path", ""))
 		for sub in ["audio", "effects", "baked", "bakedm", "interface", "objects", ""]:
 			for cand in candidates:

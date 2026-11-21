@@ -13,6 +13,7 @@ export_credentials.cfg
 # versioned; only the mechanics below are excluded.
 .saipen/locks/
 .saipen/cache/
+.saipen/kitchen/
 .saipen/recovery/ops/
 .saipen/recovery/settled-index/
 .saipen/recovery/board-terminal.json

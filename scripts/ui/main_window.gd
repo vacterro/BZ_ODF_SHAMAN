@@ -7,6 +7,7 @@ const SETTINGS_PATH := "user://settings.json"
 const GAME_ROOT := "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R"
 const HoudiniScrubberScript = preload("res://scripts/ui/houdini_scrubber.gd")
 const ModLoadoutScript = preload("res://scripts/core/mod_loadout.gd")
+const BzMeshReaderScript = preload("res://scripts/core/bz_mesh_reader.gd")
 const UI_SCALE_PRESETS := [0.75, 0.85, 1.0, 1.15, 1.25, 1.5, 1.75, 2.0]
 
 var index: ResourceIndex
@@ -59,6 +60,7 @@ var ui_scale_option: OptionButton
 var mute_button: Button
 var reset_ui_button: Button
 var reset_all_button: Button
+var recovery_history_button: Button
 var reset_doc_button: Button
 var volume_scrubber: HBoxContainer
 var _factory_doc_cache: Dictionary = {}
@@ -69,11 +71,20 @@ var live_swap_option: OptionButton
 var live_swap_mode: String = "off"  # off, shooter, target, auto_lab
 var reset_all_dialog: ConfirmationDialog
 var reset_doc_dialog: ConfirmationDialog
+var recovery_history_dialog: AcceptDialog
+var recovery_history_tree: Tree
+var recovery_history_info: Label
+var _recovery_history_rows: Array[Dictionary] = []
 var reset_all_confirmation_pending := false
 var reset_doc_confirmation_pending := false
+var _reset_impact_rev: int = 0
+var _pending_reset_all_snapshot: Dictionary = {}
+var _pending_reset_doc_snapshot: Dictionary = {}
+var _pending_project_config_reset := false
 var last_reset_impact_preview: Dictionary = {}
 var last_reset_all_report: Dictionary = {}
 var last_reset_doc_result: Dictionary = {}
+var last_recovery_restore_result: Dictionary = {}
 var last_property_reset_info: Dictionary = {}
 var actor_picker_dialog: AcceptDialog
 var actor_picker_role: String = "shooter"
@@ -156,6 +167,8 @@ func _build_ui() -> void:
 	top_bar.add_child(_top_button("Save all", save_all_edited, "Save every dirty document to workspace"))
 	reset_all_button = _top_button("Reset All", request_reset_all_odfs, "Preview impact and confirm reverting all modified/overridden ODFs back to factory defaults")
 	top_bar.add_child(reset_all_button)
+	recovery_history_button = _top_button("Recovery", func(): open_recovery_history(), "Inspect and restore Reset Recovery Points (saved overrides & unsaved working revisions)")
+	top_bar.add_child(recovery_history_button)
 	top_bar.add_child(_top_button("Export...", _on_export_pressed, "Export staged overrides (dry-run report first)"))
 	top_bar.add_child(_top_button("VSR test", _load_reference_scenario, "Load gatstabvsr / ivtank_vsr / ivscav_vsr"))
 	top_bar.add_child(_top_button("Rescan", rescan_index, "Re-index roots without restarting"))
@@ -167,7 +180,7 @@ func _build_ui() -> void:
 	top_bar.add_child(loadout_lbl)
 	loadout_option = OptionButton.new()
 	loadout_option.tooltip_text = "Active Workshop package priority for resolving duplicate ODFs across Inspector, Labs, Export & Native"
-	for lp in [["VSR (3532748119)", "3532748119"], ["VSR Legacy (1325933293)", "1325933293"], ["VRV (3820486276)", "3820486276"], ["Auto / All Mods", "auto"]]:
+	for lp in [["VSR (3532748119)", "3532748119"], ["VSR Legacy (1325933293)", "1325933293"], ["VRV (3820486276)", "3820486276"], ["Stock Only (Base Game)", "stock"], ["Auto / All Mods", "auto"]]:
 		loadout_option.add_item(str(lp[0]))
 		loadout_option.set_item_metadata(loadout_option.item_count - 1, str(lp[1]))
 	loadout_option.item_selected.connect(_on_loadout_selected)
@@ -525,11 +538,132 @@ func _build_ui() -> void:
 	reset_doc_dialog.confirmed.connect(func(): confirm_reset_current_doc())
 	reset_doc_dialog.canceled.connect(func(): cancel_reset_current_doc())
 	add_child(reset_doc_dialog)
+	_build_recovery_history_dialog()
 	_build_actor_picker_dialog()
 	_populate_theme_option()
 	# Initial comfortable split proportions (user can drag freely anywhere).
 	main_hsplit.split_offset = 100
 	right_hsplit.split_offset = -160
+
+
+func _build_recovery_history_dialog() -> void:
+	recovery_history_dialog = AcceptDialog.new()
+	recovery_history_dialog.title = "Reset Recovery History"
+	recovery_history_dialog.size = Vector2i(820, 480)
+	recovery_history_dialog.ok_button_text = "Close"
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	recovery_history_dialog.add_child(vb)
+	recovery_history_info = Label.new()
+	recovery_history_info.text = "Select a Reset Recovery Point to restore saved workspace overrides and/or unsaved working revisions."
+	recovery_history_info.add_theme_color_override("font_color", Color("#C5AB6E"))
+	recovery_history_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(recovery_history_info)
+	recovery_history_tree = Tree.new()
+	recovery_history_tree.columns = 6
+	recovery_history_tree.set_column_title(0, "Timestamp")
+	recovery_history_tree.set_column_title(1, "Scope")
+	recovery_history_tree.set_column_title(2, "Documents")
+	recovery_history_tree.set_column_title(3, "Saved Override")
+	recovery_history_tree.set_column_title(4, "Working Rev")
+	recovery_history_tree.set_column_title(5, "Integrity")
+	recovery_history_tree.column_titles_visible = true
+	recovery_history_tree.hide_root = true
+	recovery_history_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	recovery_history_tree.custom_minimum_size = Vector2(760, 310)
+	vb.add_child(recovery_history_tree)
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 6)
+	vb.add_child(btn_row)
+	btn_row.add_child(_top_button("Restore Working + Saved", func(): _restore_selected_recovery_point("full"), "Restore both saved workspace override and unsaved dirty working bytes from the selected recovery point"))
+	btn_row.add_child(_top_button("Restore Saved Only", func(): _restore_selected_recovery_point("saved_only"), "Restore only the saved workspace override (discarding unsaved working edits)"))
+	btn_row.add_child(_top_button("Restore Working Only", func(): _restore_selected_recovery_point("working_only"), "Restore only the unsaved working revision into memory as a dirty document"))
+	btn_row.add_child(_top_button("Refresh", func(): _refresh_recovery_history_tree(), "Reload and re-verify recovery point hashes from disk"))
+	add_child(recovery_history_dialog)
+
+
+func list_recovery_history() -> Array[Dictionary]:
+	_recovery_history_rows = WorkspaceStore.list_reset_recovery_points()
+	return _recovery_history_rows.duplicate(true)
+
+
+func _refresh_recovery_history_tree() -> int:
+	_recovery_history_rows = WorkspaceStore.list_reset_recovery_points()
+	if recovery_history_tree == null:
+		return _recovery_history_rows.size()
+	recovery_history_tree.clear()
+	var root := recovery_history_tree.create_item()
+	for i in _recovery_history_rows.size():
+		var row: Dictionary = _recovery_history_rows[i]
+		var item := recovery_history_tree.create_item(root)
+		var docs: Array = row.get("documents", [])
+		var doc_names: Array[String] = []
+		for dp in docs:
+			doc_names.append(str(dp).get_file())
+		item.set_text(0, str(row.get("created_at", "")))
+		item.set_text(1, str(row.get("scope", "RESET")))
+		item.set_text(2, "%d: %s" % [docs.size(), ", ".join(doc_names).substr(0, 60)])
+		item.set_text(3, "YES" if bool(row.get("has_saved_override", false)) else "no")
+		item.set_text(4, "YES" if bool(row.get("has_working_revision", false)) else "no")
+		var vstat := str(row.get("verification_status", "UNKNOWN"))
+		item.set_text(5, vstat)
+		if vstat == "VERIFIED":
+			item.set_custom_color(5, Color("#81B681"))
+		else:
+			item.set_custom_color(5, Color("#E06C6C"))
+		item.set_tooltip_text(0, "%s\n%s" % [str(row.get("transaction_id", "")), str(row.get("path", ""))])
+		item.set_metadata(0, str(row.get("path", "")))
+	if recovery_history_info != null:
+		if _recovery_history_rows.is_empty():
+			recovery_history_info.text = "No reset recovery points recorded in this workspace yet."
+		else:
+			recovery_history_info.text = "%d reset recovery point(s) found. Select one and choose a Restore action." % _recovery_history_rows.size()
+	return _recovery_history_rows.size()
+
+
+func open_recovery_history() -> int:
+	var count := _refresh_recovery_history_tree()
+	if recovery_history_dialog != null and is_inside_tree():
+		recovery_history_dialog.popup_centered()
+	return count
+
+
+func _restore_selected_recovery_point(mode: String = "full") -> Dictionary:
+	if recovery_history_tree == null:
+		return {"ok": false, "status": "NO_SELECTION"}
+	var sel := recovery_history_tree.get_selected()
+	if sel == null:
+		_set_status("Recovery History: select a recovery point first.", "warning")
+		return {"ok": false, "status": "NO_SELECTION"}
+	var tx_path := str(sel.get_metadata(0))
+	return restore_recovery_point_ui(tx_path, mode)
+
+
+func restore_recovery_point_ui(tx_path: String, mode: String = "full") -> Dictionary:
+	var res := WorkspaceStore.restore_reset_recovery_point(tx_path, mode)
+	last_recovery_restore_result = res
+	var restored_list: Array = res.get("restored", [])
+	var open_target := ""
+	if current_doc != null and current_doc.source_path != "":
+		open_target = current_doc.source_path
+	elif not restored_list.is_empty():
+		open_target = str(restored_list[0])
+	if open_target != "" and (OdfDocument.cached(open_target) != null or FileAccess.file_exists(open_target)):
+		open_document(open_target)
+	if weapon_lab != null and shooter_path != "" and target_path != "":
+		weapon_lab.reload_after_raw_edit()
+	if particle_lab != null and particle_lab.doc != null:
+		particle_lab.load_document(particle_lab.doc)
+	if audio_lab != null and current_doc != null:
+		audio_lab.set_document(current_doc)
+	_refresh_recovery_history_tree()
+	if bool(res.get("ok", false)):
+		_set_status("Recovery restored %d file(s) [%s]." % [restored_list.size(), str(res.get("outcome", res.get("status", "RESTORED")))], "success")
+	else:
+		_set_status("Recovery reported %s (%d restored, %d failed)." % [
+			str(res.get("status", "FAILED")), restored_list.size(), (res.get("failed", []) as Array).size()
+		], "danger")
+	return res
 
 
 func _build_actor_picker_dialog() -> void:
@@ -687,7 +821,7 @@ func _populate_theme_option() -> void:
 func _apply_theme(slug: String) -> void:
 	theme_engine.select(slug)
 	theme = theme_engine.build_theme()
-	for dlg in [open_dialog, export_dialog, overwrite_dialog, revert_dialog, reset_all_dialog, reset_doc_dialog, actor_picker_dialog]:
+	for dlg in [open_dialog, export_dialog, overwrite_dialog, revert_dialog, reset_all_dialog, reset_doc_dialog, recovery_history_dialog, actor_picker_dialog]:
 		if dlg != null:
 			dlg.theme = theme
 	if theme_option:
@@ -706,7 +840,7 @@ func _on_theme_selected(i: int) -> void:
 func apply_font_aa(mode: String) -> void:
 	theme_engine.set_font_aa(mode)
 	theme = theme_engine.build_theme()
-	for dlg in [open_dialog, export_dialog, overwrite_dialog, revert_dialog, reset_all_dialog, reset_doc_dialog, actor_picker_dialog]:
+	for dlg in [open_dialog, export_dialog, overwrite_dialog, revert_dialog, reset_all_dialog, reset_doc_dialog, recovery_history_dialog, actor_picker_dialog]:
 		if dlg != null:
 			dlg.theme = theme
 	if font_aa_option != null:
@@ -734,7 +868,7 @@ func apply_ui_scale(scale: float) -> void:
 	if theme_engine != null:
 		theme_engine.set_ui_scale(ui_scale)
 		theme = theme_engine.build_theme()
-		for dlg in [open_dialog, export_dialog, overwrite_dialog, revert_dialog, reset_all_dialog, reset_doc_dialog, actor_picker_dialog]:
+		for dlg in [open_dialog, export_dialog, overwrite_dialog, revert_dialog, reset_all_dialog, reset_doc_dialog, recovery_history_dialog, actor_picker_dialog]:
 			if dlg != null:
 				dlg.theme = theme
 	if ui_scale_option != null:
@@ -776,6 +910,8 @@ func apply_active_loadout(pkg_id: String, persist: bool = true) -> void:
 		audio_lab.set_document(current_doc)
 	_rebuild_inspector()
 	_refresh_dependencies()
+	_update_model_tab()
+	_populate_resources()
 	if persist:
 		_save_settings()
 	var label := loadout_option.get_item_text(loadout_option.selected) if (loadout_option != null and loadout_option.selected >= 0) else clean_pkg
@@ -785,8 +921,8 @@ func apply_active_loadout(pkg_id: String, persist: bool = true) -> void:
 func _refresh_loadout_option_profiles() -> void:
 	if loadout_option == null:
 		return
-	# Preserve the 4 built-in entries, then append saved persistent ModLoadout profiles.
-	while loadout_option.item_count > 4:
+	# Preserve the 5 built-in entries (VSR, VSR Legacy, VRV, Stock Only, Auto), then append saved persistent ModLoadout profiles.
+	while loadout_option.item_count > 5:
 		loadout_option.remove_item(loadout_option.item_count - 1)
 	for prof in ModLoadoutScript.list_profiles():
 		var pid := str(prof.get("profile_id", ""))
@@ -833,6 +969,8 @@ func load_loadout_profile(profile_id: String, persist: bool = true) -> Dictionar
 		audio_lab.set_document(current_doc)
 	_rebuild_inspector()
 	_refresh_dependencies()
+	_update_model_tab()
+	_populate_resources()
 	if persist:
 		_save_settings()
 	var rep: Dictionary = prof.resolve_conflicts_report(index)
@@ -869,12 +1007,32 @@ func reset_mod_loadout_to_default() -> void:
 	_set_status("Reset active mod loadout to default VSR (3532748119).", "success")
 
 
-## Explicit RESET COMPLETE PROJECT CONFIGURATION scope (UI + Mod Loadout).
+## Explicit RESET COMPLETE PROJECT CONFIGURATION scope (UI + Mod Loadout + optional Workspace Overrides).
+## P1-04 / RST-22: When `include_workspace_overrides=true` and `confirmed=false`,
+## performs ZERO UI, loadout, or workspace mutations until the impact snapshot is confirmed.
 func reset_project_configuration_to_default(include_workspace_overrides: bool = false, confirmed: bool = false) -> Dictionary:
+	if include_workspace_overrides and not confirmed:
+		var preview := preview_reset_all_impact()
+		if int(preview.get("total_affected_count", 0)) > 0:
+			_pending_project_config_reset = true
+			var req := request_reset_all_odfs()
+			req["scope"] = "RESET_PROJECT_CONFIGURATION"
+			req["project_config_pending"] = true
+			return req
+	_pending_project_config_reset = false
+	var ws_report: Dictionary = {}
+	if include_workspace_overrides:
+		ws_report = reset_all_odfs_to_default(true)
+		if not bool(ws_report.get("ok", false)) and str(ws_report.get("status", "")) != "NO_CHANGES":
+			ws_report["scope"] = "RESET_PROJECT_CONFIGURATION"
+			return ws_report
 	reset_ui_to_default()
 	reset_mod_loadout_to_default()
 	if include_workspace_overrides:
-		return reset_all_odfs_to_default(confirmed)
+		ws_report["scope"] = "RESET_PROJECT_CONFIGURATION"
+		ws_report["project_config_reset"] = true
+		ws_report["active_loadout"] = active_loadout_id
+		return ws_report
 	return {"ok": true, "status": "PROJECT_CONFIG_RESET", "active_loadout": active_loadout_id}
 
 
@@ -1472,6 +1630,93 @@ func reset_entry_to_default(e) -> bool:
 		return true
 
 
+func _capture_reset_confirmation_snapshot(paths: Array, scope_label: String) -> Dictionary:
+	_reset_impact_rev += 1
+	var ident_map: Dictionary = {}
+	var working_hashes: Dictionary = {}
+	for raw_p in paths:
+		var sp := str(raw_p)
+		if sp == "":
+			continue
+		var ck := WorkspaceStore.canonical(sp)
+		var norm := ck.to_lower() if OS.get_name() == "Windows" else ck
+		ident_map[norm] = ck
+		var w_md5 := ""
+		var s_md5 := ""
+		var is_dirty := false
+		var has_ov := false
+		var cdoc = OdfDocument.cached(sp)
+		if cdoc == null:
+			for k in OdfDocument._cache.keys():
+				if WorkspaceStore._same_canon_path(str(k), sp):
+					cdoc = OdfDocument._cache[k]
+					break
+		if cdoc is OdfDocument:
+			w_md5 = WorkspaceStore._md5_bytes(cdoc.to_bytes())
+			is_dirty = bool(cdoc.dirty)
+			has_ov = bool(cdoc.workspace_override)
+		var ws_ent := WorkspaceStore.entry_for(sp)
+		if not ws_ent.is_empty():
+			has_ov = true
+			var wrel := WorkspaceStore.clean_rel(str(ws_ent.get("rel", "")))
+			if wrel != "":
+				var wabs := ProjectSettings.globalize_path(WorkspaceStore.odf_dir().path_join(wrel))
+				if FileAccess.file_exists(wabs):
+					s_md5 = WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(wabs))
+		if w_md5 == "" and s_md5 != "":
+			w_md5 = s_md5
+		working_hashes[norm] = {
+			"working_md5": w_md5,
+			"saved_md5": s_md5,
+			"dirty": is_dirty,
+			"has_override": has_ov,
+		}
+	var ids: Array[String] = []
+	for k in ident_map.keys():
+		ids.append(str(k))
+	ids.sort()
+	return {
+		"impact_revision": _reset_impact_rev,
+		"scope": scope_label,
+		"affected_resource_identities": ids,
+		"working_hashes": working_hashes,
+		"manifest_revision": WorkspaceStore.manifest_fingerprint(),
+		"confirmation_nonce": "cnf_%d_%d" % [Time.get_ticks_usec(), randi() % 100000],
+	}
+
+
+static func _reset_snapshots_match(expected: Dictionary, current: Dictionary) -> bool:
+	if expected.is_empty() or current.is_empty():
+		return false
+	if str(expected.get("manifest_revision", "")) != str(current.get("manifest_revision", "")):
+		return false
+	var a_ids: Array = expected.get("affected_resource_identities", [])
+	var b_ids: Array = current.get("affected_resource_identities", [])
+	if a_ids.size() != b_ids.size():
+		return false
+	for i in a_ids.size():
+		if str(a_ids[i]) != str(b_ids[i]):
+			return false
+	var a_h: Dictionary = expected.get("working_hashes", {})
+	var b_h: Dictionary = current.get("working_hashes", {})
+	if a_h.size() != b_h.size():
+		return false
+	for k in a_h:
+		if not b_h.has(k):
+			return false
+		var ha: Dictionary = a_h[k]
+		var hb: Dictionary = b_h[k]
+		if str(ha.get("working_md5", "")) != str(hb.get("working_md5", "")):
+			return false
+		if str(ha.get("saved_md5", "")) != str(hb.get("saved_md5", "")):
+			return false
+		if bool(ha.get("dirty", false)) != bool(hb.get("dirty", false)):
+			return false
+		if bool(ha.get("has_override", false)) != bool(hb.get("has_override", false)):
+			return false
+	return true
+
+
 func request_reset_current_doc() -> Dictionary:
 	if current_doc == null or current_doc.source_path == "":
 		_set_status("Reset ODF: no document open.", "warning")
@@ -1481,6 +1726,8 @@ func request_reset_current_doc() -> Dictionary:
 	var has_ws := not WorkspaceStore.entry_for(sp).is_empty() or bool(current_doc.workspace_override)
 	var is_dirty := bool(current_doc.dirty)
 	var src_ok := FileAccess.file_exists(sp)
+	var snap := _capture_reset_confirmation_snapshot([sp], "RESET_CURRENT_DOCUMENT")
+	_pending_reset_doc_snapshot = snap
 	var preview := {
 		"scope": "RESET_CURRENT_DOCUMENT",
 		"path": sp,
@@ -1488,29 +1735,75 @@ func request_reset_current_doc() -> Dictionary:
 		"workspace_override": has_ws,
 		"source_conflict": bool(current_doc.workspace_conflict),
 		"source_exists": src_ok,
+		"confirmation_snapshot": snap,
+		"confirmation_nonce": str(snap.get("confirmation_nonce", "")),
 	}
 	reset_doc_confirmation_pending = true
 	if reset_doc_dialog != null:
-		reset_doc_dialog.dialog_text = "Reset current ODF to factory default?\n\nFile: %s\nUnsaved edits: %s\nSaved workspace override: %s\nSource conflict: %s\n\nA backup of your current work will be preserved before reset." % [
-			sp, "YES" if is_dirty else "no", "YES" if has_ws else "no", "YES" if bool(current_doc.workspace_conflict) else "no"
+		reset_doc_dialog.dialog_text = "Reset current ODF to factory default?\n\nFile: %s\nUnsaved edits: %s\nSaved workspace override: %s\nSource conflict: %s\nSnapshot rev: #%d\n\nA durable recovery point preserving BOTH saved override and unsaved working edits will be created before reset." % [
+			sp, "YES" if is_dirty else "no", "YES" if has_ws else "no", "YES" if bool(current_doc.workspace_conflict) else "no", int(snap.get("impact_revision", 0))
 		]
 		if is_inside_tree():
 			reset_doc_dialog.popup_centered()
 	_set_status("Confirm Reset ODF for %s (no files changed yet)." % sp.get_file(), "warning")
-	last_reset_doc_result = {"ok": false, "status": "CONFIRMATION_REQUIRED", "confirmation_required": true, "impact": preview}
+	last_reset_doc_result = {
+		"ok": false,
+		"status": "CONFIRMATION_REQUIRED",
+		"confirmation_required": true,
+		"impact": preview,
+		"confirmation_snapshot": snap,
+		"confirmation_nonce": str(snap.get("confirmation_nonce", "")),
+	}
 	return last_reset_doc_result
 
 
 func cancel_reset_current_doc() -> void:
 	reset_doc_confirmation_pending = false
+	_pending_reset_doc_snapshot.clear()
 	if reset_doc_dialog != null and reset_doc_dialog.visible:
 		reset_doc_dialog.hide()
 	_set_status("Reset ODF cancelled; current document preserved.", "muted")
 
 
-func confirm_reset_current_doc() -> bool:
+func confirm_reset_current_doc_ex(expected_nonce: String = "") -> Dictionary:
+	if current_doc == null or current_doc.source_path == "":
+		reset_doc_confirmation_pending = false
+		_pending_reset_doc_snapshot.clear()
+		last_reset_doc_result = {"ok": false, "status": "NO_DOCUMENT", "outcome": "NO_DOCUMENT"}
+		return last_reset_doc_result
+	if not _pending_reset_doc_snapshot.is_empty():
+		var fresh := _capture_reset_confirmation_snapshot([current_doc.source_path], "RESET_CURRENT_DOCUMENT")
+		var nonce_ok := expected_nonce == "" or expected_nonce == str(_pending_reset_doc_snapshot.get("confirmation_nonce", ""))
+		if not nonce_ok or not _reset_snapshots_match(_pending_reset_doc_snapshot, fresh):
+			var prev_snap := _pending_reset_doc_snapshot.duplicate(true)
+			_pending_reset_doc_snapshot = fresh
+			reset_doc_confirmation_pending = true
+			if reset_doc_dialog != null:
+				reset_doc_dialog.dialog_text = "STATE CHANGED BEFORE APPROVAL — PLEASE RE-CONFIRM\n\nFile: %s\nSnapshot rev: #%d\nDocument or workspace state changed since confirmation opened." % [
+					current_doc.source_path, int(fresh.get("impact_revision", 0))
+				]
+				if is_inside_tree():
+					reset_doc_dialog.popup_centered()
+			_set_status("Reset ODF requires renewed confirmation: document/workspace changed since preview.", "warning")
+			last_reset_doc_result = {
+				"ok": false,
+				"status": "IMPACT_CHANGED_RECONFIRM_REQUIRED",
+				"reconfirmation_required": true,
+				"confirmation_required": true,
+				"previous_snapshot": prev_snap,
+				"confirmation_snapshot": fresh,
+				"confirmation_nonce": str(fresh.get("confirmation_nonce", "")),
+			}
+			return last_reset_doc_result
 	reset_doc_confirmation_pending = false
-	return reset_current_doc_to_default()
+	_pending_reset_doc_snapshot.clear()
+	if reset_doc_dialog != null and reset_doc_dialog.visible:
+		reset_doc_dialog.hide()
+	return reset_current_doc_to_default_ex()
+
+
+func confirm_reset_current_doc() -> bool:
+	return bool(confirm_reset_current_doc_ex().get("ok", false))
 
 
 func reset_current_doc_to_default_ex() -> Dictionary:
@@ -1536,9 +1829,9 @@ func reset_current_doc_to_default_ex() -> Dictionary:
 	if str(res.get("status", "")) == "NO_OVERRIDE":
 		_set_status("%s already matches factory default." % sp.get_file(), "muted")
 	elif str(res.get("status", "")) == "SOURCE_CHANGED":
-		_set_status("Reset %s to current on-disk source (source changed externally since save)." % sp.get_file(), "warning")
+		_set_status("Reset %s to current on-disk source (recovery point: %s)." % [sp.get_file(), str(res.get("transaction_id", ""))], "warning")
 	else:
-		_set_status("Reset %s to factory default (backup preserved)." % sp.get_file(), "success")
+		_set_status("Reset %s to factory default (recovery point: %s)." % [sp.get_file(), str(res.get("transaction_id", ""))], "success")
 	return res
 
 
@@ -1647,12 +1940,45 @@ func preview_reset_all_impact() -> Dictionary:
 	return preview
 
 
-## Step 2 (P0-01): Request explicit confirmation with complete impact preview.
-## Performs ZERO mutations before user confirmation.
+func _format_reset_all_dialog_text(preview: Dictionary, snap: Dictionary, banner: String = "") -> String:
+	var total := int(preview.get("total_affected_count", 0))
+	var lines: Array[String] = []
+	if banner != "":
+		lines.append(banner)
+		lines.append("")
+	lines.append("RESET ALL WORKSPACE OVERRIDES — IMPACT PREVIEW (Snapshot #%d)" % int(snap.get("impact_revision", 0)))
+	if _pending_project_config_reset:
+		lines.append("Includes UI appearance + Mod Loadout reset upon confirmation.")
+	lines.append("")
+	lines.append("Total affected unique ODFs: %d" % total)
+	lines.append("• Unsaved dirty documents: %d" % (preview.unsaved_dirty_documents as Array).size())
+	lines.append("• Saved workspace overrides: %d" % (preview.saved_workspace_overrides as Array).size())
+	lines.append("• Referenced external particle files: %d" % (preview.referenced_external_particles as Array).size())
+	lines.append("• Affected weapon dependencies: %d" % (preview.affected_weapon_dependencies as Array).size())
+	lines.append("• Files with source conflicts: %d" % (preview.files_with_source_conflicts as Array).size())
+	lines.append("• Files that cannot be restored (source missing): %d" % (preview.files_cannot_restore as Array).size())
+	lines.append("")
+	lines.append("Affected resources:")
+	var shown := 0
+	for af in preview.affected_files:
+		if shown >= 20:
+			lines.append("  … and %d more" % (total - shown))
+			break
+		lines.append("  • " + str(af))
+		shown += 1
+	lines.append("")
+	lines.append("A durable recovery point will be created before any reset.")
+	return "\n".join(lines)
+
+
+## Step 2 (P0-01 / P1-04): Request explicit confirmation bound to an exact
+## impact snapshot. Performs ZERO mutations before user confirmation.
 func request_reset_all_odfs() -> Dictionary:
 	var preview := preview_reset_all_impact()
 	var total := int(preview.get("total_affected_count", 0))
 	if total == 0:
+		_pending_reset_all_snapshot.clear()
+		reset_all_confirmation_pending = false
 		_set_status("Reset All: no unsaved edits or saved workspace overrides to reset.", "muted")
 		last_reset_all_report = {
 			"ok": true,
@@ -1670,31 +1996,14 @@ func request_reset_all_odfs() -> Dictionary:
 			"failed_files": [],
 		}
 		return last_reset_all_report
+	var snap := _capture_reset_confirmation_snapshot(preview.get("affected_files", []), "RESET_ALL_WORKSPACE_OVERRIDES")
+	_pending_reset_all_snapshot = snap
+	preview["confirmation_snapshot"] = snap
+	preview["confirmation_nonce"] = str(snap.get("confirmation_nonce", ""))
+	last_reset_impact_preview = preview
 	reset_all_confirmation_pending = true
 	if reset_all_dialog != null:
-		var lines: Array[String] = [
-			"RESET ALL WORKSPACE OVERRIDES — IMPACT PREVIEW",
-			"",
-			"Total affected unique ODFs: %d" % total,
-			"• Unsaved dirty documents: %d" % (preview.unsaved_dirty_documents as Array).size(),
-			"• Saved workspace overrides: %d" % (preview.saved_workspace_overrides as Array).size(),
-			"• Referenced external particle files: %d" % (preview.referenced_external_particles as Array).size(),
-			"• Affected weapon dependencies: %d" % (preview.affected_weapon_dependencies as Array).size(),
-			"• Files with source conflicts: %d" % (preview.files_with_source_conflicts as Array).size(),
-			"• Files that cannot be restored (source missing): %d" % (preview.files_cannot_restore as Array).size(),
-			"",
-			"Affected resources:",
-		]
-		var shown := 0
-		for af in preview.affected_files:
-			if shown >= 20:
-				lines.append("  … and %d more" % (total - shown))
-				break
-			lines.append("  • " + str(af))
-			shown += 1
-		lines.append("")
-		lines.append("A durable recovery point will be created before any reset.")
-		reset_all_dialog.dialog_text = "\n".join(lines)
+		reset_all_dialog.dialog_text = _format_reset_all_dialog_text(preview, snap)
 		if is_inside_tree():
 			reset_all_dialog.popup_centered()
 	_set_status("Reset All requires confirmation (%d affected ODF(s); nothing changed yet)." % total, "warning")
@@ -1703,6 +2012,8 @@ func request_reset_all_odfs() -> Dictionary:
 		"status": "CONFIRMATION_REQUIRED",
 		"confirmation_required": true,
 		"impact": preview,
+		"confirmation_snapshot": snap,
+		"confirmation_nonce": str(snap.get("confirmation_nonce", "")),
 		"requested": total,
 		"attempted": 0,
 		"succeeded": 0,
@@ -1717,14 +2028,74 @@ func request_reset_all_odfs() -> Dictionary:
 
 func cancel_reset_all_odfs() -> void:
 	reset_all_confirmation_pending = false
+	_pending_reset_all_snapshot.clear()
+	_pending_project_config_reset = false
 	if reset_all_dialog != null and reset_all_dialog.visible:
 		reset_all_dialog.hide()
-	_set_status("Reset All cancelled; all edits and workspace overrides preserved.", "muted")
+	_set_status("Reset All cancelled; all edits, project settings, and workspace overrides preserved.", "muted")
 
 
-func confirm_reset_all_odfs() -> Dictionary:
+## P1-04 / RST-21: Confirm Reset All ONLY if live workspace state still matches
+## the approved confirmation snapshot; if anything changed since preview, refresh
+## the impact preview and require renewed confirmation without mutating files.
+func confirm_reset_all_odfs(expected_nonce: String = "") -> Dictionary:
+	var fresh_preview := preview_reset_all_impact()
+	var fresh_snap := _capture_reset_confirmation_snapshot(fresh_preview.get("affected_files", []), "RESET_ALL_WORKSPACE_OVERRIDES")
+	if not _pending_reset_all_snapshot.is_empty():
+		var nonce_ok := expected_nonce == "" or expected_nonce == str(_pending_reset_all_snapshot.get("confirmation_nonce", ""))
+		if not nonce_ok or not _reset_snapshots_match(_pending_reset_all_snapshot, fresh_snap):
+			var prev_snap := _pending_reset_all_snapshot.duplicate(true)
+			_pending_reset_all_snapshot = fresh_snap
+			fresh_preview["confirmation_snapshot"] = fresh_snap
+			fresh_preview["confirmation_nonce"] = str(fresh_snap.get("confirmation_nonce", ""))
+			last_reset_impact_preview = fresh_preview
+			reset_all_confirmation_pending = true
+			if reset_all_dialog != null:
+				reset_all_dialog.dialog_text = _format_reset_all_dialog_text(
+					fresh_preview, fresh_snap,
+					"WORKSPACE CHANGED BEFORE APPROVAL — REVIEW UPDATED IMPACT AND RE-CONFIRM"
+				)
+				if is_inside_tree():
+					reset_all_dialog.popup_centered()
+			_set_status("Reset All blocked: workspace state changed since confirmation opened; please re-confirm.", "warning")
+			last_reset_all_report = {
+				"ok": false,
+				"status": "IMPACT_CHANGED_RECONFIRM_REQUIRED",
+				"reconfirmation_required": true,
+				"confirmation_required": true,
+				"impact": fresh_preview,
+				"previous_snapshot": prev_snap,
+				"confirmation_snapshot": fresh_snap,
+				"confirmation_nonce": str(fresh_snap.get("confirmation_nonce", "")),
+				"requested": int(fresh_preview.get("total_affected_count", 0)),
+				"attempted": 0,
+				"succeeded": 0,
+				"failed": 0,
+				"skipped": int(fresh_preview.get("total_affected_count", 0)),
+				"already_default": 0,
+				"recovery_pending": 0,
+				"succeeded_files": [],
+				"failed_files": [],
+			}
+			return last_reset_all_report
+	var apply_proj_cfg := _pending_project_config_reset
 	reset_all_confirmation_pending = false
-	return reset_all_odfs_to_default(true)
+	_pending_reset_all_snapshot.clear()
+	_pending_project_config_reset = false
+	if reset_all_dialog != null and reset_all_dialog.visible:
+		reset_all_dialog.hide()
+	var targets: Array = fresh_preview.get("affected_files", [])
+	var report := _execute_transaction_reset(targets, "RESET_ALL_WORKSPACE_OVERRIDES")
+	report["impact"] = fresh_preview
+	report["confirmation_snapshot"] = fresh_snap
+	if apply_proj_cfg and (bool(report.get("ok", false)) or str(report.get("status", "")) == "NO_CHANGES"):
+		reset_ui_to_default()
+		reset_mod_loadout_to_default()
+		report["scope"] = "RESET_PROJECT_CONFIGURATION"
+		report["project_config_reset"] = true
+		report["active_loadout"] = active_loadout_id
+	last_reset_all_report = report
+	return report
 
 
 ## Explicit RESET SELECTED DOCUMENTS scope (P0-01).
@@ -1841,7 +2212,7 @@ func _execute_transaction_reset(raw_sources: Array, scope_label: String) -> Dict
 					break
 		var rres: Dictionary
 		if cdoc is OdfDocument:
-			rres = WorkspaceStore.revert_document(cdoc)
+			rres = WorkspaceStore.revert_document(cdoc, true)
 		else:
 			if not FileAccess.file_exists(sp):
 				rres = {
@@ -2392,6 +2763,19 @@ func _refresh_dependencies() -> void:
 		if e.shadowed_by != null:
 			shadowed += 1
 	diag += "\n[b]Duplicate declarations shadowed: %d[/b]\n" % shadowed
+	if index != null:
+		diag += "\n[b]Active ModLoadout Policy[/b]\nPolicy: %s · Strict filter: %s · Packages: %s\n" % [
+			index.resolution_policy, str(index.strict_package_filter),
+			", ".join(index.active_packages) if not index.active_packages.is_empty() else ("(stock only)" if index.strict_package_filter else "(auto / all)")
+		]
+		if not index.last_resolution_diagnostics.is_empty():
+			diag += "[color=#D37676]Loadout diagnostics (%d):[/color]\n" % index.last_resolution_diagnostics.size()
+			var shown_d := 0
+			for rd in index.last_resolution_diagnostics:
+				if shown_d >= 8:
+					break
+				diag += "• [%s] %s\n" % [str(rd.get("status", "")), str(rd.get("warning", ""))]
+				shown_d += 1
 	diag += "\n[b]Fidelity[/b]\nSimulation: APPROXIMATED. Data reading: DATA-DRIVEN (values come from the loaded ODFs). Native verification: none recorded.\n"
 	diag_text.text = diag
 
@@ -2429,6 +2813,27 @@ func _update_model_tab() -> void:
 				lines.append("• [color=#D3B57A]%s[/color] = %s\n   %s" % [e.key_raw, val, resolved if resolved != "" else "[color=#D37676]not indexed[/color]"])
 	if not any:
 		lines.append("No model/texture/sound references declared.\n")
+	# BZCC animation inspection (T-41): show embedded DOCB animation metadata and
+	# the companion .msha lookup result without claiming skinning we never decode.
+	var geometry_value := ""
+	for e in current_doc.effective_entries():
+		if e.key_raw.to_lower() == "geometryname":
+			geometry_value = e.core_value()
+			break
+	if geometry_value != "":
+		var msh_path := index.find_asset(geometry_value, ["msh"])
+		if msh_path != "":
+			var anim := BzMeshReaderScript.inspect_animation(msh_path, index, geometry_value)
+			lines.append("
+[b]BZCC animation inspection[/b]")
+			lines.append("• baked model: %s" % msh_path.get_file())
+			lines.append("• bones=%d poses=%d animations=%d detected=%s" % [
+				int(anim.get("bone_count", 0)), int(anim.get("pose_count", 0)),
+				int(anim.get("animation_count", 0)), str(anim.get("animation_detected", false)),
+			])
+			var msha := str(anim.get("msha_path", ""))
+			lines.append("• companion .msha: %s" % (msha.get_file() if msha != "" else "[color=#D37676]not present in indexed roots[/color]"))
+			lines.append("[color=#95804C]Only DOCB animation metadata is inspected; skin weights/tracks are not decoded and no skeleton play is claimed.[/color]")
 	lines.append("\n[color=#81B681]DOCB .msh models, .material descriptors, DDS/TGA textures and hardpoints load in the Weapons Lab when geometryName resolves to a baked .msh; otherwise an explicit PLACEHOLDER MESH box is shown.[/color]")
 	model_text.text = "\n".join(lines)
 

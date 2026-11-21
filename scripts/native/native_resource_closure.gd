@@ -10,6 +10,8 @@ const STATUS_COMPLETE := "RESOURCE_CLOSURE_COMPLETE"
 const STATUS_PARTIAL := "RESOURCE_CLOSURE_PARTIAL"
 const STATUS_AMBIGUOUS := "RESOURCE_AMBIGUOUS"
 const STATUS_MISSING := "RESOURCE_MISSING"
+const STATUS_MISSING_OR_DISABLED := "MISSING_OR_DISABLED_RESOURCE"
+const STATUS_EXPLICIT_WINNER_DISABLED := "EXPLICIT_WINNER_DISABLED_PACKAGE"
 const STATUS_COLLISION := "STAGING_RESOURCE_COLLISION"
 
 const MAX_TRANSITIVE_DEPTH := 12
@@ -42,57 +44,91 @@ static func _odf_key(name: String) -> String:
 
 
 ## Resolve an ODF name via ResourceIndex with explicit active Workshop package
-## filtering and cross-package ambiguity detection.
+## filtering, strict disabled-package exclusion (P1-01 / ML-04 / ML-05), and
+## cross-package ambiguity detection.
 static func resolve_odf_with_ambiguity(index: ResourceIndex, odf_ref: String,
-		context_path: String = "", active_packages: Array[String] = []) -> Dictionary:
+		context_path: String = "", active_packages: Array[String] = [],
+		strict_mode: bool = true, force_strict: bool = false) -> Dictionary:
 	var key := _odf_key(odf_ref)
 	if key == "" or index == null:
-		return {"found": false, "ambiguous": false, "candidates": [], "selected": {}}
+		return {"found": false, "ambiguous": false, "status": "RESOURCE_NOT_FOUND", "candidates": [], "selected": {}}
 	var cands: Array[Dictionary] = index.candidates(key)
-	if cands.is_empty():
-		return {"found": false, "ambiguous": false, "candidates": [], "selected": {}}
+	if cands.is_empty() and not index.explicit_resource_winners.has(key):
+		return {"found": false, "ambiguous": false, "status": "RESOURCE_NOT_FOUND", "candidates": [], "selected": {}}
+
+	var use_strict := strict_mode and (force_strict or not active_packages.is_empty() or bool(index.strict_package_filter))
 
 	# 0. Explicit ModLoadout resource conflict winner (identical identity across editor & native staging).
 	if not index.explicit_resource_winners.is_empty() and index.explicit_resource_winners.has(key):
 		var wanted_p := str(index.explicit_resource_winners[key])
+		var matched_exp: Dictionary = {}
 		for c in cands:
 			if WorkspaceStore._same_canon_path(str(c.get("path", "")), wanted_p):
-				return {"found": true, "ambiguous": false, "candidates": cands, "selected": c, "rule": "explicit_loadout_winner"}
+				matched_exp = c
+				break
+		if matched_exp.is_empty() and FileAccess.file_exists(wanted_p):
+			var dpkg := index.package_of(wanted_p)
+			matched_exp = {"path": wanted_p, "package": dpkg, "kind": "workshop" if dpkg != "" else "explicit"}
+		if not matched_exp.is_empty():
+			var wpkg := str(matched_exp.get("package", ""))
+			var wkind := str(matched_exp.get("kind", ""))
+			var is_disabled_ws := use_strict and (wkind == "workshop" or wpkg != "") and not active_packages.has(wpkg)
+			if is_disabled_ws and not bool(index.allow_disabled_explicit_winners):
+				return {
+					"found": false,
+					"ambiguous": false,
+					"disabled_explicit_winner": true,
+					"status": STATUS_EXPLICIT_WINNER_DISABLED,
+					"reason": STATUS_EXPLICIT_WINNER_DISABLED,
+					"blocked_packages": [wpkg],
+					"candidates": cands,
+					"selected": {},
+					"rule": "explicit_winner_disabled",
+				}
+			return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": matched_exp, "rule": "explicit_loadout_winner"}
 
 	# 1. Explicit active mod profile packages take precedence in declared order.
 	if not active_packages.is_empty():
 		for pkg in active_packages:
 			for c in cands:
 				if str(c.get("package", "")) == pkg:
-					return {"found": true, "ambiguous": false, "candidates": cands, "selected": c, "rule": "active_package:" + pkg}
+					return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": c, "rule": "active_package:" + pkg}
 
-	# 2. Same Workshop package as context document.
+	# 2. Same Workshop package as context document (ONLY if enabled under strict mode!).
 	var ctx_pkg := index.package_of(context_path) if context_path != "" else ""
-	if ctx_pkg != "":
+	if ctx_pkg != "" and (not use_strict or active_packages.has(ctx_pkg)):
 		for c in cands:
 			if str(c.get("package", "")) == ctx_pkg:
-				return {"found": true, "ambiguous": false, "candidates": cands, "selected": c, "rule": "context_package:" + ctx_pkg}
+				return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": c, "rule": "context_package:" + ctx_pkg}
 
-	# 3. Check if multiple DIFFERENT Workshop packages define the same ODF with no
-	#    active package disambiguation and no base-game match (or competing mod overrides).
+	# 3. Partition Workshop vs Base Game / Addon candidates.
 	var workshop_pkgs: Dictionary = {}
+	var disabled_pkgs: Array[String] = []
 	var game_cand: Dictionary = {}
+	var addon_cand: Dictionary = {}
 	for c in cands:
 		var kind := str(c.get("kind", ""))
-		if kind == "workshop":
-			var wp := str(c.get("package", ""))
-			if wp != "" and not workshop_pkgs.has(wp):
-				workshop_pkgs[wp] = c
+		var wp := str(c.get("package", ""))
+		if kind == "workshop" or wp != "":
+			if not use_strict or active_packages.has(wp):
+				if wp != "" and not workshop_pkgs.has(wp):
+					workshop_pkgs[wp] = c
+			else:
+				if wp != "" and not disabled_pkgs.has(wp):
+					disabled_pkgs.append(wp)
 		elif kind == "game" and game_cand.is_empty():
 			game_cand = c
+		elif kind == "addon" and addon_cand.is_empty():
+			addon_cand = c
 
-	if workshop_pkgs.size() > 1 and active_packages.is_empty():
+	if not use_strict and workshop_pkgs.size() > 1 and active_packages.is_empty():
 		var ws_paths: Array[String] = []
 		for wp in workshop_pkgs:
 			ws_paths.append(str((workshop_pkgs[wp] as Dictionary).get("path", "")))
 		return {
 			"found": true,
 			"ambiguous": true,
+			"status": STATUS_AMBIGUOUS,
 			"candidates": cands,
 			"workshop_packages": workshop_pkgs.keys(),
 			"conflicting_paths": ws_paths,
@@ -100,15 +136,33 @@ static func resolve_odf_with_ambiguity(index: ResourceIndex, odf_ref: String,
 			"rule": "ambiguous_workshop",
 		}
 
-	# 4. Base game match or single unambiguous candidate.
-	if not game_cand.is_empty() and workshop_pkgs.is_empty():
-		return {"found": true, "ambiguous": false, "candidates": cands, "selected": game_cand, "rule": "base_game"}
+	# 4. Base game / addon match (when base game fallback is enabled).
+	if bool(index.allow_base_game_fallback):
+		if not game_cand.is_empty() and (use_strict or workshop_pkgs.is_empty()):
+			return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": game_cand, "rule": "base_game"}
+		if not addon_cand.is_empty() and (use_strict or workshop_pkgs.is_empty()):
+			return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": addon_cand, "rule": "addon"}
+
+	# 5. Strict isolation: NEVER consume a disabled Workshop package!
+	if use_strict:
+		return {
+			"found": false,
+			"ambiguous": false,
+			"disabled_only": not disabled_pkgs.is_empty(),
+			"status": STATUS_MISSING_OR_DISABLED,
+			"reason": STATUS_MISSING_OR_DISABLED,
+			"blocked_packages": disabled_pkgs,
+			"candidates": cands,
+			"selected": {},
+			"rule": "blocked_disabled_package",
+		}
+
 	if workshop_pkgs.size() == 1 and active_packages.is_empty() and game_cand.is_empty():
 		var only_pkg := str(workshop_pkgs.keys()[0])
-		return {"found": true, "ambiguous": false, "candidates": cands, "selected": workshop_pkgs[only_pkg], "rule": "single_workshop:" + only_pkg}
+		return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": workshop_pkgs[only_pkg], "rule": "single_workshop:" + only_pkg}
 	if not game_cand.is_empty():
-		return {"found": true, "ambiguous": false, "candidates": cands, "selected": game_cand, "rule": "base_game"}
-	return {"found": true, "ambiguous": false, "candidates": cands, "selected": cands[0], "rule": "highest_priority"}
+		return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": game_cand, "rule": "base_game"}
+	return {"found": true, "ambiguous": false, "status": "RESOLVED", "candidates": cands, "selected": cands[0], "rule": "highest_priority"}
 
 
 ## Build a full native resource closure report for a scenario.
@@ -125,11 +179,19 @@ static func build_closure(spec: Dictionary, index: ResourceIndex,
 	for p in spec.get("mounted_workshop_packages", []):
 		mounted_pkgs.append(str(p))
 	var active_pkgs: Array[String] = []
-	for p in spec.get("active_packages", []):
-		active_pkgs.append(str(p))
-	if active_pkgs.is_empty() and index != null and not index.active_packages.is_empty():
+	var has_explicit_pkgs := spec.has("active_packages")
+	if has_explicit_pkgs:
+		for p in spec.get("active_packages", []):
+			var sp := str(p).strip_edges()
+			if sp != "":
+				active_pkgs.append(sp)
+	elif index != null and not index.active_packages.is_empty():
 		for ap in index.active_packages:
 			active_pkgs.append(str(ap))
+	var strict_native := true
+	if index != null and has_explicit_pkgs and active_pkgs.is_empty():
+		# Explicitly passed active_packages=[] means stock-only strict loadout!
+		strict_native = true
 
 	var game_root := WorkspaceStore.canonical(str(discovery.get("game_root", NativeTestAdapter.DEFAULT_GAME_ROOT)))
 	var res_root := WorkspaceStore.canonical(str(discovery.get("res_root", game_root.path_join("bz2r_res"))))
@@ -251,8 +313,27 @@ static func build_closure(spec: Dictionary, index: ResourceIndex,
 				_enqueue_odf_children(sdoc, ctx, depth + 1, is_req, queue, model_refs, audio_refs, texture_refs)
 			continue
 
-		# 2. Resolve through ResourceIndex (shared resolution with Godot preview).
-		var res := resolve_odf_with_ambiguity(index, key, ctx, active_pkgs)
+		# 2. Resolve through ResourceIndex (shared strict resolution with Godot preview; P1-01 / ML-04 / ML-05).
+		var res := resolve_odf_with_ambiguity(index, key, ctx, active_pkgs, strict_native, has_explicit_pkgs)
+		var res_status := str(res.get("status", ""))
+		if res_status == STATUS_EXPLICIT_WINNER_DISABLED or res_status == STATUS_MISSING_OR_DISABLED:
+			var blk_visit_id := "blk:" + key
+			if visited_odfs.has(blk_visit_id):
+				continue
+			visited_odfs[blk_visit_id] = true
+			if role == "classlabel" and not is_req:
+				continue
+			missing_dependencies.append({
+				"role": role,
+				"name": key,
+				"required": is_req,
+				"reason": res_status,
+				"blocked_packages": res.get("blocked_packages", []),
+				"detail": "ODF '%s' (%s) blocked by strict active loadout (%s; packages=%s)" % [key, role, res_status, str(res.get("blocked_packages", []))],
+			})
+			if is_req and primary_missing_reason == "":
+				primary_missing_reason = res_status
+			continue
 		if bool(res.get("ambiguous", false)):
 			var amb_visit_id := "amb:" + key
 			if visited_odfs.has(amb_visit_id):

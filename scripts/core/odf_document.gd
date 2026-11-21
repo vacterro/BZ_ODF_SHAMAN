@@ -183,31 +183,31 @@ static func parse_text(value: String, path: String = "") -> OdfDocument:
 	return doc
 
 
-static func load_file(path: String) -> OdfDocument:
-	if not FileAccess.file_exists(path):
-		return null
-	var bytes := FileAccess.get_file_as_bytes(path)
-	var doc := OdfDocument.new()
-	doc.source_path = path
-	doc.original_bytes = bytes
-	doc.source_hash = FileAccess.get_md5(path)
+static func decode_bytes_info(bytes: PackedByteArray, forced_encoding: String = "", forced_has_bom: int = -1) -> Dictionary:
+	var encoding_out := "utf-8"
+	var bom_out := false
 	var body := bytes
 	if bytes.size() >= 3 and bytes[0] == 0xEF and bytes[1] == 0xBB and bytes[2] == 0xBF:
-		doc.has_bom = true
+		bom_out = true
 		body = bytes.slice(3)
-		doc.encoding = "utf-8"
+		encoding_out = "utf-8"
 	elif bytes.size() >= 2 and bytes[0] == 0xFF and bytes[1] == 0xFE:
-		doc.has_bom = true
+		bom_out = true
 		body = bytes.slice(2)
-		doc.encoding = "utf-16le"
+		encoding_out = "utf-16le"
 	elif bytes.size() >= 2 and bytes[0] == 0xFE and bytes[1] == 0xFF:
-		doc.has_bom = true
+		bom_out = true
 		body = bytes.slice(2)
-		doc.encoding = "utf-16be"
-	if doc.encoding == "utf-16le":
-		doc.text = body.get_string_from_utf16()
-	elif doc.encoding == "utf-16be":
-		# Godot has no UTF-16BE decoder; swap byte pairs first.
+		encoding_out = "utf-16be"
+	else:
+		if forced_encoding != "":
+			encoding_out = forced_encoding
+		if forced_has_bom >= 0:
+			bom_out = forced_has_bom != 0
+	var decoded_text := ""
+	if encoding_out == "utf-16le":
+		decoded_text = body.get_string_from_utf16()
+	elif encoding_out == "utf-16be":
 		var swapped := body.duplicate()
 		var i := 0
 		while i + 1 < swapped.size():
@@ -215,12 +215,35 @@ static func load_file(path: String) -> OdfDocument:
 			swapped[i] = swapped[i + 1]
 			swapped[i + 1] = t
 			i += 2
-		doc.text = swapped.get_string_from_utf16()
+		decoded_text = swapped.get_string_from_utf16()
 	else:
-		doc.text = body.get_string_from_utf8()
+		decoded_text = body.get_string_from_utf8()
+	return {
+		"text": decoded_text,
+		"encoding": encoding_out,
+		"has_bom": bom_out,
+	}
+
+
+static func parse_bytes(bytes: PackedByteArray, path: String = "", forced_encoding: String = "", forced_has_bom: int = -1) -> OdfDocument:
+	var doc := OdfDocument.new()
+	doc.source_path = path
+	doc.original_bytes = bytes.duplicate()
+	var info := decode_bytes_info(bytes, forced_encoding, forced_has_bom)
+	doc.encoding = str(info.get("encoding", "utf-8"))
+	doc.has_bom = bool(info.get("has_bom", false))
+	doc.text = str(info.get("text", ""))
 	doc._parse()
 	doc.saved_text = doc.text
-	doc.saved_bytes = bytes
+	doc.saved_bytes = bytes.duplicate()
+	return doc
+
+
+static func load_file(path: String) -> OdfDocument:
+	if not FileAccess.file_exists(path):
+		return null
+	var bytes := FileAccess.get_file_as_bytes(path)
+	var doc := parse_bytes(bytes, path)
 	doc.source_hash = FileAccess.get_md5(path)
 	return doc
 
@@ -543,6 +566,39 @@ func restore_factory_state_from(factory_doc: OdfDocument) -> void:
 	_redo.clear()
 	undo_state_changed.emit()
 	changed.emit()
+
+
+## Apply byte-exact recovered working bytes in-place (encoding/BOM-aware),
+## keeping saved reference bytes separate from dirty unsaved working bytes.
+func apply_recovered_bytes(working_bytes: PackedByteArray, saved_ref_bytes: PackedByteArray = PackedByteArray(),
+		is_dirty: bool = false, is_override: bool = false, ws_rel: String = "", ws_src_md5: String = "",
+		forced_encoding: String = "", forced_has_bom: int = -1) -> bool:
+	if working_bytes.is_empty() and saved_ref_bytes.is_empty():
+		return false
+	var active_bytes := working_bytes if not working_bytes.is_empty() else saved_ref_bytes
+	var w_info := decode_bytes_info(active_bytes, forced_encoding, forced_has_bom)
+	encoding = str(w_info.get("encoding", encoding))
+	has_bom = bool(w_info.get("has_bom", has_bom))
+	text = str(w_info.get("text", ""))
+	if not saved_ref_bytes.is_empty():
+		var s_info := decode_bytes_info(saved_ref_bytes, encoding, 1 if has_bom else 0)
+		saved_bytes = saved_ref_bytes.duplicate()
+		saved_text = str(s_info.get("text", ""))
+	else:
+		saved_bytes = active_bytes.duplicate()
+		saved_text = text
+	_parse()
+	revision += 1
+	dirty = is_dirty or (active_bytes != saved_bytes)
+	workspace_override = is_override
+	workspace_rel = ws_rel
+	if ws_src_md5 != "":
+		workspace_source_md5 = ws_src_md5
+	_undo.clear()
+	_redo.clear()
+	undo_state_changed.emit()
+	changed.emit()
+	return true
 
 
 func get_value(header_name: String, key: String, fallback: String = "") -> String:

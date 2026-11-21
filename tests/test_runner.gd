@@ -16,6 +16,7 @@ const NativeSessionScript = preload("res://scripts/native/native_experiment_sess
 const ResourceClosureScript = preload("res://scripts/native/native_resource_closure.gd")
 const NativeRunnerScript = preload("res://scripts/native/native_experiment_runner.gd")
 const BzMeshReaderScript = preload("res://scripts/core/bz_mesh_reader.gd")
+const RibbonTrailScript = preload("res://scripts/lab/ribbon_trail_node.gd")
 const ModLoadoutScript = preload("res://scripts/core/mod_loadout.gd")
 
 var failures: Array[String] = []
@@ -80,6 +81,11 @@ func _initialize() -> void:
 	_test_wave_c_native_durability_and_evidence()
 	_test_t36_fx_and_sandbox()
 	_test_t34_mod_loadout_profiles()
+	_test_t38_wave_b_reset_recovery()
+	_test_t39_wave_c_strict_mod_loadout()
+	_test_t40_wave_d_durable_transitions_and_monitor()
+	_test_t41_damage_shield_ammo_and_hit_normals()
+	_test_t41_ribbons_and_animation_inspection()
 	# Static document cache holds strong references by design; release it before
 	# the engine's own shutdown so a passing run exits with no ObjectDB leak.
 	OdfDocument.clear_all_cache()
@@ -2988,6 +2994,631 @@ func _test_t34_mod_loadout_profiles() -> void:
 	OdfDocument.clear_all_cache()
 	WorkspaceStore.root_override = old_root
 	_remove_tree(abs_ws)
+
+
+func _test_t38_wave_b_reset_recovery() -> void:
+	_start("T-38 Wave B Unified Reset Transaction & Byte-Exact Post-Restart Recovery (RST-15..20, RCV-01..05)")
+	var old_root := WorkspaceStore.root_override
+	var ws := "user://t38_reset_recovery_" + str(Time.get_ticks_usec())
+	WorkspaceStore.root_override = ws
+	var abs_ws := ProjectSettings.globalize_path(ws)
+
+	# RST-15 / RST-16 / RCV-01: Factory 100 -> Save 200 -> Edit 250 (unsaved) -> Single Reset -> Restart -> Restore 250 + Saved 200
+	var src1 := abs_ws.path_join("src/unit_r15.odf")
+	_write(src1, "[OrdnanceClass]\ndamageValue(H)=100\n")
+	var factory_md5 := FileAccess.get_md5(src1)
+	OdfDocument.clear_all_cache()
+	var doc1 := OdfDocument.load_cached(src1)
+	doc1.set_entry_value(doc1.find_entry("OrdnanceClass", "damageValue(H)"), "200")
+	var sv1 := WorkspaceStore.save_document_with_rel(doc1, "unit_r15.odf")
+	_check(bool(sv1.get("ok", false)), "RST-15 setup: saved workspace override 200")
+	doc1.set_entry_value(doc1.find_entry("OrdnanceClass", "damageValue(H)"), "250")
+	_check(doc1.dirty and doc1.workspace_override, "RST-15 setup: doc has BOTH saved override=200 and dirty working=250")
+	var dirty_250_bytes := doc1.to_bytes()
+
+	var rev1 := WorkspaceStore.revert_document(doc1)
+	_check(bool(rev1.get("ok", false)) and str(rev1.get("status", "")) == "SUCCESS", "RST-15: single revert_document succeeded")
+	var tx_path1 := str(rev1.get("recovery_point", ""))
+	_check(tx_path1 != "" and FileAccess.file_exists(tx_path1), "RST-15: single-document Reset created durable recovery point")
+	_eq(doc1.get_value("OrdnanceClass", "damageValue(H)"), "100", "RST-15: factory 100 displayed after reset")
+	_eq(FileAccess.get_md5(src1), factory_md5, "RST-15: original source file untouched on disk")
+	_check(WorkspaceStore.list_reset_recovery_points().size() >= 1, "RST-15: list_reset_recovery_points exposes single-doc recovery point")
+
+	# Simulate full Godot restart (empty cache) BEFORE recovery (RST-16 / RST-19 / RCV-01)
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.restore_cache()
+	_check(OdfDocument.cached(src1) == null, "RST-19 setup: document is NOT cached after restart")
+	var rec_full := WorkspaceStore.restore_reset_recovery_point(tx_path1, "full")
+	_check(bool(rec_full.get("ok", false)), "RST-16/19: restore_reset_recovery_point succeeded without pre-cached document")
+	_eq(str((rec_full.get("per_resource", {}) as Dictionary).get(src1, {}).get("status", "")), "WORKING_REVISION_RESTORED", "RST-16/19: per-resource status is WORKING_REVISION_RESTORED")
+	var after_rec1 = OdfDocument.cached(src1)
+	_check(after_rec1 != null, "RST-19: recovery materialized document into active cache")
+	_eq(after_rec1.get_value("OrdnanceClass", "damageValue(H)") if after_rec1 != null else "", "250", "RST-16/RCV-01: unsaved dirty working revision 250 recovered after restart")
+	_check(after_rec1 != null and after_rec1.dirty and after_rec1.workspace_override, "RST-16: recovered doc retains dirty=true and workspace_override=true")
+	_eq(after_rec1.to_bytes() if after_rec1 != null else PackedByteArray(), dirty_250_bytes, "RST-16: recovered working bytes match pre-reset dirty 250 byte-for-byte")
+	# Saved override 200 is simultaneously available on disk via discard_unsaved_edits or saved_only mode!
+	var ws_ent1 := WorkspaceStore.entry_for(src1)
+	_check(not ws_ent1.is_empty(), "RST-15: saved workspace override 200 restored in manifest")
+	var ws_disk_doc := OdfDocument.load_file(WorkspaceStore.odf_dir().path_join(str(ws_ent1.get("rel", ""))))
+	_eq(ws_disk_doc.get_value("OrdnanceClass", "damageValue(H)") if ws_disk_doc != null else "", "200", "RST-15: saved override 200 preserved separately from working 250")
+
+	# Demo A: Simulate SECOND restart BEFORE saving -> working 250 still survives via durable working recovery draft!
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.restore_cache()
+	var after_second_restart := OdfDocument.load_cached(src1)
+	_eq(after_second_restart.get_value("OrdnanceClass", "damageValue(H)"), "250", "Demo A: restored unsaved 250 survives a subsequent restart")
+	_check(after_second_restart.dirty, "Demo A: restored doc remains marked dirty after restart until explicitly saved")
+
+	# RCV-05: Repeated restore is idempotent
+	var rec_again := WorkspaceStore.restore_reset_recovery_point(tx_path1, "full")
+	_check(bool(rec_again.get("ok", false)) and OdfDocument.cached(src1).to_bytes() == dirty_250_bytes, "RCV-05: repeated restore is idempotent and byte-exact")
+	# Also verify saved_only restore explicitly recovers 200
+	var rec_saved := WorkspaceStore.restore_reset_recovery_point(tx_path1, "saved_only")
+	_check(bool(rec_saved.get("ok", false)) and str((rec_saved.get("per_resource", {}) as Dictionary).get(src1, {}).get("status", "")) == "SAVED_OVERRIDE_RESTORED", "RST-15: saved_only mode restores saved 200 with SAVED_OVERRIDE_RESTORED")
+	_eq(OdfDocument.cached(src1).get_value("OrdnanceClass", "damageValue(H)"), "200", "RST-15: saved_only restored 200 cleanly")
+
+	# RST-17 / RCV-02: UTF-16LE ODF with BOM byte-exact recovery after restart
+	var src_u16 := abs_ws.path_join("src/unit_u16.odf")
+	DirAccess.make_dir_recursive_absolute(src_u16.get_base_dir())
+	var u16_bom := PackedByteArray([0xFF, 0xFE])
+	var u16_fac_bytes := u16_bom + "[OrdnanceClass]\r\ndamageValue(H)=100\r\n".to_utf16_buffer()
+	var fu16 := FileAccess.open(src_u16, FileAccess.WRITE)
+	fu16.store_buffer(u16_fac_bytes)
+	fu16.close()
+	OdfDocument.clear_all_cache()
+	var doc_u16 := OdfDocument.load_cached(src_u16)
+	_eq(doc_u16.encoding, "utf-16le", "RST-17 setup: loaded UTF-16LE ODF")
+	_check(doc_u16.has_bom, "RST-17 setup: UTF-16LE BOM detected")
+	doc_u16.set_entry_value(doc_u16.find_entry("OrdnanceClass", "damageValue(H)"), "200")
+	WorkspaceStore.save_document_with_rel(doc_u16, "unit_u16.odf")
+	doc_u16.set_entry_value(doc_u16.find_entry("OrdnanceClass", "damageValue(H)"), "250")
+	var u16_dirty_250 := doc_u16.to_bytes()
+	_check(u16_dirty_250.size() >= 4 and u16_dirty_250[0] == 0xFF and u16_dirty_250[1] == 0xFE, "RST-17 setup: dirty working bytes remain UTF-16LE with BOM")
+	var rev_u16 := WorkspaceStore.revert_document(doc_u16)
+	_check(bool(rev_u16.get("ok", false)), "RST-17: reset UTF-16LE document succeeded")
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.restore_cache()
+	var rec_u16 := WorkspaceStore.restore_reset_recovery_point(str(rev_u16.get("recovery_point", "")), "full")
+	_check(bool(rec_u16.get("ok", false)), "RST-17: restore UTF-16LE recovery point succeeded")
+	var restored_u16 = OdfDocument.cached(src_u16)
+	_check(restored_u16 != null and restored_u16.encoding == "utf-16le" and restored_u16.has_bom, "RST-17: UTF-16LE encoding and BOM preserved after recovery")
+	_eq(restored_u16.to_bytes() if restored_u16 != null else PackedByteArray(), u16_dirty_250, "RST-17/RCV-02: recovered UTF-16LE dirty bytes are 100% byte-exact")
+
+	# RST-18 / RCV-03: Corrupt working_base64 returns explicit HASH_MISMATCH (never false-positive RESTORED)
+	var bad_tx := abs_ws.path_join("reset_transactions/corrupt_single.json")
+	var j1 := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(tx_path1))
+	var p_bad: Dictionary = (j1.get("data", {}) as Dictionary).duplicate(true)
+	var r_bad: Dictionary = (p_bad["records"] as Dictionary)[src1]
+	var orig_wb64 := str(r_bad["working_base64"])
+	var raw_w := Marshalls.base64_to_raw(orig_wb64)
+	raw_w[0] = (raw_w[0] + 1) % 256
+	r_bad["working_base64"] = Marshalls.raw_to_base64(raw_w)
+	_write(bad_tx, JSON.stringify(p_bad, "  "))
+	OdfDocument.clear_all_cache()
+	var res_bad := WorkspaceStore.restore_reset_recovery_point(bad_tx, "full")
+	_check(not bool(res_bad.get("ok", true)), "RST-18/RCV-03: corrupt working_base64 fails recovery (ok=false)")
+	_eq(str(res_bad.get("status", "")), "HASH_MISMATCH", "RST-18/RCV-03: corrupt working_base64 reports explicit HASH_MISMATCH")
+	_check((res_bad.get("restored", []) as Array).is_empty(), "RST-18/RCV-03: corrupt resource is NOT falsely appended to restored[]")
+	_eq(str((res_bad.get("per_resource", {}) as Dictionary).get(src1, {}).get("status", "")), "HASH_MISMATCH", "RST-18: per-resource status is HASH_MISMATCH")
+
+	# RST-20 / RCV-04: Multi-document recovery where 1 is valid and 1 has corrupt working_base64 -> PARTIAL_RECOVERY
+	var src_g1 := abs_ws.path_join("src/good_doc.odf")
+	var src_b2 := abs_ws.path_join("src/bad_doc.odf")
+	_write(src_g1, "[A]\nx=10\n")
+	_write(src_b2, "[A]\nx=20\n")
+	OdfDocument.clear_all_cache()
+	var dg1 := OdfDocument.load_cached(src_g1)
+	var db2 := OdfDocument.load_cached(src_b2)
+	dg1.set_entry_value(dg1.find_entry("A", "x"), "111")
+	db2.set_entry_value(db2.find_entry("A", "x"), "222")
+	var batch_pt := WorkspaceStore.create_reset_recovery_point([src_g1, src_b2], "BATCH_PARTIAL_TEST")
+	_check(bool(batch_pt.get("ok", false)), "RST-20 setup: created 2-document batch recovery point")
+	var jbatch := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(str(batch_pt.get("path", ""))))
+	var p_part: Dictionary = (jbatch.get("data", {}) as Dictionary).duplicate(true)
+	var rb2: Dictionary = (p_part["records"] as Dictionary)[src_b2]
+	var raw_b2 := Marshalls.base64_to_raw(str(rb2["working_base64"]))
+	raw_b2[0] = (raw_b2[0] + 1) % 256
+	rb2["working_base64"] = Marshalls.raw_to_base64(raw_b2)
+	var part_tx := abs_ws.path_join("reset_transactions/partial_two.json")
+	_write(part_tx, JSON.stringify(p_part, "  "))
+	WorkspaceStore.revert_document(dg1, true)
+	WorkspaceStore.revert_document(db2, true)
+	OdfDocument.clear_all_cache()
+	var res_part := WorkspaceStore.restore_reset_recovery_point(part_tx, "full")
+	_check(not bool(res_part.get("ok", true)), "RST-20/RCV-04: partial corruption returns ok=false")
+	_eq(str(res_part.get("status", "")), "PARTIAL_RECOVERY", "RST-20/RCV-04: status is PARTIAL_RECOVERY")
+	_eq((res_part.get("restored", []) as Array).size(), 1, "RST-20/RCV-04: exactly 1 valid file restored")
+	_eq((res_part.get("failed", []) as Array).size(), 1, "RST-20/RCV-04: exactly 1 corrupt file failed")
+	_eq(str((res_part.get("per_resource", {}) as Dictionary).get(src_g1, {}).get("status", "")), "WORKING_REVISION_RESTORED", "RST-20: valid doc reports WORKING_REVISION_RESTORED")
+	_eq(str((res_part.get("per_resource", {}) as Dictionary).get(src_b2, {}).get("status", "")), "HASH_MISMATCH", "RST-20: corrupt doc reports HASH_MISMATCH")
+	_eq(OdfDocument.cached(src_g1).get_value("A", "x"), "111", "RST-20: valid doc working value 111 recovered cleanly")
+
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.root_override = old_root
+	_remove_tree(abs_ws)
+
+
+func _test_t39_wave_c_strict_mod_loadout() -> void:
+	_start("T-39 Wave C Strict ModLoadout Isolation & Resolution Parity (P1-01; ML-01..ML-05)")
+	var old_root := WorkspaceStore.root_override
+	var ws := "user://t39_strict_loadout_" + str(Time.get_ticks_usec())
+	WorkspaceStore.root_override = ws
+	var abs_ws := ProjectSettings.globalize_path(ws)
+	var base_root := abs_ws.path_join("base_game")
+	var ws_root := abs_ws.path_join("workshop_sim")
+
+	var base_only := base_root.path_join("stock_tank.odf")
+	var shared_base := base_root.path_join("shared_wpn.odf")
+	var pkg_a_shared := ws_root.path_join("pkg_a/shared_wpn.odf")
+	var pkg_a_only := ws_root.path_join("pkg_a/alpha_only.odf")
+	var pkg_b_only := ws_root.path_join("pkg_b/beta_exclusive.odf")
+	var pkg_b_shared := ws_root.path_join("pkg_b/shared_wpn.odf")
+
+	_write(base_only, "[GameObjectClass]\nunitName=\"StockTank\"\n")
+	_write(shared_base, "[WeaponClass]\nwpnName=\"StockWpn\"\n")
+	_write(pkg_a_shared, "[WeaponClass]\nwpnName=\"AlphaWpn\"\n")
+	_write(pkg_a_only, "[OrdnanceClass]\ndamageValue(H)=111\n")
+	_write(pkg_b_only, "[OrdnanceClass]\ndamageValue(H)=222\n")
+	_write(pkg_b_shared, "[WeaponClass]\nwpnName=\"BetaWpn\"\n")
+
+	var idx := ResourceIndex.new()
+	idx.roots = [
+		{"path": base_root, "label": "Base", "kind": "game", "priority": 10, "enabled": true},
+		{"path": ws_root, "label": "Workshop", "kind": "workshop", "priority": 30, "enabled": true},
+	]
+	idx.scan(true)
+
+	# ML-02: enabled_packages == [] with non-empty stale priority_order MUST return [] (never pull stale packages!)
+	var ml_empty = ModLoadoutScript.new()
+	ml_empty.profile_id = "stock_only_test"
+	ml_empty.enabled_packages.clear()
+	ml_empty.priority_order.assign(["pkg_a", "pkg_b"])
+	_eq(ml_empty.effective_package_order(), [], "ML-02: empty enabled_packages returns [] despite non-empty stale priority_order")
+	idx.apply_loadout(ml_empty)
+	_eq(idx.resolve_path("beta_exclusive.odf"), "", "ML-02: stock-only loadout does NOT resolve disabled Workshop package file")
+	_check(WorkspaceStore._same_canon_path(idx.resolve_path("shared_wpn.odf"), shared_base), "ML-02: stock-only loadout resolves shared_wpn.odf to base game, not Workshop")
+	_check(WorkspaceStore._same_canon_path(idx.resolve_path("stock_tank.odf"), base_only), "ML-02: stock-only loadout resolves base game stock_tank.odf")
+
+	# ML-01: Package A enabled, Package B disabled; file only in B -> STRICT_ACTIVE_LOADOUT refuses B!
+	var ml_a = ModLoadoutScript.capture_from_index("only_a", idx, "Only A", "BZCC", ["pkg_a"])
+	idx.apply_loadout(ml_a)
+	_eq(idx.resolve_path("beta_exclusive.odf"), "", "ML-01: strict loadout with pkg_a enabled MUST NOT resolve beta_exclusive.odf from disabled pkg_b")
+	_eq(idx.resolve_path_from("beta_exclusive.odf", pkg_a_only), "", "ML-01: resolve_from MUST NOT leak disabled pkg_b resource")
+	_check(WorkspaceStore._same_canon_path(idx.resolve_path("alpha_only.odf"), pkg_a_only), "ML-01: enabled pkg_a resource resolves normally")
+	var rep_a: Dictionary = ml_a.resolve_conflicts_report(idx, ["beta_exclusive.odf", "alpha_only.odf", "shared_wpn.odf"])
+	_check(not bool(rep_a.get("ok", true)) and (rep_a.get("missing_dependencies", []) as Array).has("beta_exclusive.odf"), "ML-01: ModLoadout conflict report rejects disabled-only resource instead of falling back to cands")
+	_check((rep_a.get("missing_or_disabled_resources", []) as Array).size() >= 1, "ML-01: missing_or_disabled_resources reports disabled pkg_b resource")
+
+	# ML-01b: Explicit EDITOR_PREVIEW_FALLBACK emits explicit provenance warning (never silent!)
+	if idx.has_method("resolve_ex"):
+		var strict_ex: Dictionary = idx.call("resolve_ex", "beta_exclusive.odf", "", "STRICT_ACTIVE_LOADOUT")
+		_check(not bool(strict_ex.get("found", true)) and str(strict_ex.get("status", "")) == "MISSING_OR_DISABLED_RESOURCE", "ML-01: resolve_ex STRICT returns MISSING_OR_DISABLED_RESOURCE")
+		_check((strict_ex.get("blocked_disabled_packages", []) as Array).has("pkg_b"), "ML-01: resolve_ex lists blocked disabled package pkg_b")
+		var fb_ex: Dictionary = idx.call("resolve_ex", "beta_exclusive.odf", "", "EDITOR_PREVIEW_FALLBACK")
+		_check(bool(fb_ex.get("found", false)) and str(fb_ex.get("status", "")) == "RESOLVED_WITH_PREVIEW_FALLBACK", "ML-01: EDITOR_PREVIEW_FALLBACK returns RESOLVED_WITH_PREVIEW_FALLBACK")
+		_check(str(fb_ex.get("warning", "")) != "" and WorkspaceStore._same_canon_path(str(fb_ex.get("path", "")), pkg_b_only), "ML-01: EDITOR_PREVIEW_FALLBACK surfaces non-empty provenance warning")
+
+	# ML-03: Explicit winner pointing to disabled package B -> EXPLICIT_WINNER_DISABLED_PACKAGE diagnostic, blocked in strict mode!
+	var ml_dis_win = ModLoadoutScript.capture_from_index("dis_win", idx, "Disabled Winner", "BZCC", ["pkg_a"], {"shared_wpn.odf": pkg_b_shared})
+	var rep_dw: Dictionary = ml_dis_win.resolve_conflicts_report(idx, ["shared_wpn.odf"])
+	_check(not bool(rep_dw.get("ok", true)) and (rep_dw.get("disabled_explicit_winners", []) as Array).size() == 1, "ML-03: explicit winner in disabled pkg_b flagged in disabled_explicit_winners")
+	var elig_dw: Dictionary = ml_dis_win.evaluate_native_eligibility(idx, ["shared_wpn.odf"])
+	_check(not bool(elig_dw.get("eligible", true)), "ML-03: disabled explicit winner marks native eligibility INELIGIBLE")
+	idx.apply_loadout(ml_dis_win)
+	if idx.has_method("resolve_ex"):
+		var dw_ex: Dictionary = idx.call("resolve_ex", "shared_wpn.odf", "")
+		_check(not bool(dw_ex.get("found", true)) and str(dw_ex.get("status", "")) == "EXPLICIT_WINNER_DISABLED_PACKAGE", "ML-03: ResourceIndex.resolve_ex returns EXPLICIT_WINNER_DISABLED_PACKAGE in strict mode")
+	_eq(idx.resolve_path("shared_wpn.odf"), "", "ML-03: strict ResourceIndex refuses disabled explicit winner")
+
+	# ML-04 & ML-05: NativeResourceClosureBuilder strict isolation + editor/native resolution parity
+	idx.apply_loadout(ml_a)
+	var ed_shared := idx.resolve_path("shared_wpn.odf")
+	var nat_shared := ResourceClosureScript.resolve_odf_with_ambiguity(idx, "shared_wpn.odf", "", idx.active_packages)
+	_check(bool(nat_shared.get("found", false)) and WorkspaceStore._same_canon_path(str((nat_shared.get("selected", {}) as Dictionary).get("path", "")), ed_shared), "ML-04: editor and native staging select identical shared_wpn.odf path")
+	var nat_beta := ResourceClosureScript.resolve_odf_with_ambiguity(idx, "beta_exclusive.odf", "", idx.active_packages)
+	_check(not bool(nat_beta.get("found", true)), "ML-05: NativeResourceClosureBuilder refuses disabled pkg_b resource")
+	_eq(str(nat_beta.get("status", "")), "MISSING_OR_DISABLED_RESOURCE", "ML-05: native closure reports MISSING_OR_DISABLED_RESOURCE for disabled-only package")
+
+	var nat_closure := ResourceClosureScript.build_closure({
+		"shooter_odf": "stock_tank.odf",
+		"target_odf": "stock_tank.odf",
+		"weapon_odf": "shared_wpn.odf",
+		"ordnance_odf": "beta_exclusive.odf",
+		"active_packages": ["pkg_a"],
+		"mounted_workshop_packages": ["pkg_a"],
+		"check_base_disk": false,
+	}, idx, {"res_root": base_root})
+	_check(not bool(nat_closure.get("ok", true)) and str(nat_closure.get("reason", "")) == "MISSING_OR_DISABLED_RESOURCE", "ML-05: build_closure rejects disabled package dependency with MISSING_OR_DISABLED_RESOURCE")
+
+	# Native also refuses disabled explicit winner
+	idx.apply_loadout(ml_dis_win)
+	var nat_dw := ResourceClosureScript.resolve_odf_with_ambiguity(idx, "shared_wpn.odf", "", idx.active_packages)
+	_check(not bool(nat_dw.get("found", true)) and str(nat_dw.get("status", "")) == "EXPLICIT_WINNER_DISABLED_PACKAGE", "ML-05: NativeResourceClosureBuilder rejects disabled explicit winner")
+
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.root_override = old_root
+	_remove_tree(abs_ws)
+
+
+func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
+	_start("T-40 Wave D Durable Transitions & Async NativeProcessMonitor (P1-02, P1-03; ND-11..15, SM-01..07)")
+	NativeAdapterScript.clear_trusted_sessions()
+	var old_root := WorkspaceStore.root_override
+	var ws := "user://t40_native_durable_mon_" + str(Time.get_ticks_usec())
+	WorkspaceStore.root_override = ws
+	var abs_ws := ProjectSettings.globalize_path(ws)
+	var disc := NativeAdapterScript.discover()
+	var odf_bytes := "[OrdnanceClass]\ndamageValue(H)=100\nshotSpeed=120\n".to_utf8_buffer()
+	var odf_md5 := WorkspaceStore._md5_bytes(odf_bytes)
+	var steam_on := {"steam_present": true, "steam_logged_in": true, "steam_exe": str(disc.get("steam_exe", ""))}
+	var expected_exe := str(disc.get("exe", "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe"))
+	var expected_md5 := str(disc.get("exe_md5", ""))
+
+	# ND-11: stage() ledger persist failure -> STATE_PERSIST_FAILED / RECOVERY_PENDING (never false STAGED)
+	var r11 = NativeRunnerScript.new()
+	var p11: Dictionary = r11.preflight(null, null, {"discovery": disc, "stage_prefix": "nd11", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+	var sid11 := str(p11.get("session_id", ""))
+	r11.fault_fail_ledger_write = true
+	var st11: Dictionary = r11.stage(sid11)
+	r11.fault_fail_ledger_write = false
+	_check(not bool(st11.get("ok", true)), "ND-11: stage() fails closed when session_ledger.json write fails")
+	_eq(str(st11.get("reason", "")), "STATE_PERSIST_FAILED", "ND-11: stage() returns STATE_PERSIST_FAILED")
+	_eq(str(st11.get("state", "")), "RECOVERY_PENDING", "ND-11: stage() returns RECOVERY_PENDING")
+	_check(bool(st11.get("recovery_pending", false)), "ND-11: stage() sets recovery_pending=true")
+	var rec11_runner = NativeRunnerScript.new()
+	var rec11: Dictionary = rec11_runner.recover_sessions()
+	_check(bool(rec11.get("ok", false)) and not rec11_runner.get_session_record(sid11).is_empty(), "ND-11: durable ledger stays consistent & recoverable after stage persist failure")
+	var sess11_d: Dictionary = (rec11_runner.get_session_record(sid11).get("session", {}) as Dictionary)
+	if str(sess11_d.get("stage_root", "")) != "":
+		_remove_tree(str(sess11_d.get("stage_root", "")))
+
+	# ND-12: launch() ledger persist failure -> STATE_PERSIST_FAILED / RECOVERY_PENDING
+	var r12 = NativeRunnerScript.new()
+	r12.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+		return {"ok": true, "pid": 4100, "exit_code": 0}
+	r12.game_process_detector = func() -> Dictionary:
+		return {"detected": false, "game_pid": 0}
+	var p12: Dictionary = r12.preflight(null, null, {"discovery": disc, "stage_prefix": "nd12", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+	var sid12 := str(p12.get("session_id", ""))
+	var st12: Dictionary = r12.stage(sid12)
+	var sess12 = st12.get("session", null)
+	r12.fault_fail_ledger_write = true
+	var l12: Dictionary = r12.launch(sid12, {"execute_process": true})
+	r12.fault_fail_ledger_write = false
+	_check(not bool(l12.get("ok", true)) and str(l12.get("reason", "")) == "STATE_PERSIST_FAILED" and str(l12.get("state", "")) == "RECOVERY_PENDING", "ND-12: launch() ledger write failure returns STATE_PERSIST_FAILED / RECOVERY_PENDING")
+
+	# ND-13: OPERATOR_MANUAL launch fails operator_instructions.txt write -> STATE_PERSIST_FAILED / RECOVERY_PENDING (never false AWAITING_OPERATOR)
+	r12.set("fault_fail_operator_instructions_write", true)
+	var l13: Dictionary = r12.launch(sid12, {"manual_handoff": true})
+	r12.set("fault_fail_operator_instructions_write", false)
+	_check(not bool(l13.get("ok", true)) and str(l13.get("reason", "")) == "STATE_PERSIST_FAILED" and str(l13.get("state", "")) == "RECOVERY_PENDING", "ND-13: failed operator_instructions.txt write returns STATE_PERSIST_FAILED / RECOVERY_PENDING, never false AWAITING_OPERATOR")
+
+	# ND-14: collect_observation() fails native_evidence.json write or ledger write -> STATE_PERSIST_FAILED / RECOVERY_PENDING (never false COMPARISON_COMPLETE/NATIVE_VERIFIED)
+	var obs14_path := str(sess12.stage_root).path_join("obs_nd14.json")
+	_write(obs14_path, JSON.stringify({
+		"contract_version": 1, "measurement_method": "GetCurHealth_delta",
+		"session_id": sid12, "launch_nonce": str(sess12.launch_nonce), "scenario_id": str(sess12.scenario_id),
+		"state": "MEASUREMENT_COMPLETE", "shooter": "ivtank_vsr", "target": "ivscav_vsr",
+		"weapon": "gatstabvsr_c", "ordnance": "atstabvsr_c.odf",
+		"hp_before": 3000.0, "hp_after": 2900.0, "hp_max": 3000.0, "damage": 100.0,
+		"elapsed_mission_s": 0.9, "tps": 20, "odf_probe_damage": 100.0,
+		"expected_odf_md5": odf_md5, "observed_odf_md5": "", "observed_odf_hash_available": false,
+		"mount_marker": str(sess12.mount_marker), "resources_mounted": true,
+	}))
+	r12.set("fault_fail_evidence_write", true)
+	var c14a: Dictionary = r12.collect_observation(sid12, obs14_path)
+	r12.set("fault_fail_evidence_write", false)
+	_check(not bool(c14a.get("ok", true)) and str(c14a.get("reason", "")) == "STATE_PERSIST_FAILED" and str(c14a.get("state", "")) == "RECOVERY_PENDING" and not bool(c14a.get("verified", true)), "ND-14: failed native_evidence.json write returns STATE_PERSIST_FAILED / RECOVERY_PENDING (verified=false)")
+	r12.fault_fail_ledger_write = true
+	var c14b: Dictionary = r12.collect_observation(sid12, obs14_path)
+	r12.fault_fail_ledger_write = false
+	_check(not bool(c14b.get("ok", true)) and str(c14b.get("reason", "")) == "STATE_PERSIST_FAILED" and str(c14b.get("state", "")) == "RECOVERY_PENDING", "ND-14: failed ledger write during collect_observation returns STATE_PERSIST_FAILED / RECOVERY_PENDING")
+
+	# ND-15: cleanup_stage() fails ledger write -> STATE_PERSIST_FAILED / RECOVERY_PENDING (never false CLEANED_UP)
+	r12.fault_fail_session_write = true
+	var cl15: Dictionary = r12.cleanup_stage(sid12)
+	r12.fault_fail_session_write = false
+	_check(not bool(cl15.get("ok", true)) and str(cl15.get("reason", "")) == "STATE_PERSIST_FAILED" and str(cl15.get("state", "")) == "RECOVERY_PENDING", "ND-15: failed cleanup_stage persist returns STATE_PERSIST_FAILED / RECOVERY_PENDING")
+	_remove_tree(str(sess12.stage_root))
+
+	# SM-01..SM-07: Bounded asynchronous NativeProcessMonitor
+	var has_mon: bool = r12.has_method("poll_monitor") and r12.has_method("resume_monitor") and r12.has_method("cancel_monitor")
+	_check(has_mon, "SM-01..07: NativeExperimentRunner exposes async NativeProcessMonitor API (poll_monitor/resume_monitor/cancel_monitor)")
+	if has_mon:
+		# SM-01, SM-03, SM-04: Preexisting PID ignored, wrong exe/hash rejected, delayed new verified battlezone2.exe detected on poll 2 -> mission -> probe -> observation
+		var rm = NativeRunnerScript.new()
+		rm.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+			return {"ok": true, "pid": 7001, "exit_code": 0}
+		var fake_procs: Array = [
+			{"pid": 1111, "name": "battlezone2.exe", "exe_path": expected_exe, "exe_md5": expected_md5},
+		]
+		rm.set("process_inspector", func() -> Array: return fake_procs.duplicate(true))
+		var obs_flags := {"mission_observed": false, "mission_loaded_at": "", "resource_probe_confirmed": false}
+		rm.mission_observer = func(_s) -> Dictionary: return obs_flags.duplicate(true)
+
+		var pm: Dictionary = rm.preflight(null, null, {"discovery": disc, "stage_prefix": "sm01_04", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var sidm := str(pm.get("session_id", ""))
+		var stm: Dictionary = rm.stage(sidm)
+		var sessm = stm.get("session", null)
+		# Launch captures preexisting PID 1111 BEFORE spawning Steam!
+		var lm: Dictionary = rm.launch(sidm, {"execute_process": true, "monitor_timeout_s": 30.0, "monitor_poll_interval_s": 0.25})
+		_eq(str(lm.get("state", "")), "STEAM_PROCESS_STARTED", "SM-01/SM-03: preexisting battlezone2.exe PID 1111 ignored at launch -> STEAM_PROCESS_STARTED")
+
+		# Poll 1: only preexisting PID 1111 + a foreign mismatched battlezone2.exe PID 2222 exist -> MUST stay STEAM_PROCESS_STARTED!
+		fake_procs.clear()
+		fake_procs.append({"pid": 1111, "name": "battlezone2.exe", "exe_path": expected_exe, "exe_md5": expected_md5})
+		fake_procs.append({"pid": 2222, "name": "battlezone2.exe", "exe_path": "C:/FakeGame/battlezone2.exe", "exe_md5": "00000000000000000000000000000000"})
+		var poll1: Dictionary = rm.call("poll_monitor", sidm, 1.0)
+		_eq(str(poll1.get("state", "")), "STEAM_PROCESS_STARTED", "SM-03: preexisting PID 1111 and mismatched exe/MD5 PID 2222 rejected -> stays STEAM_PROCESS_STARTED")
+		_check(int(poll1.get("game_pid", 0)) == 0, "SM-03: game_pid remains 0 when only preexisting/mismatched processes exist")
+
+		# Poll 2: new verified battlezone2.exe PID 8888 appears -> GAME_PROCESS_DETECTED!
+		fake_procs.append({"pid": 8888, "name": "battlezone2.exe", "exe_path": expected_exe, "exe_md5": expected_md5})
+		var poll2: Dictionary = rm.call("poll_monitor", sidm, 2.0)
+		_eq(str(poll2.get("state", "")), "GAME_PROCESS_DETECTED", "SM-01: delayed new verified battlezone2.exe detected on poll 2 -> GAME_PROCESS_DETECTED")
+		_eq(int(poll2.get("game_pid", 0)), 8888, "SM-01: monitor captured verified new game_pid=8888")
+		_check(bool(poll2.get("game_exe_verified", false)), "SM-01: monitor verified executable path & MD5")
+
+		# SM-07: Simulate application restart while monitor is active in GAME_PROCESS_DETECTED -> resume_monitor preserves session_id, preexisting_game_pids, state!
+		var rm_restart = NativeRunnerScript.new()
+		rm_restart.recover_sessions()
+		rm_restart.set("process_inspector", func() -> Array: return fake_procs.duplicate(true))
+		rm_restart.mission_observer = func(_s) -> Dictionary: return obs_flags.duplicate(true)
+		var res_mon: Dictionary = rm_restart.call("resume_monitor", sidm)
+		_check(bool(res_mon.get("ok", false)) and str(res_mon.get("session_id", "")) == sidm and str(res_mon.get("state", "")) == "GAME_PROCESS_DETECTED", "SM-07: restart recovery resumes monitored session preserving session_id and GAME_PROCESS_DETECTED state")
+		_check((res_mon.get("preexisting_game_pids", []) as Array).has(1111), "SM-07: resumed monitor preserves preexisting_game_pids across restart")
+
+		# Poll 3 (on original in-process runner rm with live trusted session): mission observed -> MISSION_OBSERVED
+		obs_flags.clear()
+		obs_flags["mission_observed"] = true
+		obs_flags["mission_loaded_at"] = "2026-11-21T19:45:00"
+		obs_flags["resource_probe_confirmed"] = false
+		var poll3: Dictionary = rm.call("poll_monitor", sidm, 3.0)
+		_eq(str(poll3.get("state", "")), "MISSION_OBSERVED", "SM-04: monitor transitions GAME_PROCESS_DETECTED -> MISSION_OBSERVED")
+
+		# Poll 4: resource probe confirmed -> RESOURCE_PROBE_CONFIRMED
+		obs_flags.clear()
+		obs_flags["mission_observed"] = true
+		obs_flags["mission_loaded_at"] = "2026-11-21T19:45:00"
+		obs_flags["resource_probe_confirmed"] = true
+		var poll4: Dictionary = rm.call("poll_monitor", sidm, 4.0)
+		_eq(str(poll4.get("state", "")), "RESOURCE_PROBE_CONFIRMED", "SM-04: monitor transitions MISSION_OBSERVED -> RESOURCE_PROBE_CONFIRMED")
+
+		# SM-05: Synthetic observation NEVER reaches NATIVE_VERIFIED!
+		var syn_obs_p := str(sessm.stage_root).path_join("syn_sm05.json")
+		_write(syn_obs_p, JSON.stringify({
+			"contract_version": 1, "measurement_method": "GetCurHealth_delta", "synthetic": true,
+			"session_id": sidm, "launch_nonce": str(sessm.launch_nonce), "scenario_id": str(sessm.scenario_id),
+			"state": "MEASUREMENT_COMPLETE", "shooter": "ivtank_vsr", "target": "ivscav_vsr",
+			"weapon": "gatstabvsr_c", "ordnance": "atstabvsr_c.odf",
+			"hp_before": 3000.0, "hp_after": 2900.0, "hp_max": 3000.0, "damage": 100.0,
+			"elapsed_mission_s": 0.9, "tps": 20, "odf_probe_damage": 100.0,
+			"expected_odf_md5": odf_md5, "observed_odf_md5": "", "observed_odf_hash_available": false,
+			"mount_marker": str(sessm.mount_marker), "resources_mounted": true,
+		}))
+		var poll_syn: Dictionary = rm.call("poll_monitor", sidm, 5.0, syn_obs_p)
+		_check(str(poll_syn.get("state", "")) != "NATIVE_VERIFIED" and not bool(poll_syn.get("native_verified", true)), "SM-05: synthetic observation NEVER transitions monitor to NATIVE_VERIFIED")
+
+		# SM-04 final: non-synthetic observation written to expected path completes collection + comparison
+		var real_obs_p := str(sessm.stage_root).path_join("obs_sm04.json")
+		_write(real_obs_p, JSON.stringify({
+			"contract_version": 1, "measurement_method": "GetCurHealth_delta",
+			"session_id": sidm, "launch_nonce": str(sessm.launch_nonce), "scenario_id": str(sessm.scenario_id),
+			"state": "MEASUREMENT_COMPLETE", "shooter": "ivtank_vsr", "target": "ivscav_vsr",
+			"weapon": "gatstabvsr_c", "ordnance": "atstabvsr_c.odf",
+			"hp_before": 3000.0, "hp_after": 2900.0, "hp_max": 3000.0, "damage": 100.0,
+			"elapsed_mission_s": 0.9, "tps": 20, "odf_probe_damage": 100.0,
+			"expected_odf_md5": odf_md5, "observed_odf_md5": "", "observed_odf_hash_available": false,
+			"mount_marker": str(sessm.mount_marker), "resources_mounted": true,
+		}))
+		var poll5: Dictionary = rm.call("poll_monitor", sidm, 6.0, real_obs_p)
+		_check(bool(poll5.get("observation_collected", false)) and bool(poll5.get("comparison_complete", false)), "SM-04: monitor collects observation and completes comparison")
+		_check(str(poll5.get("state", "")) in ["COMPARISON_COMPLETE", "NATIVE_VERIFIED"], "SM-04: monitor reaches terminal comparison state (%s)" % str(poll5.get("state", "")))
+		rm.cleanup_stage(sidm)
+		_remove_tree(str(sessm.stage_root))
+
+		# SM-02 & SM-06: Game never appears -> stays STEAM_PROCESS_STARTED until timeout -> clean TIMEOUT; and cancel -> CANCELLED
+		var rt = NativeRunnerScript.new()
+		rt.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+			return {"ok": true, "pid": 7100, "exit_code": 0}
+		rt.set("process_inspector", func() -> Array: return [])
+		var pt: Dictionary = rt.preflight(null, null, {"discovery": disc, "stage_prefix": "sm02_06", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var sidt := str(pt.get("session_id", ""))
+		var stt: Dictionary = rt.stage(sidt)
+		var sesst = stt.get("session", null)
+		rt.launch(sidt, {"execute_process": true, "monitor_timeout_s": 5.0, "monitor_max_polls": 10})
+		var pt1: Dictionary = rt.call("poll_monitor", sidt, 2.0)
+		_eq(str(pt1.get("state", "")), "STEAM_PROCESS_STARTED", "SM-02: game never appears -> stays STEAM_PROCESS_STARTED before timeout")
+		var pt_to: Dictionary = rt.call("poll_monitor", sidt, 6.5)
+		_eq(str(pt_to.get("state", "")), "TIMEOUT", "SM-06: exceeding timeout_s transitions cleanly to TIMEOUT")
+		_check(not bool(pt_to.get("active", true)) and str(pt_to.get("reason", "")) == "MONITOR_TIMEOUT", "SM-06: TIMEOUT stops polling and records MONITOR_TIMEOUT")
+		rt.cleanup_stage(sidt)
+		_remove_tree(str(sesst.stage_root))
+
+		# Cancel check:
+		var rc = NativeRunnerScript.new()
+		rc.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+			return {"ok": true, "pid": 7200, "exit_code": 0}
+		rc.set("process_inspector", func() -> Array: return [])
+		var pc: Dictionary = rc.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_cancel", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var sidc := str(pc.get("session_id", ""))
+		var stc: Dictionary = rc.stage(sidc)
+		var sessc = stc.get("session", null)
+		rc.launch(sidc, {"execute_process": true, "monitor_timeout_s": 30.0})
+		var c_res: Dictionary = rc.call("cancel_monitor", sidc)
+		_eq(str(c_res.get("state", "")), "CANCELLED", "SM-06: cancel_monitor transitions cleanly to CANCELLED")
+		_check(not bool(c_res.get("active", true)), "SM-06: cancelled monitor is inactive")
+		rc.cleanup_stage(sidc)
+		_remove_tree(str(sessc.stage_root))
+
+		# SM-01 regression: preexisting PIDs must be captured BEFORE Steam spawn.
+		# The launcher adds the game PID during spawn; a post-spawn snapshot would
+		# wrongly classify it as preexisting and the monitor would never detect it.
+		var rp = NativeRunnerScript.new()
+		var live_procs: Array = []
+		rp.set("process_inspector", func() -> Array: return live_procs.duplicate(true))
+		rp.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+			live_procs.append({"pid": 9999, "name": "battlezone2.exe", "exe_path": expected_exe, "exe_md5": expected_md5})
+			return {"ok": true, "pid": 7300, "exit_code": 0}
+		var pp: Dictionary = rp.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_pre_spawn", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var sidp := str(pp.get("session_id", ""))
+		var stp: Dictionary = rp.stage(sidp)
+		var sessp = stp.get("session", null)
+		rp.launch(sidp, {"execute_process": true, "monitor_timeout_s": 30.0})
+		var poll_pre: Dictionary = rp.call("poll_monitor", sidp, 1.0)
+		_eq(str(poll_pre.get("state", "")), "GAME_PROCESS_DETECTED", "SM-01: game PID created by Steam spawn is not mistaken for preexisting")
+		_eq(int(poll_pre.get("game_pid", 0)), 9999, "SM-01: post-spawn game PID 9999 detected")
+		rp.cleanup_stage(sidp)
+		_remove_tree(str(sessp.stage_root))
+
+		# SM-06 regression: production polling (no injected relative clock) must
+		# not time out on its first wall-clock poll.
+		var rw = NativeRunnerScript.new()
+		rw.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+			return {"ok": true, "pid": 7400, "exit_code": 0}
+		rw.set("process_inspector", func() -> Array: return [])
+		var pw: Dictionary = rw.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_wall_clock", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var sidw := str(pw.get("session_id", ""))
+		var stw: Dictionary = rw.stage(sidw)
+		var sessw = stw.get("session", null)
+		rw.launch(sidw, {"execute_process": true, "monitor_timeout_s": 30.0})
+		var poll_wall: Dictionary = rw.call("poll_monitor", sidw)
+		_eq(str(poll_wall.get("state", "")), "STEAM_PROCESS_STARTED", "SM-06: wall-clock monitor does not time out on first poll")
+		rw.cleanup_stage(sidw)
+		_remove_tree(str(sessw.stage_root))
+
+	NativeAdapterScript.clear_trusted_sessions()
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.root_override = old_root
+	_remove_tree(abs_ws)
+
+
+func _test_t41_damage_shield_ammo_and_hit_normals() -> void:
+	_start("T-41 Wave E Damage / Shield / Ammo slice + hit normals (DS-01..DS-05)")
+	var tmp_dir := ProjectSettings.globalize_path("user://t41_shield_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+	var sh := tmp_dir.path_join("sh.odf")
+	var wp := tmp_dir.path_join("wp.odf")
+	var ord := tmp_dir.path_join("or.odf")
+	var tg := tmp_dir.path_join("tg.odf")
+	_write(sh, "[GameObjectClass]
+weaponName1=\"wp\"
+")
+	_write(wp, "[WeaponClass]
+ordName=\"or\"
+shotDelay=0.5
+")
+	_write(ord, "[OrdnanceClass]
+shotSpeed=120
+lifeSpan=1.0
+shotRadius=0.5
+ammoCost=2
+DamageShield=1.0
+damageValue(H)=100
+damageValue(D)=200
+")
+	_write(tg, "[GameObjectClass]
+maxHealth=1000
+armorClass=\"H\"
+shieldClass=\"D\"
+maxShield=80
+maxAmmo=5
+")
+	var idx := ResourceIndex.new()
+	idx.roots = [{"path": tmp_dir, "label": "t41", "kind": "game", "priority": 10, "enabled": true}]
+	idx.scan(false)
+	var prof := WeaponProfile.new()
+	_check(prof.resolve(idx, sh, tg), "DS-01: shielded target ODF chain resolved")
+	_eq(prof.target_shield_max, 80.0, "DS-01: maxShield parsed from target ODF")
+	_eq(prof.target_shield_class, "D", "DS-01: shieldClass parsed from target ODF")
+	_eq(prof.target_ammo_max, 5, "DS-01: maxAmmo parsed from target ODF")
+	_eq(prof.expected_damage_for_target(), 200.0, "DS-02: damageValue(D) selected for shielded target")
+	_eq(prof.shield_damage_ratio(), 0.5, "DS-02: BZCC shieldRatio D=0.5 applied")
+	var target_pos := Vector3(0, 2.0, -60.0)
+	var result := ProjectileSim.run_once(prof, Vector3(0, 2.0, 0), Vector3(0, 0, -1), target_pos, 2.0)
+	_eq(str(result.kind), "vehicle", "DS-02: shot reaches shielded target")
+	_eq(float(result.shield_damage), 80.0, "DS-02: shield absorbed 80 of 100 effective shield damage")
+	_eq(float(result.shield_remaining), 0.0, "DS-02: shield fully depleted")
+	_eq(float(result.damage_to_hull), 40.0, "DS-02: spill damage reaches hull after shield ratio")
+	_eq(float(result.target_health), 960.0, "DS-02: hull health reflects shield spill only")
+	_eq(int(result.ammo_spent), 2, "DS-03: ammoCost consumed from declared reserve")
+	_check((result.hit_normal as Vector3).length() > 0.9, "DS-04: hit normal is a unit-ish outward vector")
+	_check((result.hit_normal as Vector3).z > 0.0, "DS-04: front hit normal points back toward shooter")
+	var events: Array = result.events
+	var shield_logged := false
+	for ev in events:
+		if str(ev.get("kind", "")) == "damage" and str(ev.get("text", "")).contains("Shield class D"):
+			shield_logged = true
+	_check(shield_logged, "DS-05: shield absorption is explicitly logged as APPROXIMATED")
+	# No-shield regression: ordinary armor path must remain unchanged.
+	prof.set_override("maxShield", "0")
+	prof.set_override("shieldClass", "N")
+	prof.refresh()
+	_eq(prof.expected_damage_for_target(), 100.0, "DS-05: unshielded target falls back to armor damageValue(H)")
+	var bare := ProjectileSim.run_once(prof, Vector3(0, 2.0, 0), Vector3(0, 0, -1), target_pos, 2.0)
+	_eq(float(bare.damage), 100.0, "DS-05: unshielded hull damage unchanged")
+	_eq(float(bare.target_health), 900.0, "DS-05: unshielded hull health unchanged")
+	_remove_tree(tmp_dir)
+
+
+func _test_t41_ribbons_and_animation_inspection() -> void:
+	_start("T-41 Wave E Animated Ribbon Trails & BZCC animation inspection (TR-01..TR-04)")
+	var tmp_dir := ProjectSettings.globalize_path("user://t41_trail_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+	var fx_path := tmp_dir.path_join("fx.odf")
+	_write(fx_path, "[SmokeTrail]
+renderBase=\"draw_twirl_trail\"
+lifeTime=1.2
+startRadius=0.4
+finishRadius=0.1
+startColor=\"80 200 255 255\"
+")
+	var doc := OdfDocument.load_cached(fx_path)
+	var idx := ResourceIndex.new()
+	idx.roots = [{"path": tmp_dir, "label": "fx", "kind": "game", "priority": 10, "enabled": true}]
+	idx.scan(false)
+	var preview := EffectRuntime.build_document_preview(idx, doc)
+	var holder = (preview.get("header_nodes", {}) as Dictionary).get("SmokeTrail", null)
+	_check(holder != null, "TR-01: trail header preview holder built")
+	var trail: Node = null
+	for c in holder.get_children():
+		if str(c.name).begins_with("Trail_"):
+			trail = c
+			break
+	_check(trail != null, "TR-01: animated ribbon trail node created for draw_twirl_trail")
+	if trail != null:
+		_eq(int(trail.get_meta("trail_points", 0)), 25, "TR-01: ribbon sampled path has 25 points")
+		var mesh_node = trail.get("mesh_instance")
+		_check(mesh_node != null and (mesh_node as MeshInstance3D).mesh != null, "TR-02: ribbon mesh generated")
+		trail.call("rebuild", 1.25)
+		_check((mesh_node as MeshInstance3D).mesh != null, "TR-02: ribbon mesh rebuilds under animation")
+	var path := RibbonTrailScript.build_path(Vector3(-1, 1, 0), Vector3(1, 1, 0), 0.5, 12)
+	_eq(path.size(), 13, "TR-02: curved trail path sampled deterministically")
+	# Real baked .msh embedded animation metadata (no .msha sample exists in the game root).
+	var msh_path := BzMeshReaderScript.resolve_msh_for_geometry(idx, "ivtank00.fbx", "")
+	var real_idx := ResourceIndex.new()
+	real_idx.roots = [
+		{"path": BASE, "label": "base", "kind": "game", "priority": 10, "enabled": true},
+		{"path": WORKSHOP, "label": "workshop", "kind": "workshop", "priority": 30, "enabled": true},
+	]
+	real_idx.scan(true)
+	msh_path = BzMeshReaderScript.resolve_msh_for_geometry(real_idx, "ivtank00.fbx", "")
+	_check(msh_path != "", "TR-03: real baked .msh resolved for animation inspection")
+	if msh_path != "":
+		var reader = BzMeshReaderScript.new()
+		var anim: Dictionary = reader.call("inspect_animation", msh_path, real_idx, "ivtank00.fbx")
+		_check(bool(anim.get("ok", false)), "TR-03: animation metadata inspected from real DOCB model")
+		_check(anim.has("bone_count") and anim.has("pose_count") and anim.has("node_count"), "TR-03: bone/pose/node count fields reported")
+		_check(bool(anim.has("animation_count")), "TR-03: animation_count reported honestly even when zero")
+	var fake_msha := tmp_dir.path_join("fake.msha")
+	_write(fake_msha, "NOTDOCB")
+	var reader_msha = BzMeshReaderScript.new()
+	var msha_check: Dictionary = reader_msha.call("inspect_msha_file", fake_msha)
+	_eq(str(msha_check.get("errors", [])), '["not a DOCB .msha file"]', "TR-04: non-DOCB .msha rejected")
+	if holder != null and holder is Node:
+		(holder as Node).free()
+	OdfDocument.clear_all_cache()
+	_remove_tree(tmp_dir)
 
 
 # ---------------------------------------------------------------- helpers

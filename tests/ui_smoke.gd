@@ -720,6 +720,7 @@ func _ready() -> void:
 		DirAccess.remove_absolute(rst_bad_p)
 		var mix_rep: Dictionary = main.reset_selected_odfs_to_default([rst_ok_p, rst_bad_p, rst_ok_p], true)
 		_check(int(mix_rep.get("requested", 0)) == 2 and int(mix_rep.get("succeeded", 0)) == 1 and int(mix_rep.get("failed", 0)) == 1 and not bool(mix_rep.get("ok", true)), "RST-08: deduplicated reset report accurately reports requested=2, succeeded=1, failed=1")
+		OdfDocument.invalidate_cache(rst_bad_p)
 
 		# RST-01 confirm: Confirm Reset All restores A and C with recovery point.
 		db.set_entry_value(db.find_entry("OrdnanceClass", "damageValue(H)"), "202")
@@ -893,6 +894,99 @@ func _ready() -> void:
 		_check(main.weapon_lab.apply_camera_bookmark("titan_angle") and main.weapon_lab.active_camera_preset == "bookmark:titan_angle", "T-34 UI: apply_camera_bookmark restores saved camera view")
 		main.weapon_lab.reset_scene_to_default()
 
+		# T-38 UI: Single-doc Reset preserves dirty+saved, Recovery History UI (VIS-11),
+		# Impact-Snapshot confirmation reconfirm (RST-21), and Project Config atomic confirm (RST-22)
+		var t38_dir := ProjectSettings.globalize_path(test_root.path_join("t38_ui_src"))
+		DirAccess.make_dir_recursive_absolute(t38_dir)
+		var t38_a := t38_dir.path_join("t38_alpha.odf")
+		var t38_b := t38_dir.path_join("t38_beta.odf")
+		var fa38 := FileAccess.open(t38_a, FileAccess.WRITE)
+		fa38.store_string("[OrdnanceClass]\ndamageValue(H)=100\n")
+		fa38.close()
+		var fb38 := FileAccess.open(t38_b, FileAccess.WRITE)
+		fb38.store_string("[OrdnanceClass]\ndamageValue(H)=50\n")
+		fb38.close()
+
+		main.open_document(t38_a)
+		main.current_doc.set_entry_value(main.current_doc.find_entry("OrdnanceClass", "damageValue(H)"), "200")
+		main.save_all_edited()
+		main.current_doc.set_entry_value(main.current_doc.find_entry("OrdnanceClass", "damageValue(H)"), "250")
+		var req_single: Dictionary = main.request_reset_current_doc()
+		_check(bool(req_single.get("confirmation_required", false)) and str(req_single.get("confirmation_nonce", "")) != "", "T-38 UI: request_reset_current_doc binds confirmation snapshot & nonce")
+		var cnf_single: Dictionary = main.confirm_reset_current_doc_ex()
+		_check(bool(cnf_single.get("ok", false)) and main.current_doc.get_value("OrdnanceClass", "damageValue(H)") == "100", "T-38 UI / RST-15: confirmed single Reset restores factory 100")
+		var single_tx := str(cnf_single.get("recovery_point", ""))
+		_check(main.recovery_history_button != null and main.recovery_history_dialog != null, "VIS-11: Recovery History UI button & dialog present")
+		var rh_cnt: int = main.open_recovery_history()
+		_check(rh_cnt >= 1, "VIS-11: Recovery History UI lists single-document recovery point (%d)" % rh_cnt)
+		if main.recovery_history_dialog != null:
+			main.recovery_history_dialog.hide()
+		var ui_rec: Dictionary = main.restore_recovery_point_ui(single_tx, "full")
+		_check(bool(ui_rec.get("ok", false)) and main.current_doc.get_value("OrdnanceClass", "damageValue(H)") == "250", "VIS-11 / Demo A UI: Recovery History restore recovers unsaved 250 directly into open Inspector/editor")
+
+		# RST-21: Reset All confirmation snapshot detects state change before approval and requires renewed confirmation
+		var req_all21: Dictionary = main.request_reset_all_odfs()
+		_check(bool(req_all21.get("confirmation_required", false)) and str(req_all21.get("confirmation_nonce", "")) != "", "RST-21 setup: Reset All confirmation captured snapshot")
+		# Mutate a second file while confirmation dialog is open!
+		var doc_b38 := OdfDocument.load_cached(t38_b)
+		doc_b38.set_entry_value(doc_b38.find_entry("OrdnanceClass", "damageValue(H)"), "999")
+		var stale_confirm: Dictionary = main.confirm_reset_all_odfs()
+		_check(not bool(stale_confirm.get("ok", true)) and str(stale_confirm.get("status", "")) == "IMPACT_CHANGED_RECONFIRM_REQUIRED", "RST-21: stale Reset All confirmation rejected with IMPACT_CHANGED_RECONFIRM_REQUIRED")
+		_check(bool(stale_confirm.get("reconfirmation_required", false)) and main.reset_all_confirmation_pending, "RST-21: renewed confirmation remains pending after impact drift")
+		_check(doc_b38.get_value("OrdnanceClass", "damageValue(H)") == "999" and main.current_doc.get_value("OrdnanceClass", "damageValue(H)") == "250", "RST-21: zero files mutated when confirmation snapshot drifted")
+		main.cancel_reset_all_odfs()
+
+		# RST-22: Reset project configuration with workspace overrides does NOT mutate UI/loadout before approval or on cancel
+		var alt_theme := "goldendefault"
+		for slug in main.theme_engine.slugs:
+			if slug != "goldendefault":
+				alt_theme = slug
+				break
+		main._apply_theme(alt_theme)
+		main.apply_active_loadout("3820486276", false)
+		var proj_req: Dictionary = main.reset_project_configuration_to_default(true, false)
+		_check(bool(proj_req.get("confirmation_required", false)) and bool(proj_req.get("project_config_pending", false)), "RST-22: reset_project_configuration_to_default(include_workspace=true) requires confirmation first")
+		_check(main.theme_engine.current_slug == alt_theme and main.active_loadout_id == "3820486276", "RST-22: UI theme and mod loadout NOT mutated before confirmation")
+		main.cancel_reset_all_odfs()
+		_check(main.theme_engine.current_slug == alt_theme and main.active_loadout_id == "3820486276" and doc_b38.get_value("OrdnanceClass", "damageValue(H)") == "999", "RST-22: cancelled project configuration reset leaves UI, loadout, and ODFs unmutated")
+		# Now cleanly confirm full project configuration reset and verify everything resets together
+		main.reset_project_configuration_to_default(true, false)
+		var proj_ok: Dictionary = main.confirm_reset_all_odfs()
+		_check(bool(proj_ok.get("ok", false)) and main.theme_engine.current_slug == "goldendefault" and main.active_loadout_id == "3532748119", "RST-22: confirmed project config reset resets UI, loadout, and workspace in one transaction")
+		_check(doc_b38.get_value("OrdnanceClass", "damageValue(H)") == "50", "RST-22: confirmed transaction restored ODFs to factory defaults")
+
+		# ML-06: Switching ModLoadout in UI refreshes all active consumers and enforces strict Stock-Only isolation
+		main.apply_active_loadout("stock", false)
+		_check(main.active_loadout_id == "stock" and main.index.strict_package_filter and main.index.active_packages.is_empty(), "ML-06: Stock Only loadout enables strict empty active_packages filter")
+		_check(main.index.resolve_path("ivtank_vsr.odf") == "", "ML-06: Stock Only loadout strictly blocks disabled VSR ODF (ivtank_vsr.odf)")
+		var stock_ex: Dictionary = main.index.resolve_ex("ivtank_vsr.odf")
+		_check(str(stock_ex.get("status", "")) == "MISSING_OR_DISABLED_RESOURCE", "ML-06: Stock Only resolve_ex reports MISSING_OR_DISABLED_RESOURCE for disabled VSR file")
+		_check(main.index.resolve_path("ivtank.odf") != "", "ML-06: Stock Only loadout still resolves base game ivtank.odf")
+		main.apply_active_loadout("3532748119", false)
+		_check(main.index.resolve_path("ivtank_vsr.odf") != "" and main.weapon_lab.profile != null, "ML-06: switching back to VSR 3532748119 restores VSR resolution and refreshes Weapons Lab")
+
+	# T-41: Live Parameter Inspection + animation metadata surfaced in UI.
+	if main.particle_lab != null:
+		var t41_path := ProjectSettings.globalize_path(test_root.path_join("t41_live.odf"))
+		var ft41 := FileAccess.open(t41_path, FileAccess.WRITE)
+		ft41.store_string("[Trail]
+renderBase=\"draw_twirl_trail\"
+lifeTime=1.0
+startRadius=0.35
+finishRadius=0.1
+")
+		ft41.close()
+		var t41_doc := OdfDocument.load_cached(t41_path)
+		main.particle_lab.load_document(t41_doc)
+		await get_tree().process_frame
+		var live: Dictionary = main.particle_lab.inspect_emitter_live_state("Trail")
+		_check(bool(live.has("live_particle_count")) and int(live.get("live_particle_count", 0)) > 0, "T-41 UI: live parameter inspection reports actual particle nodes")
+		_check(int(live.get("live_scale_curve_points", 0)) >= 0, "T-41 UI: live radius curve point count inspected")
+		if main.model_text != null:
+			main.current_doc = t41_doc
+			main._update_model_tab()
+	# Restore the real scenario for any later assertions.
+	main.apply_active_loadout("3532748119", false)
 	_cleanup_test_root()
 	print("UI smoke: %d failure(s)" % failures.size())
 	if failures.is_empty():

@@ -15,6 +15,7 @@ const MAX_PARTICLES := 160
 const MAX_DEPTH := 6
 const BzMeshReaderScript = preload("res://scripts/core/bz_mesh_reader.gd")
 const BoltBeamScript = preload("res://scripts/lab/bolt_beam_node.gd")
+const RibbonTrailScript = preload("res://scripts/lab/ribbon_trail_node.gd")
 
 
 static func build(p_index: ResourceIndex, xpl_path: String, position: Vector3,
@@ -270,6 +271,11 @@ static func build_document_preview(p_index: ResourceIndex, doc: OdfDocument) -> 
 				var bn = bres.root
 				bn.duration = 9999.0
 				holder.add_child(bn)
+		# Animated crossed-ribbon trail for continuous draw_trail / draw_twirl_trail.
+		if rb == "draw_trail" or rb == "draw_twirl_trail":
+			var trail = build_ribbon_trail(doc, h.name)
+			if trail != null:
+				holder.add_child(trail)
 		(out.nodes as Array).append(holder)
 		(out.header_nodes as Dictionary)[h.name] = holder
 		for rt in res.render_types:
@@ -781,6 +787,28 @@ static func _build_light(doc: OdfDocument, header: String, scale_factor: float) 
 	light.light_energy = clampf(3.5 + doc.get_float(header, "attenuateConstant", 1.0), 1.0, 8.0)
 	light.shadow_enabled = false
 	return light
+
+
+## Build an animated ribbon preview from the header's declared radius/color
+## and a deterministic curved sample path (APPROXIMATED, no native geometry).
+static func build_ribbon_trail(doc: OdfDocument, header: String):
+	if doc == null:
+		return null
+	var sr := maxf(0.02, doc.get_float(header, "startRadius", 0.3))
+	var fr := maxf(0.02, doc.get_float(header, "finishRadius", sr))
+	var col := _color(doc.get_value(header, "color1", doc.get_value(header, "color", "1 1 1 1")), Color(1, 1, 1, 0.8))
+	var life := maxf(0.1, doc.get_float(header, "lifeTime", doc.get_float(header, "lifeSpan", 1.0)))
+	var arc := clampf(doc.get_float(header, "animateTime", 1.0) * 0.35, 0.15, 1.8)
+	var pts := RibbonTrailScript.build_path(Vector3(-2.2, 0.6, 0), Vector3(2.2, 0.6, -0.4), arc, 24)
+	var trail = RibbonTrailScript.new()
+	trail.name = "Trail_" + header
+	trail.set_meta("header", header)
+	trail.set_meta("render_base", "draw_trail")
+	trail.set_meta("trail_radius", (sr + fr) * 0.5)
+	trail.set_meta("trail_points", pts.size())
+	trail.set_meta("trail_life", life)
+	trail.configure(pts, (sr + fr) * 0.5, col, maxf(0.5, 3.0 / life), 1.0 / life)
+	return trail
 
 
 static func _vec(raw: String) -> Vector3:

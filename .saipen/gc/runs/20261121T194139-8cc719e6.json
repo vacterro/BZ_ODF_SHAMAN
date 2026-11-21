@@ -1,0 +1,20 @@
+{
+ "accounting_matches": true,
+ "agent": "saipen",
+ "blockers": [
+  {
+   "code": "EVIDENCE_KEPT",
+   "detail": "605097 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
+  }
+ ],
+ "bytes_planned": 0,
+ "bytes_reclaimed": 0,
+ "finished": "2026-11-21T19:41:39Z",
+ "kept": 0,
+ "protected_bytes": 605097,
+ "recovered_runs": [],
+ "run_id": "20261121T194139-8cc719e6",
+ "schema": 1,
+ "started": "2026-11-21T19:41:39Z",
+ "targets": []
+}

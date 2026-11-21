@@ -18,6 +18,9 @@ Equivalent:
 | Category | Coverage |
 |---|---|
 | Reset safety (`RST-04..05,09,11,13..14`) | manifest failure blocks false reset success (`RESET_FAILED_RECOVERABLE`), durable recovery point create/restore, occurrence-aware physical duplicate reset, full factory header restore removing custom properties |
+| Damage/shield/ammo + hit normals (`DS-01..05`, `T-41`) | `maxShield`/`shieldClass`/`maxAmmo` parsed, `damageValue(S/D/A)` and shieldRatio applied before hull spill, `ammoCost` consumed, outward hit normal emitted in `shot_finished`/`run_once`, no-shield path unchanged |
+| Animated trails + animation inspection (`TR-01..04`, `T-41`) | crossed-ribbon trail generated and rebuilt for `draw_twirl_trail`, deterministic curved path, real DOCB `.msh` animation metadata inspected, non-DOCB `.msha` rejected |
+| Checked native transitions & async monitor (`ND-11..15`, `SM-01..07`, `T-40`) | ledger/instruction/evidence write failures fail closed as `STATE_PERSIST_FAILED` / `RECOVERY_PENDING`; monitor ignores pre-spawn PIDs and mismatched exe/MD5, verifies new game PID, advances mission/probe states, rejects synthetic evidence, resumes across restart, and bounds timeout/cancel |
 | Native durability & evidence (`N-D01..10`, `N-E01..08`) | preflight package/session/ledger persistence failure rejected, 1-byte tamper (`PREFLIGHT_SNAPSHOT_HASH_MISMATCH`), corrupt base64, wrong session, UTF-16LE byte-exact source hashing, fail-closed staging/launch, fake PID/mission/probe options ignored, synthetic rejected, operator-imported unattested |
 | Titan FX, Floor Physics & Sandbox (`T-36`) | `fvatank` → `garc_c` → `arcbolt` `BoltBeamNode`, `garc_a` `ArcCannonClass` (`ordName=NULL`, 400 dmg), `sim_ember` rigid floor bouncing (`min_y >= 0.0`, `bounce_events_count > 0`), `BottomInteractsWithTerrain` clamping, homing missile (`omegaTurn`) tracking wiggling target, sloped terrain ramp interception/clearance, `shotVariance` spread, shooter velocity inheritance, multi-target splash |
 | Persistent `ModLoadout` (`T-34`) | JSON save/load/list/delete under `workspace/loadouts/`, multi-package priority order, explicit per-ODF conflict winner shared identically by `ResourceIndex` and `NativeResourceClosureBuilder`, missing dependency & native eligibility reporting |
@@ -111,8 +114,10 @@ Boots the real main scene and verifies:
 - Multiple workshop package orders beyond the same-package/base/other policy.
 - Audio playback in headless mode; compressed WAV codecs (metadata only).
 - Native BZCC live execution (preflight, closure, allowlisted staging, durable session ledger,
-  controlled Lua contract, and evidence gate tests pass; live launch is `BLOCKED` by
-  `STEAM_USER_NOT_LOGGED_IN`, `ActiveUser = 0x0`, in the isolated Windows session and `BZ2R` is read-only).
+  controlled Lua contract, checked transitions, async monitor, and evidence gate tests pass; the
+  original isolated session was `BLOCKED` by `STEAM_USER_NOT_LOGGED_IN` (`ActiveUser = 0x0`), a later
+  GUI session reported `STRUCTURALLY_VALID` / `STEAM_MANAGED`, and no live-attested launch has run;
+  `BZ2R` is read-only).
 - Interactive GUI run of the packaged Windows GUI (`build/BZ_ODF_SHAMAN.exe`) is verified via
   windowed OpenGL self-verification (`BZ_SHAMAN_VERIFY_GUI_DIR` capturing `exe_weapons_lab.png`,
   `exe_particle_lab.png`, and `gui_verify_report.txt`); mouse/keyboard OS-level input automation is
@@ -126,14 +131,14 @@ tools\run_bench.cmd
 ```
 
 Prints index scan, 500-file parse throughput, 100 cold inheritance merges, 500 deterministic
-shots and static memory. There is no pass/fail threshold; compare runs by hand. Last run (2026-11-21 Wave G `T-35`):
+shots and static memory. There is no pass/fail threshold; compare runs by hand. Last run (2026-11-21 Wave F `T-42`):
 
 ```
-index: 17028 ODFs, 37161 asset names in 1321.0 ms
-parse: 500 ODFs, 0.55 MB in 633.4 ms (0.9 MB/s)
-inheritance: 100 cold merges of ivtank_vsr in 88.6 ms (0.89 ms each, 131 rows)
-sim: 500 shots in 3763.5 ms (7.53 ms each, 500 hits)
-memory: 147.6 MB static
+index: 17028 ODFs, 37161 asset names in 1323.1 ms
+parse: 500 ODFs, 0.55 MB in 606.3 ms (0.9 MB/s)
+inheritance: 100 cold merges of ivtank_vsr in 110.1 ms (1.10 ms each, 131 rows)
+sim: 500 shots in 4250.0 ms (8.50 ms each, 500 hits)
+memory: 147.9 MB static
 ```
 
 ## Regression rule

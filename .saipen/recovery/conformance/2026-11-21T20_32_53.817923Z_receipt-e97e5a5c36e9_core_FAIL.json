@@ -1,0 +1,43 @@
+{
+  "blocking_findings": {
+    "problem_count": 1,
+    "problems": [
+      {
+        "category": null,
+        "credential": false,
+        "detail": "source freshness computation BLOCKED -- Git metadata exists but work-tree discovery failed: fatal: detected dubious ownership in repository at 'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN' 'V:/___VAC/__",
+        "detail_hash": "3c4f2fefa3367660",
+        "finding_key": "76b48f23558dce11",
+        "rule_id": "unclassified",
+        "severity": "problem",
+        "subject_id": null,
+        "subject_kind": "global",
+        "subject_ref": null
+      }
+    ],
+    "ruleset_fingerprint": "9a47d608ed3f3a833348aaeeca5cd9e9076f3bf53b1ef92b6ade46958e3e3fec",
+    "ruleset_version": 2,
+    "status": "complete",
+    "warning_count": 2
+  },
+  "board_hash": "53d87a06526d530d",
+  "canonical_next_command": null,
+  "content_hash": "115c850afcc3724b",
+  "exit_code": 1,
+  "external_actions": [],
+  "gate": "core",
+  "install_fingerprint": "install-v1:81890cd34446a9582544ef490bf7f6117d8aa02674b9f0270d4c8a183d0dd736",
+  "install_home": "C:\\Users\\vac34\\AppData\\Local\\saipen\\scheduled-source",
+  "kind": "conformance_receipt",
+  "log_hash": "ed428d7bb9349d8c",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "receipt_id": "receipt-e97e5a5c36e9",
+  "remediation_commands": [],
+  "schema_version": 2,
+  "source_head": "",
+  "source_tree_fingerprint": "",
+  "state_hash": "c199ca26f7c8630d",
+  "timestamp_utc": "2026-11-21T20:32:53.817923Z",
+  "validator_protocol_version": "1",
+  "verdict": "FAIL"
+}

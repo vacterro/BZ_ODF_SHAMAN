@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 84.7,
+  "timeout_s": 3600,
+  "subject_before": "tree:21f887527852768a731e4a54779ac848e669328c740d4780e89218709f19f495",
+  "subject": "tree:21f887527852768a731e4a54779ac848e669328c740d4780e89218709f19f495",
+  "stdout_tail": "ed ModLoadout profile\n  ✓ T-34 UI: load_loadout_profile restores multi-package priority [3532748119, 3820486276]\n  ✓ T-34 UI: save_camera_bookmark persists camera state\n  ✓ T-34 UI: save_scene_preset persists sandbox actors, motion, aim, and props\n  ✓ T-34 UI: scene reset cleared obstacles before reload\n  ✓ T-34 UI: load_scene_preset restores Wall+Ramp obstacles, orbit motion, and track aim\n  ✓ T-34 UI: apply_camera_bookmark restores saved camera view\n  ✓ T-38 UI: request_reset_current_doc binds confirmation snapshot & nonce\n  ✓ T-38 UI / RST-15: confirmed single Reset restores factory 100\n  ✓ VIS-11: Recovery History UI button & dialog present\n  ✓ VIS-11: Recovery History UI lists single-document recovery point (11)\n  ✓ VIS-11 / Demo A UI: Recovery History restore recovers unsaved 250 directly into open Inspector/editor\n  ✓ RST-21 setup: Reset All confirmation captured snapshot\n  ✓ RST-21: stale Reset All confirmation rejected with IMPACT_CHANGED_RECONFIRM_REQUIRED\n  ✓ RST-21: renewed confirmation remains pending after impact drift\n  ✓ RST-21: zero files mutated when confirmation snapshot drifted\n  ✓ RST-22: reset_project_configuration_to_default(include_workspace=true) requires confirmation first\n  ✓ RST-22: UI theme and mod loadout NOT mutated before confirmation\n  ✓ RST-22: cancelled project configuration reset leaves UI, loadout, and ODFs unmutated\n  ✓ RST-22: confirmed project config reset resets UI, loadout, and workspace in one transaction\n  ✓ RST-22: confirmed transaction restored ODFs to factory defaults\n  ✓ ML-06: Stock Only loadout enables strict empty active_packages filter\n  ✓ ML-06: Stock Only loadout strictly blocks disabled VSR ODF (ivtank_vsr.odf)\n  ✓ ML-06: Stock Only resolve_ex reports MISSING_OR_DISABLED_RESOURCE for disabled VSR file\n  ✓ ML-06: Stock Only loadout still resolves base game ivtank.odf\n  ✓ ML-06: switching back to VSR 3532748119 restores VSR resolution and refreshes Weapons Lab\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nALL TESTS PASSED\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-21T20:26:13Z",
+  "verdict": "PASS",
+  "problems": []
+}

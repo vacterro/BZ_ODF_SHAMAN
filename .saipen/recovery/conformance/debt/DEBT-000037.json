@@ -1,0 +1,38 @@
+{
+  "board_sha256": "1994fdb8b17ab94e",
+  "bound_work": "T-39",
+  "bound_work_phase": "SCOUT",
+  "created_at": "2026-11-21T19:33:05Z",
+  "findings_digest": "9778d69685e9d05e4afe59fc06a721d19298841719e5a63c95473f5ce688e9c9",
+  "gate": "core",
+  "journal_op_id": "debt.snapshot-54f3bdd38765",
+  "log_fingerprint": "b766b8360c23238b",
+  "problem_count": 0,
+  "problems": [],
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "reason": "pre-BUILD debt baseline for T-39",
+  "ruleset_fingerprint": "9a47d608ed3f3a833348aaeeca5cd9e9076f3bf53b1ef92b6ade46958e3e3fec",
+  "ruleset_version": 2,
+  "schema_version": 1,
+  "snapshot_id": "DEBT-000037",
+  "source_head": "83a8c8e9aa70c7c4b9eabd4252ea8777b227f4c6",
+  "source_tree_fingerprint": "git-delta-v1:061e2957e225263716dc400aeeddecaf0e4e5bfdade51ba690433f9a63b58bc4",
+  "state_sha256": "dec675852e0e9861",
+  "validator_protocol_version": "1",
+  "warning_count": 1,
+  "warnings": [
+    {
+      "category": "log-soft-cap",
+      "credential": false,
+      "detail": ".saipen/LOG.md is <n> / <n>, past the <n> / <n> cap -- `saipen transition CLEAN` seals it into the next .saipen/logs/LOG-<NNN>.md (phases/clean.md step 4)",
+      "detail_hash": "dfb4bf66467774ab",
+      "finding_key": "64be00fb9de17a5d",
+      "rule_id": "log_soft_cap",
+      "severity": "warning",
+      "subject_id": null,
+      "subject_kind": "global",
+      "subject_ref": null
+    }
+  ]
+}

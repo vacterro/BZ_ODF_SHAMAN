@@ -48,24 +48,49 @@
   "T-33",
   "T-36",
   "T-34",
-  "T-35"
+  "T-35",
+  "T-38",
+  "T-39",
+  "T-40",
+  "T-42",
+  "T-41"
  ],
+ "last_interval_consumed": 20,
+ "last_run": {
+  "counted_at_run": 35,
+  "run_id": "20261121T194139-8cc719e6"
+ },
  "maintenance": {
   "blockers": [
    {
     "code": "GIT_GUARD_FAILED",
-    "detail": "GIT_COMMAND_FAILED: git rev-parse --is-inside-work-tree exited 128: fatal: not a git repository (or any of the parent directories): .git; nothing was deleted"
+    "detail": "GIT_COMMAND_FAILED: git rev-parse --is-inside-work-tree exited 128: fatal: detected dubious ownership in repository at 'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN'\n'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.git' is owned by:\n\tDESKTOP-TTH0L52/SAIAG_9fabb0d5 (S-1-5-21-6247072-3065140091-1424061869-1019)\nbut the current user is:\n\tDESKTOP-TTH0L52/vac34 (S-1-5-21-6247072-3065140091-1424061869-1002)\nTo add an exception for this directory, call:\n\n\tgit config --global --a; nothing was deleted"
    }
   ],
   "bytes_reclaimed": 0,
-  "fingerprint": "49c3188b115a7a734e2ccdea284d8aa9e5966f5d10691ff25fc1b4c058fcafef",
-  "last_attempt_fingerprint": "49c3188b115a7a734e2ccdea284d8aa9e5966f5d10691ff25fc1b4c058fcafef",
+  "fingerprint": "38b9a7dbf0e3902d1a8fd46a62388fb89820795a92c916f89f1f01a1a71d539d",
+  "last_attempt_fingerprint": "38b9a7dbf0e3902d1a8fd46a62388fb89820795a92c916f89f1f01a1a71d539d",
   "protected_bytes": 0,
-  "reason": "GIT_COMMAND_FAILED: git rev-parse --is-inside-work-tree exited 128: fatal: not a git repository (or any of the parent directories): .git",
-  "run_id": "20261121T185425-ff5304c4",
+  "reason": "GIT_COMMAND_FAILED: git rev-parse --is-inside-work-tree exited 128: fatal: detected dubious ownership in repository at 'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN'\n'V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.git' is owned by:\n\tDESKTOP-TTH0L52/SAIAG_9fabb0d5 (S-1-5-21-6247072-3065140091-1424061869-1019)\nbut the current user is:\n\tDESKTOP-TTH0L52/vac34 (S-1-5-21-6247072-3065140091-1424061869-1002)\nTo add an exception for this directory, call:\n\n\tgit config --global --a",
+  "run_id": "20261121T213004-0a22ba3c",
   "state": "GC_FAILED",
-  "updated": "2026-11-21T18:54:25Z"
+  "updated": "2026-11-21T21:30:04Z"
  },
- "runs": [],
+ "runs": [
+  {
+   "bytes": 0,
+   "counted_at_run": 34,
+   "finished": "2026-11-21T19:32:59Z",
+   "run_id": "20261121T193258-17ccf420",
+   "started": "2026-11-21T19:32:58Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 35,
+   "finished": "2026-11-21T19:41:39Z",
+   "run_id": "20261121T194139-8cc719e6",
+   "started": "2026-11-21T19:41:39Z"
+  }
+ ],
  "schema": 1
 }

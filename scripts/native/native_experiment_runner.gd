@@ -13,10 +13,13 @@ extends RefCounted
 
 const LEDGER_SCHEMA := 1
 const LUA_CONTRACT_VERSION := 1
+const REASON_STATE_PERSIST_FAILED := "STATE_PERSIST_FAILED"
+const STATE_RECOVERY_PENDING := "RECOVERY_PENDING"
 const NativeAdapterScript = preload("res://scripts/native/native_test_adapter.gd")
 const NativeSessionScript = preload("res://scripts/native/native_experiment_session.gd")
 const ResourceClosureScript = preload("res://scripts/native/native_resource_closure.gd")
 const SafeStageScript = preload("res://scripts/native/safe_stage_manager.gd")
+const ProcessMonitorScript = preload("res://scripts/native/native_process_monitor.gd")
 
 const REQUIRED_LUA_CONTRACT_FIELDS := [
 	"session_id",
@@ -49,10 +52,16 @@ var process_launcher: Callable = Callable()
 var game_process_detector: Callable = Callable()
 ## Optional test-only mission/resource probe observer: func(sess) -> Dictionary{mission_observed, mission_loaded_at, resource_probe_confirmed, startup_log_path}
 var mission_observer: Callable = Callable()
-## Test-only persistence failure injection hooks (P1-NATIVE-01).
+## Optional test-only process inspector: func() -> Array of {pid, name, exe_path, exe_md5}.
+var process_inspector: Callable = Callable()
+## Active bounded monitors: session_id -> NativeProcessMonitor.
+var monitors: Dictionary = {}
+## Test-only persistence failure injection hooks (P1-NATIVE-01, P1-02).
 var fault_fail_preflight_package_write := false
 var fault_fail_session_write := false
 var fault_fail_ledger_write := false
+var fault_fail_operator_instructions_write := false
+var fault_fail_evidence_write := false
 
 
 static func ledger_dir() -> String:
@@ -263,10 +272,17 @@ func recover_sessions() -> Dictionary:
 		entry["recovered_at"] = Time.get_datetime_string_from_system()
 		entry["stage_present_on_disk"] = stage_exists and manifest_exists
 		entry["observation_present_on_disk"] = obs_exists
-		entry["can_collect_observation"] = obs_exists and stage_exists and prev_state != "CLEANED_UP"
+		entry["can_collect_observation"] = obs_exists and stage_exists and prev_state != "CLEANED_UP" and prev_state != STATE_RECOVERY_PENDING
 		entry["can_cleanup"] = stage_exists and manifest_exists
+		monitors.erase(sid)
 
-		if prev_state in ["STAGED", "LAUNCH_REQUESTED", "AWAITING_OPERATOR", "GAME_STARTED", "MISSION_LOADED"]:
+		if str(entry.get("reason", "")) == REASON_STATE_PERSIST_FAILED or prev_state == STATE_RECOVERY_PENDING:
+			entry["state"] = STATE_RECOVERY_PENDING
+			entry["reason"] = REASON_STATE_PERSIST_FAILED
+			entry["recovery_pending"] = true
+			entry["recovery_status"] = "STATE_PERSIST_FAILED"
+			sess_obj.add_checkpoint(STATE_RECOVERY_PENDING, "Recovered checked transition that failed persistence")
+		elif prev_state in ["STAGED", "LAUNCH_REQUESTED", "AWAITING_OPERATOR", "GAME_PROCESS_DETECTED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED", "STEAM_PROCESS_STARTED", "GAME_STARTED", "MISSION_LOADED"]:
 			if not (stage_exists and manifest_exists):
 				missing_stage += 1
 				entry["recovery_status"] = "STAGE_MISSING"
@@ -326,6 +342,73 @@ func recover_sessions() -> Dictionary:
 		"observation_ready": observation_ready,
 		"errors": errors,
 		"sessions": list_sessions(),
+	}
+
+
+## P1-02: A checked transition commits the session record and ledger before any
+## externally visible success is returned. A failed persist leaves the durable
+## record in RECOVERY_PENDING with reason=STATE_PERSIST_FAILED, so a restart
+## cannot observe a state the process never proved it reached.
+func _commit_transition(session_id: String, record: Dictionary, next_state: String, checkpoint_detail: String = "") -> Dictionary:
+	var sess = NativeSessionScript.from_dict(record.get("session", {}))
+	if sess != null and checkpoint_detail != "":
+		sess.add_checkpoint(next_state, checkpoint_detail)
+	record["state"] = next_state
+	record["updated_at"] = Time.get_datetime_string_from_system()
+	record["session"] = sess.to_dict() if sess != null else record.get("session", {})
+	var per := _persist_session(session_id, record)
+	if bool(per.get("ok", false)):
+		return {"ok": true, "state": next_state, "reason": "", "record": record.duplicate(true)}
+	record["state"] = STATE_RECOVERY_PENDING
+	record["evidence_state"] = STATE_RECOVERY_PENDING
+	record["reason"] = REASON_STATE_PERSIST_FAILED
+	record["persist_error"] = str(per.get("error", str(per.get("reason", "checked state persist failed"))))
+	record["recovery_pending"] = true
+	record["updated_at"] = Time.get_datetime_string_from_system()
+	if sess != null:
+		sess.add_checkpoint(STATE_RECOVERY_PENDING, "Checked transition to %s failed: %s" % [next_state, record["persist_error"]])
+		record["session"] = sess.to_dict()
+	# Leave the in-memory projection in the failed state too; never report a
+	# transition the durable ledger did not accept. Persist the failed state to
+	# the single-session record so a restart sees the same RECOVERY_PENDING fact.
+	sessions[session_id] = record.duplicate(true)
+	WorkspaceStore.atomic_write_abs(
+		_session_file(session_id), JSON.stringify(record, "  ").to_utf8_buffer()
+	)
+	return {
+		"ok": false,
+		"state": STATE_RECOVERY_PENDING,
+		"reason": REASON_STATE_PERSIST_FAILED,
+		"recovery_pending": true,
+		"attempted_state": next_state,
+		"error": str(record["persist_error"]),
+		"persist": per.duplicate(true),
+	}
+
+
+## Checked failure when the artifact a transition depends on could not be
+## written: never publish the intended state; persist RECOVERY_PENDING instead.
+func _fail_transition(session_id: String, record: Dictionary, attempted_state: String, error: String) -> Dictionary:
+	record["state"] = STATE_RECOVERY_PENDING
+	record["evidence_state"] = STATE_RECOVERY_PENDING
+	record["reason"] = REASON_STATE_PERSIST_FAILED
+	record["persist_error"] = error
+	record["recovery_pending"] = true
+	record["attempted_state"] = attempted_state
+	record["updated_at"] = Time.get_datetime_string_from_system()
+	var sess = NativeSessionScript.from_dict(record.get("session", {}))
+	if sess != null:
+		sess.add_checkpoint(STATE_RECOVERY_PENDING, "Checked transition to %s failed: %s" % [attempted_state, error])
+		record["session"] = sess.to_dict()
+	sessions[session_id] = record.duplicate(true)
+	WorkspaceStore.atomic_write_abs(_session_file(session_id), JSON.stringify(record, "  ").to_utf8_buffer())
+	return {
+		"ok": false,
+		"state": STATE_RECOVERY_PENDING,
+		"reason": REASON_STATE_PERSIST_FAILED,
+		"recovery_pending": true,
+		"attempted_state": attempted_state,
+		"error": error,
 	}
 
 
@@ -928,7 +1011,12 @@ func stage(session_id: String, files_override: Dictionary = {}, stage_options: D
 		"launch_eligible": true,
 	}
 	record["evidence"] = (stg.get("evidence", {}) as Dictionary).duplicate(true)
-	_persist_session(session_id, record)
+	var staged_commit := _commit_transition(session_id, record, "STAGED", "Staged via SafeStageManager")
+	if not bool(staged_commit.get("ok", false)):
+		staged_commit["session_id"] = session_id
+		staged_commit["evidence_state"] = STATE_RECOVERY_PENDING
+		staged_commit["launch_eligible"] = false
+		return staged_commit
 	return {
 		"ok": true,
 		"session_id": session_id,
@@ -971,7 +1059,19 @@ func _verify_staged_integrity_before_launch(sess: RefCounted) -> Dictionary:
 ## option fields (game_process_detected / game_pid / mission_loaded_at / resources_mounted).
 ## Only an explicit test DI callback (`game_process_detector`) or real OS process
 ## inspection (`tasklist` for battlezone2.exe) can confirm a running game process.
-func _detect_bzcc_game_process() -> Dictionary:
+func _detect_bzcc_game_process(preexisting_pids: Array = []) -> Dictionary:
+	# A bound process inspector is authoritative: never fall through to the
+	# real OS process table, which can race an injected deterministic fixture.
+	if process_inspector.is_valid():
+		var procs = process_inspector.call()
+		if procs is Array:
+			for item in procs:
+				if not (item is Dictionary):
+					continue
+				var pid := int(item.get("pid", 0))
+				if pid > 0 and not preexisting_pids.has(pid):
+					return {"detected": true, "game_pid": pid, "source": "test_inspector_di"}
+		return {"detected": false, "game_pid": 0, "source": "test_inspector_di"}
 	if game_process_detector.is_valid():
 		var dres = game_process_detector.call()
 		if dres is Dictionary:
@@ -1119,7 +1219,9 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 			"instructions=" + str(cmd.get("instructions", cmd.get("launch_options_text", ""))),
 		])
 		var instr_path := str(sess.stage_root).path_join("operator_instructions.txt")
-		WorkspaceStore.atomic_write_abs(instr_path, "\n".join(instr_lines).to_utf8_buffer())
+		var instr_res: Dictionary = {"ok": false, "error": "injected operator_instructions.txt write failure"} if fault_fail_operator_instructions_write else WorkspaceStore.atomic_write_abs(instr_path, "\n".join(instr_lines).to_utf8_buffer())
+		if not bool(instr_res.get("ok", false)):
+			return _fail_transition(session_id, record, "AWAITING_OPERATOR", "operator_instructions.txt write failed")
 		sess.add_checkpoint("AWAITING_OPERATOR", "Operator manual handoff written to " + instr_path)
 		record["state"] = "AWAITING_OPERATOR"
 		record["evidence_state"] = "LAUNCH_REQUESTED"
@@ -1135,7 +1237,11 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 			"observation_expected_path": str(sess.observation_expected_path),
 		}
 		record["session"] = sess.to_dict()
-		_persist_session(session_id, record)
+		var manual_commit := _commit_transition(session_id, record, "AWAITING_OPERATOR", "Operator handoff written")
+		if not bool(manual_commit.get("ok", false)):
+			manual_commit["session_id"] = session_id
+			manual_commit["route"] = route
+			return manual_commit
 		return {
 			"ok": true,
 			"state": "AWAITING_OPERATOR",
@@ -1171,8 +1277,18 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 			"process_id": 0,
 		}
 		record["session"] = sess.to_dict()
-		_persist_session(session_id, record)
+		var launch_req_commit := _commit_transition(session_id, record, "LAUNCH_REQUESTED", "Prepared STEAM_MANAGED launch")
+		if not bool(launch_req_commit.get("ok", false)):
+			launch_req_commit["session_id"] = session_id
+			launch_req_commit["route"] = "STEAM_MANAGED"
+			launch_req_commit["launch_rejected"] = true
+			return launch_req_commit
 
+		# P1-03: snapshot game PIDs BEFORE spawning Steam so a game process
+		# started by this launch is never mistaken for a preexisting one.
+		var launch_options := options.duplicate(true)
+		if not launch_options.has("preexisting_game_pids"):
+			launch_options["preexisting_game_pids"] = _capture_preexisting_game_pids()
 		var execute_proc := bool(options.get("execute_process", false))
 		var pid := 0
 		var exit_code := -1
@@ -1193,7 +1309,7 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 				exit_code = 0 if pid > 0 else -1
 			if pid > 0:
 				# P1-NATIVE-05: Steam PID alone only proves STEAM_PROCESS_STARTED, never GAME_PROCESS_DETECTED.
-				var det_info := _detect_bzcc_game_process()
+				var det_info := _detect_bzcc_game_process(launch_options.get("preexisting_game_pids", []))
 				game_detected = bool(det_info.get("detected", false))
 				game_pid = int(det_info.get("game_pid", 0)) if game_detected else 0
 				if game_detected:
@@ -1227,7 +1343,16 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 				(record["launch"] as Dictionary)["exit_code"] = exit_code
 				record["session"] = sess.to_dict()
 				record["updated_at"] = Time.get_datetime_string_from_system()
-				_persist_session(session_id, record)
+				var post_launch_commit := _commit_transition(session_id, record, str(record["state"]), "Launch process outcome persisted")
+				if not bool(post_launch_commit.get("ok", false)):
+					post_launch_commit["session_id"] = session_id
+					post_launch_commit["route"] = "STEAM_MANAGED"
+					return post_launch_commit
+				var mstart := _start_monitor(session_id, sess, disc, launch_options, true)
+				if not bool(mstart.get("ok", false)):
+					return mstart
+					if not bool(mstart.get("ok", false)):
+						return mstart
 			else:
 				sess.add_checkpoint("FAILED", "STEAM_MANAGED launch failed to spawn process")
 				record["state"] = "FAILED"
@@ -1406,7 +1531,11 @@ func collect_observation(session_id: String, observation_path_override: String =
 		final_state = "FAILED"
 
 	if str(sess.evidence_path) != "":
-		WorkspaceStore.atomic_write_abs(str(sess.evidence_path), JSON.stringify(updated_ev, "  ").to_utf8_buffer())
+		var ev_res: Dictionary = {"ok": false, "error": "injected native_evidence.json write failure"} if fault_fail_evidence_write else WorkspaceStore.atomic_write_abs(str(sess.evidence_path), JSON.stringify(updated_ev, "  ").to_utf8_buffer())
+		if not bool(ev_res.get("ok", false)):
+			var fev: Dictionary = _fail_transition(session_id, record, final_state, "native_evidence.json write failed: " + str(ev_res.get("error", "")))
+			fev["verified"] = false
+			return fev
 
 	sess.add_checkpoint(final_state, "Collected observation %s (verified=%s)" % [obs_path.get_file(), str(verdict.get("verified", false))])
 	record["state"] = final_state
@@ -1416,7 +1545,11 @@ func collect_observation(session_id: String, observation_path_override: String =
 	record["verdict"] = verdict
 	record["session"] = sess.to_dict()
 	record["updated_at"] = Time.get_datetime_string_from_system()
-	_persist_session(session_id, record)
+	var obs_commit := _commit_transition(session_id, record, final_state, "Observation collected and compared")
+	if not bool(obs_commit.get("ok", false)):
+		obs_commit["session_id"] = session_id
+		obs_commit["verified"] = false
+		return obs_commit
 
 	return {
 		"ok": final_state == "NATIVE_VERIFIED" or final_state == "COMPARISON_COMPLETE",
@@ -1431,6 +1564,169 @@ func collect_observation(session_id: String, observation_path_override: String =
 		"verdict": verdict,
 		"session_id": session_id,
 	}
+
+
+## P1-03: Capture PIDs of battlezone2.exe processes already running before our
+## Steam launcher spawns a new one. These are never attributed to this session.
+func _capture_preexisting_game_pids() -> Array:
+	var out: Array = []
+	if process_inspector.is_valid():
+		var procs = process_inspector.call()
+		if procs is Array:
+			for item in procs:
+				if item is Dictionary and str(item.get("name", "")).to_lower() == "battlezone2.exe":
+					var pid := int(item.get("pid", 0))
+					if pid > 0:
+						out.append(pid)
+		return out
+	if OS.get_name() == "Windows":
+		var pout: Array = []
+		var prc := OS.execute("tasklist", ["/FI", "IMAGENAME eq battlezone2.exe", "/FO", "CSV", "/NH"], pout, true)
+		if prc == 0:
+			for raw_line in pout:
+				var line := str(raw_line).strip_edges()
+				if line.to_lower().begins_with("\"battlezone2.exe\""):
+					var cols := line.split("\",\"")
+					var pid := int(cols[1].replace("\"", "").strip_edges()) if cols.size() >= 2 else 0
+					if pid > 0:
+						out.append(pid)
+	return out
+
+
+func _save_monitors() -> void:
+	if not sessions.is_empty():
+		var doc := {"schema": LEDGER_SCHEMA, "updated": Time.get_datetime_string_from_system(), "monitors": {}}
+		for sid in monitors:
+			doc["monitors"][sid] = (monitors[sid] as RefCounted).to_dict()
+		WorkspaceStore.atomic_write_abs(
+			ledger_dir().path_join("process_monitors.json"), JSON.stringify(doc, "  ").to_utf8_buffer()
+		)
+
+
+func _start_monitor(session_id: String, sess: RefCounted, disc: Dictionary, options: Dictionary, pre_captured: bool) -> Dictionary:
+	var preexisting: Array = options.get("preexisting_game_pids", []) if options.get("preexisting_game_pids", []) is Array else []
+	if not pre_captured:
+		preexisting = _capture_preexisting_game_pids()
+	var monitor = ProcessMonitorScript.create(session_id, disc, options, preexisting)
+	var record: Dictionary = sessions.get(session_id, {})
+	# Wall clock for production; an explicitly injected origin selects the
+	# relative test clock so no real waits are needed.
+	monitor.started_at_s = float(options.get("monitor_started_at_s", Time.get_unix_time_from_system()))
+	monitor.relative_clock = options.has("monitor_started_at_s") or (monitor.started_at_s == 0.0)
+	record["monitor"] = monitor.to_dict()
+	sessions[session_id] = record
+	monitors[session_id] = monitor
+	_save_monitors()
+	return {"ok": true, "session_id": session_id, "state": monitor.state, "active": monitor.active}
+
+
+func _persist_monitor_state(session_id: String, monitor, record: Dictionary, state: String) -> bool:
+	monitor.state = state
+	record["monitor"] = monitor.to_dict()
+	record["state"] = state
+	record["evidence_state"] = state
+	var commit := _commit_transition(session_id, record, state, "NativeProcessMonitor state=" + state)
+	return bool(commit.get("ok", false))
+
+
+## Advance an active monitor by one bounded poll. `now_s` is an injectable clock
+## so tests never depend on real waits; `observation_path` may supply an on-disk
+## artifact when the monitor has already confirmed mission + resource probe.
+func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: String = "") -> Dictionary:
+	if not monitors.has(session_id):
+		return {"ok": false, "state": "NO_ACTIVE_MONITOR", "reason": "NO_ACTIVE_MONITOR", "active": false}
+	var monitor = monitors[session_id]
+	if not bool(monitor.active) or monitor.is_terminal():
+		var d: Dictionary = monitor.result()
+		d["ok"] = false
+		d["reason"] = "MONITOR_NOT_ACTIVE"
+		return d
+	# Explicit now_s is a relative test clock; production poll uses wall time.
+	var explicit_clock := now_s >= 0.0
+	var t: float = now_s if explicit_clock else Time.get_unix_time_from_system()
+	var origin: float = 0.0 if explicit_clock else monitor.started_at_s
+	monitor.polls += 1
+	if monitor.polls > monitor.max_polls or (t - origin) > monitor.timeout_s:
+		var record: Dictionary = sessions.get(session_id, {})
+		var commit := _commit_transition(session_id, record, "TIMEOUT", "Monitor bounded poll/timeout")
+		if not bool(commit.get("ok", false)):
+			commit["session_id"] = session_id
+			return commit
+		monitor.timeout()
+		_save_monitors()
+		return monitor.result()
+
+	if monitor.state == "STEAM_PROCESS_STARTED":
+		var det: Dictionary = monitor.detect_game(process_inspector, game_process_detector)
+		if bool(det.get("detected", false)):
+			var record0: Dictionary = sessions.get(session_id, {})
+			if not _persist_monitor_state(session_id, monitor, record0, "GAME_PROCESS_DETECTED"):
+				var failed := _fail_transition(session_id, record0, "GAME_PROCESS_DETECTED", "checked transition persist failed")
+				failed["session_id"] = session_id
+				return failed
+			_save_monitors()
+			return monitor.result()
+
+	elif monitor.state in ["GAME_PROCESS_DETECTED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED"]:
+		var sess = NativeSessionScript.from_dict((sessions.get(session_id, {}) as Dictionary).get("session", {}))
+		if sess == null:
+			return {"ok": false, "state": "INVALID_SESSION", "reason": "INVALID_SESSION", "active": false}
+		var probe := _observe_mission_and_probe(sess)
+		monitor.apply_mission_probe(probe)
+		var record1: Dictionary = sessions.get(session_id, {})
+		if not _persist_monitor_state(session_id, monitor, record1, monitor.state):
+			var failed1 := _fail_transition(session_id, record1, monitor.state, "checked probe transition persist failed")
+			failed1["session_id"] = session_id
+			return failed1
+
+		if monitor.state == "RESOURCE_PROBE_CONFIRMED" and observation_path != "":
+			var obs_res := collect_observation(session_id, observation_path)
+			var out: Dictionary = monitor.result()
+			out["observation_collected"] = bool(obs_res.get("ok", false))
+			out["comparison_complete"] = bool(obs_res.get("comparison_complete", obs_res.get("ok", false)))
+			out["verified"] = bool(obs_res.get("verified", false))
+			out["state"] = str(obs_res.get("state", monitor.state))
+			out["native_verified"] = bool(obs_res.get("verified", false))
+			monitor.finish_collection(out)
+			_save_monitors()
+			return out
+
+	monitor.polls = int(monitor.polls)
+	_save_monitors()
+	return monitor.result()
+
+
+func resume_monitor(session_id: String) -> Dictionary:
+	var path := ledger_dir().path_join("process_monitors.json")
+	if FileAccess.file_exists(path):
+		var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(path))
+		if bool(jres.get("ok", false)) and jres.get("data", null) is Dictionary:
+			var md = (jres.get("data", {}) as Dictionary).get("monitors", {})
+			if md is Dictionary and (md as Dictionary).has(session_id):
+				var monitor = ProcessMonitorScript.from_dict(md[session_id])
+				if monitor != null:
+					var normalized: Array = []
+					for p in monitor.preexisting_game_pids:
+						normalized.append(int(p))
+					monitor.preexisting_game_pids = normalized
+					monitors[session_id] = monitor
+					if not sessions.has(session_id):
+						recover_sessions()
+					return monitor.result()
+	if monitors.has(session_id):
+		return (monitors[session_id] as RefCounted).result()
+	return {"ok": false, "state": "NO_MONITOR_TO_RESUME", "reason": "NO_MONITOR_TO_RESUME", "active": false}
+
+
+func cancel_monitor(session_id: String) -> Dictionary:
+	if not monitors.has(session_id):
+		return {"ok": false, "state": "NO_ACTIVE_MONITOR", "reason": "NO_ACTIVE_MONITOR", "active": false}
+	var monitor = monitors[session_id]
+	monitor.cancel()
+	var record: Dictionary = sessions.get(session_id, {})
+	_commit_transition(session_id, record, "CANCELLED", "Monitor cancelled by operator")
+	_save_monitors()
+	return monitor.result()
 
 
 ## Step 5: Safe MD5-verified cleanup of the staged directory via SafeStageManager.
@@ -1455,7 +1751,11 @@ func cleanup_stage(session_id: String) -> Dictionary:
 	record["session"] = sess.to_dict()
 	record["updated_at"] = Time.get_datetime_string_from_system()
 	_pending_files.erase(session_id)
-	_persist_session(session_id, record)
+	var cleanup_commit := _commit_transition(session_id, record, new_state, "Stage cleanup completed")
+	if not bool(cleanup_commit.get("ok", false)):
+		cleanup_commit["session_id"] = session_id
+		cleanup_commit["cleanup"] = cl
+		return cleanup_commit
 	return {
 		"ok": bool(cl.get("ok", false)),
 		"state": new_state,

@@ -164,8 +164,111 @@ static func reset_transactions_dir() -> String:
 	return root().path_join("reset_transactions")
 
 
+static func working_recovery_dir() -> String:
+	return root().path_join("recovery_working")
+
+
 static func project_file() -> String:
 	return root().path_join("project.json")
+
+
+static func manifest_fingerprint() -> String:
+	var ents := entries()
+	var lines: Array[String] = []
+	for e in ents:
+		if e is Dictionary:
+			lines.append("%s|%s|%s|%d" % [
+				canonical(str(e.get("source", ""))).to_lower(),
+				str(e.get("rel", "")),
+				str(e.get("source_md5", "")),
+				int(e.get("bytes", 0)),
+			])
+	lines.sort()
+	return _md5_bytes("\n".join(lines).to_utf8_buffer())
+
+
+static func _is_valid_base64(s: String) -> bool:
+	if s.is_empty():
+		return true
+	if (s.length() % 4) != 0:
+		return false
+	var pad_started := false
+	var pad_count := 0
+	for i in s.length():
+		var c := s.unicode_at(i)
+		var is_alnum := (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 43 or c == 47
+		if c == 61: # '='
+			pad_started = true
+			pad_count += 1
+			if pad_count > 2:
+				return false
+		elif is_alnum:
+			if pad_started:
+				return false
+		else:
+			return false
+	return true
+
+
+static func _decode_verified_base64(b64: String, exp_md5: String, exp_size: int = -1) -> Dictionary:
+	if b64 == "":
+		return {"ok": true, "empty": true, "bytes": PackedByteArray(), "md5": "", "status": "EMPTY", "error": ""}
+	if not _is_valid_base64(b64):
+		return {"ok": false, "empty": false, "bytes": PackedByteArray(), "md5": "", "status": "HASH_MISMATCH", "error": "malformed base64 payload"}
+	var raw := Marshalls.base64_to_raw(b64)
+	if raw.is_empty():
+		return {"ok": false, "empty": false, "bytes": PackedByteArray(), "md5": "", "status": "HASH_MISMATCH", "error": "base64 decoded to empty bytes"}
+	if Marshalls.raw_to_base64(raw) != b64:
+		return {"ok": false, "empty": false, "bytes": PackedByteArray(), "md5": "", "status": "HASH_MISMATCH", "error": "non-canonical or corrupted base64"}
+	if exp_size >= 0 and raw.size() != exp_size:
+		return {"ok": false, "empty": false, "bytes": PackedByteArray(), "md5": "", "status": "HASH_MISMATCH", "error": "byte length mismatch (expected %d, got %d)" % [exp_size, raw.size()]}
+	var actual_md5 := _md5_bytes(raw)
+	if exp_md5 != "" and actual_md5 != exp_md5.to_lower():
+		return {"ok": false, "empty": false, "bytes": PackedByteArray(), "md5": actual_md5, "status": "HASH_MISMATCH", "error": "MD5 mismatch (expected %s, got %s)" % [exp_md5, actual_md5]}
+	return {"ok": true, "empty": false, "bytes": raw, "md5": actual_md5, "status": "VALID", "error": ""}
+
+
+static func _working_draft_path(source: String) -> String:
+	var ckey := canonical(source)
+	if OS.get_name() == "Windows":
+		ckey = ckey.to_lower()
+	return ProjectSettings.globalize_path(working_recovery_dir().path_join("%s_%s.json" % [ckey.md5_text().substr(0, 12), source.get_file()]))
+
+
+static func _save_working_draft(source: String, working_bytes: PackedByteArray, had_override: bool,
+		ws_rel: String, ws_src_md5: String, enc: String, has_bom: bool, tx_id: String = "") -> Dictionary:
+	if source == "" or working_bytes.is_empty():
+		return {"ok": false, "error": "empty working draft"}
+	var dpath := _working_draft_path(source)
+	DirAccess.make_dir_recursive_absolute(dpath.get_base_dir())
+	var wmd5 := _md5_bytes(working_bytes)
+	var payload := {
+		"schema": 1,
+		"source": source,
+		"canonical_source": canonical(source),
+		"had_override": had_override,
+		"workspace_rel": ws_rel,
+		"workspace_source_md5": ws_src_md5,
+		"encoding": enc,
+		"has_bom": has_bom,
+		"working_size": working_bytes.size(),
+		"working_md5": wmd5,
+		"working_base64": Marshalls.raw_to_base64(working_bytes),
+		"from_transaction_id": tx_id,
+		"updated_at": Time.get_datetime_string_from_system(),
+	}
+	var wres := atomic_write_abs(dpath, JSON.stringify(payload, "  ").to_utf8_buffer())
+	if not bool(wres.get("ok", false)):
+		return {"ok": false, "path": dpath, "error": str(wres.get("error", "working draft write failed"))}
+	return {"ok": true, "path": dpath, "md5": wmd5}
+
+
+static func clear_working_draft(source: String) -> void:
+	if source == "":
+		return
+	var dpath := _working_draft_path(source)
+	if FileAccess.file_exists(dpath):
+		DirAccess.remove_absolute(dpath)
 
 
 ## Reject absolute paths, drive letters and traversal. Returns "" when unsafe.
@@ -660,6 +763,7 @@ static func save_document(doc) -> Dictionary:
 			"backup": backup,
 		}
 	commit_transaction(orig_journal)
+	clear_working_draft(doc.source_path)
 	doc.mark_saved(bytes)
 	doc.workspace_override = true
 	doc.workspace_rel = safe
@@ -734,9 +838,13 @@ static func read_manifest() -> Dictionary:
 
 
 ## Create a durable recovery point before destructive multi-file or single-file
-## reset operations (P0-01 / RST-14). Preserves working bytes, saved workspace
-## override bytes, and manifest records; fails closed if any backup write fails.
-static func create_reset_recovery_point(target_sources: Array, scope_label: String = "RESET_ALL") -> Dictionary:
+## reset operations (P0-01 / RST-14..17). Separately preserves:
+##   1) FACTORY SOURCE fingerprint
+##   2) SAVED OVERRIDE bytes + manifest entry
+##   3) UNSAVED WORKING REVISION bytes + encoding/BOM
+## Fails closed if any backup write or hash verification fails.
+static func create_reset_recovery_point(target_sources: Array, scope_label: String = "RESET_ALL",
+		extra_docs: Dictionary = {}) -> Dictionary:
 	if _fault("reset_backup") or _fault("backup_write"):
 		return {
 			"ok": false,
@@ -775,14 +883,14 @@ static func create_reset_recovery_point(target_sources: Array, scope_label: Stri
 		var had_override := not ws_entry.is_empty()
 		var ws_rel := clean_rel(str(ws_entry.get("rel", ""))) if had_override else ""
 		var saved_override_bytes := PackedByteArray()
-		var backup_file := ""
+		var override_backup_file := ""
 		if had_override and ws_rel != "":
 			var ws_abs := ProjectSettings.globalize_path(odf_dir().path_join(ws_rel))
 			if FileAccess.file_exists(ws_abs):
 				saved_override_bytes = FileAccess.get_file_as_bytes(ws_abs)
-				backup_file = ProjectSettings.globalize_path(backups_dir().path_join(ws_rel) + ".reset.bak")
-				DirAccess.make_dir_recursive_absolute(backup_file.get_base_dir())
-				if not _write_verified(backup_file, saved_override_bytes):
+				override_backup_file = ProjectSettings.globalize_path(backups_dir().path_join(ws_rel) + ".reset.bak")
+				DirAccess.make_dir_recursive_absolute(override_backup_file.get_base_dir())
+				if not _write_verified(override_backup_file, saved_override_bytes):
 					return {
 						"ok": false,
 						"status": "BACKUP_FAILED",
@@ -793,7 +901,17 @@ static func create_reset_recovery_point(target_sources: Array, scope_label: Stri
 					}
 		var working_bytes := PackedByteArray()
 		var was_dirty := false
-		var cdoc = OdfDocument.cached(sp)
+		var working_encoding := ""
+		var working_has_bom := false
+		var working_backup_file := ""
+		var cdoc = extra_docs.get(sp, null)
+		if cdoc == null:
+			for ek in extra_docs:
+				if _same_canon_path(str(ek), sp):
+					cdoc = extra_docs[ek]
+					break
+		if cdoc == null:
+			cdoc = OdfDocument.cached(sp)
 		if cdoc == null:
 			for k in OdfDocument._cache:
 				if _same_canon_path(str(k), sp):
@@ -802,7 +920,10 @@ static func create_reset_recovery_point(target_sources: Array, scope_label: Stri
 		if cdoc is OdfDocument:
 			working_bytes = cdoc.to_bytes()
 			was_dirty = bool(cdoc.dirty)
-			if was_dirty:
+			working_encoding = str(cdoc.encoding)
+			working_has_bom = bool(cdoc.has_bom)
+			var distinct_working: bool = was_dirty or (not working_bytes.is_empty() and working_bytes != saved_override_bytes)
+			if distinct_working and not working_bytes.is_empty():
 				var wrel := ws_rel if ws_rel != "" else clean_rel("working/%s_%s" % [ckey.md5_text().substr(0, 8), sp.get_file()])
 				if wrel != "":
 					var wbak := ProjectSettings.globalize_path(backups_dir().path_join(wrel) + ".working.bak")
@@ -816,23 +937,30 @@ static func create_reset_recovery_point(target_sources: Array, scope_label: Stri
 							"path": "",
 							"error": "failed to verify working-bytes backup for " + sp.get_file(),
 						}
-					if backup_file == "":
-						backup_file = wbak
+					working_backup_file = wbak
+		var backup_file := override_backup_file if override_backup_file != "" else working_backup_file
 		records[sp] = {
 			"source": sp,
 			"canonical_source": canonical(sp),
+			"factory_md5": source_md5(sp),
 			"had_override": had_override,
 			"workspace_rel": ws_rel,
 			"manifest_entry": ws_entry.duplicate(true),
+			"saved_override_size": saved_override_bytes.size(),
 			"saved_override_md5": _md5_bytes(saved_override_bytes) if not saved_override_bytes.is_empty() else "",
 			"saved_override_base64": Marshalls.raw_to_base64(saved_override_bytes) if not saved_override_bytes.is_empty() else "",
+			"saved_override_backup_path": override_backup_file,
 			"was_dirty": was_dirty,
+			"working_encoding": working_encoding,
+			"working_has_bom": working_has_bom,
+			"working_size": working_bytes.size(),
 			"working_md5": _md5_bytes(working_bytes) if not working_bytes.is_empty() else "",
 			"working_base64": Marshalls.raw_to_base64(working_bytes) if not working_bytes.is_empty() else "",
+			"working_backup_path": working_backup_file,
 			"backup_path": backup_file,
 		}
 	var payload := {
-		"schema": 1,
+		"schema": 2,
 		"transaction_id": tx_id,
 		"scope": scope_label,
 		"created_at": Time.get_datetime_string_from_system(),
@@ -841,15 +969,16 @@ static func create_reset_recovery_point(target_sources: Array, scope_label: Stri
 		"records": records,
 	}
 	var tx_path := rdir.path_join(tx_id + ".json")
-	var wres := atomic_write_abs(tx_path, JSON.stringify(payload, "  ").to_utf8_buffer())
-	if not bool(wres.get("ok", false)):
+	var payload_bytes := JSON.stringify(payload, "  ").to_utf8_buffer()
+	var wres := atomic_write_abs(tx_path, payload_bytes)
+	if not bool(wres.get("ok", false)) or not FileAccess.file_exists(tx_path) or _md5_bytes(FileAccess.get_file_as_bytes(tx_path)) != _md5_bytes(payload_bytes):
 		return {
 			"ok": false,
 			"status": "BACKUP_FAILED",
 			"outcome": "RESET_FAILED_RECOVERABLE",
 			"transaction_id": tx_id,
 			"path": tx_path,
-			"error": "could not write reset recovery transaction: " + str(wres.get("error", "")),
+			"error": "could not write or verify reset recovery transaction: " + str(wres.get("error", "")),
 		}
 	return {
 		"ok": true,
@@ -876,52 +1005,304 @@ static func finalize_reset_recovery_point(tx_path: String, final_status: String,
 	return bool(wres.get("ok", false))
 
 
-## Restore saved overrides and/or working edits from a reset recovery transaction.
-static func restore_reset_recovery_point(tx_path: String) -> Dictionary:
+## Inspect and validate a single recovery point JSON without mutating workspace state.
+static func read_reset_recovery_point(tx_path_or_id: String) -> Dictionary:
+	var tx_path := tx_path_or_id
+	if not FileAccess.file_exists(tx_path):
+		var candidate := ProjectSettings.globalize_path(reset_transactions_dir().path_join(tx_path_or_id))
+		if not candidate.ends_with(".json"):
+			candidate += ".json"
+		if FileAccess.file_exists(candidate):
+			tx_path = candidate
 	if tx_path == "" or not FileAccess.file_exists(tx_path):
 		return {"ok": false, "status": "NOT_FOUND", "error": "recovery point not found"}
 	var jres := parse_json_safe(FileAccess.get_file_as_string(tx_path))
 	if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
-		return {"ok": false, "status": "CORRUPT_RECOVERY_POINT", "error": str(jres.get("error", "invalid JSON"))}
+		return {"ok": false, "status": "CORRUPT_RECOVERY_POINT", "path": tx_path, "error": str(jres.get("error", "invalid JSON"))}
 	var payload: Dictionary = jres.get("data", {})
 	var recs = payload.get("records", {})
 	if not (recs is Dictionary):
-		return {"ok": false, "status": "CORRUPT_RECOVERY_POINT", "error": "missing records"}
+		return {"ok": false, "status": "CORRUPT_RECOVERY_POINT", "path": tx_path, "error": "missing records"}
+	var all_valid := true
+	var has_saved := false
+	var has_working := false
+	var docs: Array[String] = []
+	var doc_details: Array[Dictionary] = []
+	for sp in recs:
+		var r = recs[sp]
+		if not (r is Dictionary):
+			all_valid = false
+			continue
+		var rd: Dictionary = r
+		docs.append(str(sp))
+		var ov_b64 := str(rd.get("saved_override_base64", ""))
+		var work_b64 := str(rd.get("working_base64", ""))
+		var ov_ok := true
+		var work_ok := true
+		if ov_b64 != "":
+			has_saved = true
+			var ov_chk := _decode_verified_base64(ov_b64, str(rd.get("saved_override_md5", "")), int(rd.get("saved_override_size", -1)))
+			ov_ok = bool(ov_chk.get("ok", false))
+		if work_b64 != "":
+			has_working = true
+			var wk_chk := _decode_verified_base64(work_b64, str(rd.get("working_md5", "")), int(rd.get("working_size", -1)))
+			work_ok = bool(wk_chk.get("ok", false))
+		if not ov_ok or not work_ok:
+			all_valid = false
+		doc_details.append({
+			"source": str(sp),
+			"filename": str(sp).get_file(),
+			"had_override": bool(rd.get("had_override", false)),
+			"was_dirty": bool(rd.get("was_dirty", false)),
+			"has_saved_bytes": ov_b64 != "",
+			"has_working_bytes": work_b64 != "",
+			"saved_valid": ov_ok,
+			"working_valid": work_ok,
+			"encoding": str(rd.get("working_encoding", "")),
+		})
+	docs.sort()
+	return {
+		"ok": all_valid,
+		"status": "VALID" if all_valid else "HASH_MISMATCH",
+		"verification_status": "VERIFIED" if all_valid else "HASH_MISMATCH",
+		"transaction_id": str(payload.get("transaction_id", tx_path.get_file().get_basename())),
+		"path": tx_path,
+		"scope": str(payload.get("scope", "RESET")),
+		"created_at": str(payload.get("created_at", "")),
+		"finished_at": str(payload.get("finished_at", "")),
+		"tx_status": str(payload.get("status", "")),
+		"record_count": docs.size(),
+		"documents": docs,
+		"doc_details": doc_details,
+		"has_saved_override": has_saved,
+		"has_working_revision": has_working,
+		"payload": payload,
+	}
+
+
+## Enumerate all persisted reset recovery points newest-first for UI Recovery History.
+static func list_reset_recovery_points() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var rdir := ProjectSettings.globalize_path(reset_transactions_dir())
+	var dir := DirAccess.open(rdir)
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var n := dir.get_next()
+	while n != "":
+		if not dir.current_is_dir() and n.to_lower().ends_with(".json"):
+			var info := read_reset_recovery_point(rdir.path_join(n))
+			info.erase("payload")
+			out.append(info)
+		n = dir.get_next()
+	dir.list_dir_end()
+	out.sort_custom(func(a, b):
+		var ta := str(a.get("created_at", ""))
+		var tb := str(b.get("created_at", ""))
+		if ta != tb:
+			return ta > tb
+		return str(a.get("transaction_id", "")) > str(b.get("transaction_id", ""))
+	)
+	return out
+
+
+static func _find_cached_doc_ci(sp: String):
+	var cdoc = OdfDocument.cached(sp)
+	if cdoc != null:
+		return cdoc
+	for k in OdfDocument._cache:
+		if _same_canon_path(str(k), sp):
+			return OdfDocument._cache[k]
+	return null
+
+
+## Restore saved overrides and/or dirty working revisions from a reset recovery
+## transaction (P0-02 / RCV-01..05 / RST-15..20).
+##
+## `mode`:
+##   "full"         -> restore saved override (if any) AND working revision (if any)
+##   "saved_only"   -> restore saved workspace override only (clears dirty draft)
+##   "working_only" -> restore working revision into active dirty document only
+##
+## Per-resource outcome states:
+##   SAVED_OVERRIDE_RESTORED, WORKING_REVISION_RESTORED, PARTIAL_RECOVERY,
+##   HASH_MISMATCH, SOURCE_MISSING, RECOVERY_PENDING.
+static func restore_reset_recovery_point(tx_path: String, mode: String = "full") -> Dictionary:
+	if tx_path == "" or not FileAccess.file_exists(tx_path):
+		return {"ok": false, "status": "NOT_FOUND", "outcome": "NOT_FOUND", "error": "recovery point not found", "restored": [], "failed": [], "per_resource": {}}
+	var jres := parse_json_safe(FileAccess.get_file_as_string(tx_path))
+	if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
+		return {"ok": false, "status": "CORRUPT_RECOVERY_POINT", "outcome": "CORRUPT_RECOVERY_POINT", "error": str(jres.get("error", "invalid JSON")), "restored": [], "failed": [], "per_resource": {}}
+	var payload: Dictionary = jres.get("data", {})
+	var recs = payload.get("records", {})
+	if not (recs is Dictionary):
+		return {"ok": false, "status": "CORRUPT_RECOVERY_POINT", "outcome": "CORRUPT_RECOVERY_POINT", "error": "missing records", "restored": [], "failed": [], "per_resource": {}}
+
+	var clean_mode := mode.strip_edges().to_lower()
+	if clean_mode != "saved_only" and clean_mode != "working_only":
+		clean_mode = "full"
+	var tx_id := str(payload.get("transaction_id", tx_path.get_file().get_basename()))
 	var restored: Array[String] = []
 	var failed: Array[Dictionary] = []
-	for sp in recs:
-		var r: Dictionary = recs[sp]
+	var per_resource: Dictionary = {}
+	var any_working_restored := false
+	var any_saved_restored := false
+
+	for raw_sp in recs:
+		var sp := str(raw_sp)
+		var r_any = recs[raw_sp]
+		if not (r_any is Dictionary):
+			var bad_rec := {"source": sp, "status": "CORRUPT_RECOVERY_POINT", "error": "record is not a dictionary"}
+			failed.append(bad_rec)
+			per_resource[sp] = {"ok": false, "status": "CORRUPT_RECOVERY_POINT", "error": bad_rec.error}
+			continue
+		var r: Dictionary = r_any
 		var had_ov := bool(r.get("had_override", false))
+		var was_dirty := bool(r.get("was_dirty", false))
 		var ws_rel := clean_rel(str(r.get("workspace_rel", "")))
 		var ov_b64 := str(r.get("saved_override_base64", ""))
 		var work_b64 := str(r.get("working_base64", ""))
-		if had_ov and ws_rel != "" and ov_b64 != "":
-			var ov_bytes := Marshalls.base64_to_raw(ov_b64)
-			var exp_md5 := str(r.get("saved_override_md5", ""))
-			if exp_md5 != "" and _md5_bytes(ov_bytes) != exp_md5:
-				failed.append({"source": str(sp), "error": "override backup hash mismatch"})
+		var rec_enc := str(r.get("working_encoding", ""))
+		var rec_bom: int = (1 if bool(r.get("working_has_bom", false)) else 0) if r.has("working_has_bom") else -1
+
+		var want_saved := (clean_mode != "working_only") and had_ov and ws_rel != "" and ov_b64 != ""
+		var want_working := (clean_mode != "saved_only") and work_b64 != ""
+
+		# 1. Verify BOTH hashes and byte lengths BEFORE mutating any file or cache for this resource.
+		var ov_bytes := PackedByteArray()
+		if want_saved:
+			var ov_exp_size := int(r.get("saved_override_size", -1)) if r.has("saved_override_size") else -1
+			var ov_dec := _decode_verified_base64(ov_b64, str(r.get("saved_override_md5", "")), ov_exp_size)
+			if not bool(ov_dec.get("ok", false)):
+				var oerr := "saved override backup corrupt: " + str(ov_dec.get("error", "hash mismatch"))
+				failed.append({"source": sp, "status": "HASH_MISMATCH", "error": oerr})
+				per_resource[sp] = {"ok": false, "status": "HASH_MISMATCH", "saved_override_restored": false, "working_revision_restored": false, "error": oerr}
 				continue
+			ov_bytes = ov_dec.get("bytes", PackedByteArray())
+
+		var wbytes := PackedByteArray()
+		if want_working:
+			var w_exp_size := int(r.get("working_size", -1)) if r.has("working_size") else -1
+			var w_dec := _decode_verified_base64(work_b64, str(r.get("working_md5", "")), w_exp_size)
+			if not bool(w_dec.get("ok", false)):
+				var werr := "working bytes backup corrupt: " + str(w_dec.get("error", "hash mismatch"))
+				failed.append({"source": sp, "status": "HASH_MISMATCH", "error": werr})
+				per_resource[sp] = {"ok": false, "status": "HASH_MISMATCH", "saved_override_restored": false, "working_revision_restored": false, "error": werr}
+				continue
+			wbytes = w_dec.get("bytes", PackedByteArray())
+
+		var source_exists := FileAccess.file_exists(sp)
+		if not want_saved and not want_working:
+			if not source_exists:
+				failed.append({"source": sp, "status": "SOURCE_MISSING", "error": "no saved or working backup bytes and original source is missing"})
+				per_resource[sp] = {"ok": false, "status": "SOURCE_MISSING", "saved_override_restored": false, "working_revision_restored": false, "error": "source missing"}
+				continue
+			per_resource[sp] = {"ok": true, "status": "NO_CHANGES", "saved_override_restored": false, "working_revision_restored": false, "error": ""}
+			restored.append(sp)
+			continue
+
+		# 2. Restore saved workspace override to disk + manifest (idempotent).
+		var saved_restored := false
+		var ment: Dictionary = r.get("manifest_entry", {}) if r.get("manifest_entry", {}) is Dictionary else {}
+		var ment_src_md5 := str(ment.get("source_md5", source_md5(sp)))
+		if want_saved:
 			var target := odf_dir().path_join(ws_rel)
 			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(target.get_base_dir()))
 			var w := atomic_write_abs(target, ov_bytes)
 			if not bool(w.get("ok", false)):
-				failed.append({"source": str(sp), "error": str(w.get("error", "write failed"))})
+				var we := str(w.get("error", "override write failed"))
+				failed.append({"source": sp, "status": "RECOVERY_PENDING", "error": we})
+				per_resource[sp] = {"ok": false, "status": "RECOVERY_PENDING", "saved_override_restored": false, "working_revision_restored": false, "error": we}
 				continue
-			var ment: Dictionary = r.get("manifest_entry", {})
-			if not record(str(sp), ws_rel, str(ment.get("source_md5", source_md5(str(sp)))), ov_bytes.size()):
-				failed.append({"source": str(sp), "error": "manifest restore failed"})
+			if not record(sp, ws_rel, ment_src_md5, ov_bytes.size()):
+				failed.append({"source": sp, "status": "RECOVERY_PENDING", "error": "manifest restore failed"})
+				per_resource[sp] = {"ok": false, "status": "RECOVERY_PENDING", "saved_override_restored": false, "working_revision_restored": false, "error": "manifest restore failed"}
 				continue
-		if work_b64 != "":
-			var wbytes := Marshalls.base64_to_raw(work_b64)
-			var exp_wmd5 := str(r.get("working_md5", ""))
-			if exp_wmd5 == "" or _md5_bytes(wbytes) == exp_wmd5:
-				var cdoc = OdfDocument.cached(str(sp))
-				if cdoc is OdfDocument:
-					cdoc.replace_text(wbytes.get_string_from_utf8())
-					cdoc.dirty = bool(r.get("was_dirty", false))
-					cdoc.workspace_override = had_ov
-		restored.append(str(sp))
-	return {"ok": failed.is_empty(), "status": "RESTORED" if failed.is_empty() else "PARTIAL_RESTORE", "restored": restored, "failed": failed}
+			saved_restored = true
+			any_saved_restored = true
+
+		# 3. Restore working revision (encoding-aware, works even when NOT cached after restart).
+		var working_restored := false
+		var factory_bytes := FileAccess.get_file_as_bytes(sp) if source_exists else PackedByteArray()
+		var saved_ref_bytes := ov_bytes if not ov_bytes.is_empty() else factory_bytes
+		if want_working:
+			var cdoc = _find_cached_doc_ci(sp)
+			var effective_had_ov := saved_restored or (not entry_for(sp).is_empty())
+			var eff_rel := ws_rel if effective_had_ov else ""
+			if not (cdoc is OdfDocument):
+				cdoc = OdfDocument.parse_bytes(wbytes, sp, rec_enc, rec_bom)
+				if not factory_bytes.is_empty():
+					cdoc.original_bytes = factory_bytes
+					cdoc.source_hash = source_md5(sp)
+			var applied: bool = cdoc.apply_recovered_bytes(
+				wbytes, saved_ref_bytes, was_dirty, effective_had_ov, eff_rel, ment_src_md5, rec_enc, rec_bom
+			)
+			if not applied or cdoc.to_bytes() != wbytes:
+				var aerr := "byte-exact working document reconstruction failed"
+				failed.append({"source": sp, "status": "RECOVERY_PENDING", "error": aerr})
+				per_resource[sp] = {"ok": false, "status": "RECOVERY_PENDING", "saved_override_restored": saved_restored, "working_revision_restored": false, "error": aerr}
+				continue
+			if not source_exists:
+				cdoc.workspace_conflict = true
+			OdfDocument.cache_document(cdoc)
+			# Persist durable working draft when dirty so a subsequent restart still preserves unsaved recovered edits.
+			if cdoc.dirty or was_dirty:
+				var wd := _save_working_draft(sp, wbytes, effective_had_ov, eff_rel, ment_src_md5, str(cdoc.encoding), bool(cdoc.has_bom), tx_id)
+				if not bool(wd.get("ok", false)):
+					var wd_err := "working recovery draft persist failed: " + str(wd.get("error", ""))
+					failed.append({"source": sp, "status": "RECOVERY_PENDING", "error": wd_err})
+					per_resource[sp] = {"ok": false, "status": "RECOVERY_PENDING", "saved_override_restored": saved_restored, "working_revision_restored": false, "error": wd_err}
+					continue
+			else:
+				clear_working_draft(sp)
+			working_restored = true
+			any_working_restored = true
+		elif saved_restored:
+			# Saved-only restore: clear any stale dirty draft and sync cached doc to saved override bytes.
+			clear_working_draft(sp)
+			var sdoc = _find_cached_doc_ci(sp)
+			if not (sdoc is OdfDocument):
+				sdoc = OdfDocument.parse_bytes(ov_bytes, sp)
+				if not factory_bytes.is_empty():
+					sdoc.original_bytes = factory_bytes
+					sdoc.source_hash = source_md5(sp)
+			sdoc.apply_recovered_bytes(ov_bytes, ov_bytes, false, true, ws_rel, ment_src_md5)
+			if not source_exists:
+				sdoc.workspace_conflict = true
+			OdfDocument.cache_document(sdoc)
+
+		var r_status := "WORKING_REVISION_RESTORED" if (working_restored and (was_dirty or not saved_restored or wbytes != ov_bytes)) else "SAVED_OVERRIDE_RESTORED"
+		per_resource[sp] = {
+			"ok": true,
+			"status": r_status,
+			"saved_override_restored": saved_restored,
+			"working_revision_restored": working_restored,
+			"was_dirty": was_dirty,
+			"source_missing": not source_exists,
+			"error": "",
+		}
+		restored.append(sp)
+
+	var overall_ok := failed.is_empty()
+	var overall_status := "RESTORED"
+	var overall_outcome := "WORKING_REVISION_RESTORED" if any_working_restored else ("SAVED_OVERRIDE_RESTORED" if any_saved_restored else "RESTORED")
+	if not overall_ok:
+		if not restored.is_empty():
+			overall_status = "PARTIAL_RECOVERY"
+			overall_outcome = "PARTIAL_RECOVERY"
+		else:
+			overall_status = str((failed[0] as Dictionary).get("status", "HASH_MISMATCH"))
+			overall_outcome = overall_status
+	return {
+		"ok": overall_ok,
+		"status": overall_status,
+		"outcome": overall_outcome,
+		"mode": clean_mode,
+		"transaction_id": tx_id,
+		"restored": restored,
+		"failed": failed,
+		"per_resource": per_resource,
+	}
 
 
 ## Explicitly discard ONLY unsaved in-memory edits, restoring the last saved
@@ -931,6 +1312,7 @@ static func discard_unsaved_edits(doc) -> Dictionary:
 	if doc == null or str(doc.source_path) == "":
 		return {"ok": false, "status": "SOURCE_MISSING", "error": "invalid document"}
 	var sp := str(doc.source_path)
+	clear_working_draft(sp)
 	var ws_entry := entry_for(sp)
 	if not ws_entry.is_empty():
 		var rel := clean_rel(str(ws_entry.get("rel", "")))
@@ -959,11 +1341,12 @@ static func discard_unsaved_edits(doc) -> Dictionary:
 
 ## Revert an in-memory OdfDocument back to its unmodified factory on-disk bytes
 ## and remove any saved workspace override for it, preserving object identity.
-## P0-02: Returns structured outcome; NEVER mutates in-memory state when
-## persistent workspace override removal or backup fails.
+## P0-01 / P0-02: Unified reset transaction — ALWAYS preserves BOTH saved override
+## bytes AND unsaved dirty working bytes in a verified durable recovery point
+## BEFORE removing the override or mutating in-memory state.
 ## Status values: SUCCESS, NO_OVERRIDE, BACKUP_FAILED, MANIFEST_FAILED,
 ## RECOVERY_PENDING, SOURCE_MISSING, SOURCE_CHANGED.
-static func revert_document(doc) -> Dictionary:
+static func revert_document(doc, skip_recovery_point: bool = false) -> Dictionary:
 	if doc == null or str(doc.source_path) == "":
 		return {
 			"ok": false,
@@ -976,6 +1359,10 @@ static func revert_document(doc) -> Dictionary:
 			"source_missing": true,
 			"source_changed": false,
 			"backup": "",
+			"working_backup": "",
+			"override_backup": "",
+			"transaction_id": "",
+			"recovery_point": "",
 			"error": "invalid document or missing source_path",
 		}
 	var sp := str(doc.source_path)
@@ -995,6 +1382,10 @@ static func revert_document(doc) -> Dictionary:
 			"source_missing": true,
 			"source_changed": false,
 			"backup": "",
+			"working_backup": "",
+			"override_backup": "",
+			"transaction_id": "",
+			"recovery_point": "",
 			"error": "original factory source file is missing: " + sp,
 		}
 	var fdoc := OdfDocument.load_file(sp)
@@ -1010,10 +1401,15 @@ static func revert_document(doc) -> Dictionary:
 			"source_missing": true,
 			"source_changed": false,
 			"backup": "",
+			"working_backup": "",
+			"override_backup": "",
+			"transaction_id": "",
+			"recovery_point": "",
 			"error": "could not load factory source file: " + sp,
 		}
+	var working_bytes: PackedByteArray = doc.to_bytes()
 	var factory_bytes := fdoc.to_bytes()
-	if not had_override and not had_dirty and doc.to_bytes() == factory_bytes:
+	if not had_override and not had_dirty and working_bytes == factory_bytes:
 		return {
 			"ok": true,
 			"status": "NO_OVERRIDE",
@@ -1025,9 +1421,97 @@ static func revert_document(doc) -> Dictionary:
 			"source_missing": false,
 			"source_changed": false,
 			"backup": "",
+			"working_backup": "",
+			"override_backup": "",
+			"transaction_id": "",
+			"recovery_point": "",
 			"error": "",
 		}
-	var backup_path := ""
+
+	# Step 1 (P0-01): Create durable unified recovery point BEFORE any mutation
+	# so BOTH saved override (200) and unsaved dirty working bytes (250) survive
+	# reset and application restart.
+	var tx_id := ""
+	var tx_path := ""
+	var working_backup := ""
+	var override_backup := ""
+	if not skip_recovery_point:
+		var rec_pt := create_reset_recovery_point([sp], "RESET_SINGLE_DOCUMENT", {sp: doc})
+		if not bool(rec_pt.get("ok", false)):
+			return {
+				"ok": false,
+				"status": str(rec_pt.get("status", "BACKUP_FAILED")),
+				"outcome": "RESET_FAILED_RECOVERABLE",
+				"had_override": had_override,
+				"had_dirty": had_dirty,
+				"already_default": false,
+				"recovery_pending": false,
+				"source_missing": false,
+				"source_changed": false,
+				"backup": "",
+				"working_backup": "",
+				"override_backup": "",
+				"transaction_id": str(rec_pt.get("transaction_id", "")),
+				"recovery_point": str(rec_pt.get("path", "")),
+				"error": str(rec_pt.get("error", "failed to create single-document reset recovery point")),
+			}
+		tx_id = str(rec_pt.get("transaction_id", ""))
+		tx_path = str(rec_pt.get("path", ""))
+		var rmap: Dictionary = rec_pt.get("records", {})
+		if rmap.has(sp) and rmap[sp] is Dictionary:
+			var rrec: Dictionary = rmap[sp]
+			working_backup = str(rrec.get("working_backup_path", ""))
+			override_backup = str(rrec.get("saved_override_backup_path", ""))
+
+	# Step 2: Independently ensure dirty working bytes are backed up on disk
+	# EVEN WHEN a saved workspace override also exists (fixes the `elif` bug).
+	if had_dirty and working_backup == "":
+		if _fault("backup_write"):
+			if tx_path != "":
+				finalize_reset_recovery_point(tx_path, "BACKUP_FAILED", {"source": sp})
+			return {
+				"ok": false,
+				"status": "BACKUP_FAILED",
+				"outcome": "RESET_FAILED_RECOVERABLE",
+				"had_override": had_override,
+				"had_dirty": true,
+				"already_default": false,
+				"recovery_pending": false,
+				"source_missing": false,
+				"source_changed": false,
+				"backup": "",
+				"working_backup": "",
+				"override_backup": override_backup,
+				"transaction_id": tx_id,
+				"recovery_point": tx_path,
+				"error": "could not preserve working bytes before reset",
+			}
+		var rel_key := clean_rel(doc.workspace_rel if str(doc.workspace_rel) != "" else ("working/%s_%s" % [canonical(sp).md5_text().substr(0, 8), sp.get_file()]))
+		if rel_key != "":
+			working_backup = ProjectSettings.globalize_path(backups_dir().path_join(rel_key) + ".working.bak")
+			DirAccess.make_dir_recursive_absolute(working_backup.get_base_dir())
+			if not _write_verified(working_backup, working_bytes):
+				if tx_path != "":
+					finalize_reset_recovery_point(tx_path, "BACKUP_FAILED", {"source": sp})
+				return {
+					"ok": false,
+					"status": "BACKUP_FAILED",
+					"outcome": "RESET_FAILED_RECOVERABLE",
+					"had_override": had_override,
+					"had_dirty": true,
+					"already_default": false,
+					"recovery_pending": false,
+					"source_missing": false,
+					"source_changed": false,
+					"backup": working_backup,
+					"working_backup": working_backup,
+					"override_backup": override_backup,
+					"transaction_id": tx_id,
+					"recovery_point": tx_path,
+					"error": "working-bytes backup verification failed",
+				}
+
+	var backup_path := override_backup if override_backup != "" else working_backup
 	var src_changed := false
 	if has_entry:
 		var disc := discard_override_ex(sp)
@@ -1043,6 +1527,8 @@ static func revert_document(doc) -> Dictionary:
 				rec_pend = true
 			elif raw_st != "BACKUP_FAILED":
 				mapped_st = "MANIFEST_FAILED"
+			if tx_path != "":
+				finalize_reset_recovery_point(tx_path, mapped_st, {"source": sp, "error": str(disc.get("error", ""))})
 			# Do NOT mutate `doc` in memory when persistent state could not be reconciled.
 			return {
 				"ok": false,
@@ -1055,54 +1541,57 @@ static func revert_document(doc) -> Dictionary:
 				"recovery_pending": rec_pend,
 				"source_missing": false,
 				"source_changed": false,
-				"backup": str(disc.get("backup", "")),
+				"backup": str(disc.get("backup", backup_path)),
+				"working_backup": working_backup,
+				"override_backup": str(disc.get("backup", override_backup)),
+				"transaction_id": tx_id,
+				"recovery_point": tx_path,
 				"error": str(disc.get("error", "failed to remove workspace override")),
 			}
-		backup_path = str(disc.get("backup", ""))
+		override_backup = str(disc.get("backup", override_backup))
+		backup_path = override_backup if override_backup != "" else working_backup
 		src_changed = bool(disc.get("source_changed", false))
-	elif had_dirty:
-		# Preserve dirty unsaved bytes in backups/ before discarding them.
-		if _fault("backup_write"):
-			return {
-				"ok": false,
-				"status": "BACKUP_FAILED",
-				"outcome": "RESET_FAILED_RECOVERABLE",
-				"had_override": had_override,
-				"had_dirty": true,
-				"already_default": false,
-				"recovery_pending": false,
-				"source_missing": false,
-				"source_changed": false,
-				"backup": "",
-				"error": "could not preserve working bytes before reset",
-			}
-		var rel_key := clean_rel(doc.workspace_rel if str(doc.workspace_rel) != "" else ("working/%s_%s" % [canonical(sp).md5_text().substr(0, 8), sp.get_file()]))
-		if rel_key != "":
-			backup_path = backups_dir().path_join(rel_key) + ".bak"
-			DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(backup_path.get_base_dir()))
-			if not _write_verified(ProjectSettings.globalize_path(backup_path), doc.to_bytes()):
-				return {
-					"ok": false,
-					"status": "BACKUP_FAILED",
-					"outcome": "RESET_FAILED_RECOVERABLE",
-					"had_override": had_override,
-					"had_dirty": true,
-					"already_default": false,
-					"recovery_pending": false,
-					"source_missing": false,
-					"source_changed": false,
-					"backup": backup_path,
-					"error": "working-bytes backup verification failed",
-				}
+
+	# Step 3: Verify persistent state after reset before mutating in-memory doc.
+	if not entry_for(sp).is_empty():
+		if tx_path != "":
+			finalize_reset_recovery_point(tx_path, "MANIFEST_FAILED", {"source": sp})
+		return {
+			"ok": false,
+			"status": "MANIFEST_FAILED",
+			"outcome": "RESET_FAILED_RECOVERABLE",
+			"had_override": had_override,
+			"had_dirty": had_dirty,
+			"already_default": false,
+			"recovery_pending": true,
+			"source_missing": false,
+			"source_changed": false,
+			"backup": backup_path,
+			"working_backup": working_backup,
+			"override_backup": override_backup,
+			"transaction_id": tx_id,
+			"recovery_point": tx_path,
+			"error": "post-reset verification failed: manifest entry still present",
+		}
+
+	clear_working_draft(sp)
 	if not src_changed and doc.workspace_source_md5 != "" and fdoc.source_hash != "" and doc.workspace_source_md5 != fdoc.source_hash:
 		src_changed = true
 	doc.restore_factory_state_from(fdoc)
 	doc.workspace_rel = ""
 	doc.workspace_source_md5 = ""
 	OdfDocument.cache_document(doc)
+	var final_st := "SOURCE_CHANGED" if src_changed else "SUCCESS"
+	if tx_path != "":
+		finalize_reset_recovery_point(tx_path, final_st, {
+			"source": sp,
+			"had_override": had_override,
+			"had_dirty": had_dirty,
+			"source_changed": src_changed,
+		})
 	return {
 		"ok": true,
-		"status": "SOURCE_CHANGED" if src_changed else "SUCCESS",
+		"status": final_st,
 		"outcome": "SUCCESS",
 		"had_override": had_override,
 		"had_dirty": had_dirty,
@@ -1111,13 +1600,18 @@ static func revert_document(doc) -> Dictionary:
 		"source_missing": false,
 		"source_changed": src_changed,
 		"backup": backup_path,
+		"working_backup": working_backup,
+		"override_backup": override_backup,
+		"transaction_id": tx_id,
+		"recovery_point": tx_path,
 		"error": "",
 	}
 
 
-## Load every recorded override into the OdfDocument cache under its original
-## source path. Returns the number restored. The original game file is never
-## written; `workspace_conflict` marks a source changed after the save.
+## Load every recorded override (and any recovered dirty working drafts) into
+## the OdfDocument cache under its original source path. Returns the number
+## restored. The original game file is never written; `workspace_conflict` marks
+## a source changed after the save.
 static func restore_cache() -> int:
 	recover_transactions()
 	var restored := 0
@@ -1150,6 +1644,49 @@ static func restore_cache() -> int:
 		doc.dirty = false
 		OdfDocument.cache_document(doc)
 		restored += 1
+
+	# Restore any active durable dirty working recovery drafts (created by explicit
+	# reset recovery before the user has saved) while preserving saved override bytes.
+	var wdir := ProjectSettings.globalize_path(working_recovery_dir())
+	var dir := DirAccess.open(wdir)
+	if dir != null:
+		dir.list_dir_begin()
+		var n := dir.get_next()
+		while n != "":
+			if not dir.current_is_dir() and n.to_lower().ends_with(".json"):
+				var jres := parse_json_safe(FileAccess.get_file_as_string(wdir.path_join(n)))
+				if bool(jres.get("ok", false)) and jres.get("data", null) is Dictionary:
+					var wd: Dictionary = jres.get("data", {})
+					var sp := str(wd.get("source", ""))
+					var wb64 := str(wd.get("working_base64", ""))
+					var wdec := _decode_verified_base64(wb64, str(wd.get("working_md5", "")), int(wd.get("working_size", -1)))
+					if sp != "" and bool(wdec.get("ok", false)) and not bool(wdec.get("empty", true)):
+						var wbytes: PackedByteArray = wdec.get("bytes", PackedByteArray())
+						var enc := str(wd.get("encoding", ""))
+						var bom: int = (1 if bool(wd.get("has_bom", false)) else 0) if wd.has("has_bom") else -1
+						var cdoc = _find_cached_doc_ci(sp)
+						var ws_ent := entry_for(sp)
+						var has_ov := not ws_ent.is_empty()
+						var ws_rel := clean_rel(str(ws_ent.get("rel", ""))) if has_ov else ""
+						var saved_ref := PackedByteArray()
+						if has_ov and ws_rel != "":
+							var ws_abs := ProjectSettings.globalize_path(odf_dir().path_join(ws_rel))
+							if FileAccess.file_exists(ws_abs):
+								saved_ref = FileAccess.get_file_as_bytes(ws_abs)
+						if saved_ref.is_empty() and FileAccess.file_exists(sp):
+							saved_ref = FileAccess.get_file_as_bytes(sp)
+						var was_new := not (cdoc is OdfDocument)
+						if was_new:
+							cdoc = OdfDocument.parse_bytes(wbytes, sp, enc, bom)
+							if FileAccess.file_exists(sp):
+								cdoc.original_bytes = FileAccess.get_file_as_bytes(sp)
+								cdoc.source_hash = source_md5(sp)
+						cdoc.apply_recovered_bytes(wbytes, saved_ref, true, has_ov, ws_rel, str(ws_ent.get("source_md5", "")), enc, bom)
+						OdfDocument.cache_document(cdoc)
+						if was_new:
+							restored += 1
+			n = dir.get_next()
+		dir.list_dir_end()
 	return restored
 
 

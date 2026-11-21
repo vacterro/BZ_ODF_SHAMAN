@@ -53,6 +53,7 @@ var ordnance_class_label: String = ""
 var recoil_node_name: String = ""
 var weapon_hardpoints: Array[String] = []
 var ammo_cost: int = 0
+var damage_shield: float = 1.0
 var damage: Dictionary = {}
 var damage_radius: float = 0.0
 var xpl_ground: String = ""
@@ -63,6 +64,9 @@ var shot_geometry: String = ""
 
 # Target values
 var target_health_max: float = 0.0
+var target_shield_max: float = 0.0
+var target_shield_class: String = ""
+var target_ammo_max: int = 0
 var target_armor: String = "N"
 var target_radius: float = 2.0
 var target_half_extents: Vector3 = Vector3.ZERO
@@ -243,6 +247,9 @@ func _resolve_alt() -> void:
 
 func _read_target() -> void:
 	target_health_max = 1000.0
+	target_shield_max = 0.0
+	target_shield_class = ""
+	target_ammo_max = 0
 	target_armor = "N"
 	target_radius = 2.0
 	target_name = target_path.get_file().get_basename() if target_path != "" else "none"
@@ -264,6 +271,15 @@ func _read_target() -> void:
 	var radius := _find_value(target_doc, ["collisionRadius", "shotRadius"])
 	if radius != "":
 		target_radius = max(0.2, radius.to_float())
+	var shield_max := _find_value(target_doc, ["maxShield", "shieldHealth"])
+	if shield_max != "":
+		target_shield_max = maxf(0.0, shield_max.to_float())
+	var shield_class := _find_value(target_doc, ["shieldClass"])
+	if shield_class != "":
+		target_shield_class = shield_class.strip_edges().to_upper().substr(0, 1)
+	var ammo_max := _find_value(target_doc, ["maxAmmo"])
+	if ammo_max != "":
+		target_ammo_max = maxi(0, ammo_max.to_int())
 	var nm := _find_value(target_doc, ["unitName"])
 	if nm != "":
 		target_name = nm
@@ -276,6 +292,14 @@ func refresh() -> void:
 	if target_doc != null:
 		target_geometry = _find_value(target_doc, ["geometryName"])
 		target_geometry_scale = _float_or(_find_value(target_doc, ["geometryScale"]), 1.0)
+		# Shield/ammo are live-tunable preview fields; re-read on every refresh
+		# so set_override() from the sweep and inspector edits take effect.
+		var shield_max := _find_value(target_doc, ["maxShield", "shieldHealth"])
+		target_shield_max = maxf(0.0, shield_max.to_float()) if shield_max != "" else 0.0
+		var shield_class := _find_value(target_doc, ["shieldClass"])
+		target_shield_class = shield_class.strip_edges().to_upper().substr(0, 1) if shield_class != "" else ""
+		var ammo_max := _find_value(target_doc, ["maxAmmo"])
+		target_ammo_max = maxi(0, ammo_max.to_int()) if ammo_max != "" else 0
 	if weapon_doc != null:
 		weapon_class_label = _find_value(weapon_doc, ["classLabel"]).strip_edges().to_lower()
 		fire_sound = _find_value(weapon_doc, ["fireSound", "activeSound"])
@@ -322,7 +346,8 @@ func refresh() -> void:
 		xpl_ground = _find_value(ordnance_doc, ["xplGround"])
 		xpl_vehicle = _find_value(ordnance_doc, ["xplVehicle"])
 		xpl_expire = _find_value(ordnance_doc, ["xplExpire"])
-		ammo_cost = _int_or(_find_value(ordnance_doc, ["ammoCost"]), 0)
+		ammo_cost = maxi(0, _int_or(_find_value(ordnance_doc, ["ammoCost"]), 0))
+		damage_shield = maxf(0.0, _float_or(_find_value(ordnance_doc, ["DamageShield"]), 1.0))
 		damage.clear()
 		for letter in ["N", "L", "H", "S", "D", "A"]:
 			var v := _find_value(ordnance_doc, ["damageValue", "damagevalue"], "(" + letter + ")")
@@ -338,7 +363,29 @@ func refresh() -> void:
 
 
 func expected_damage() -> float:
-	return float(damage.get(target_armor, damage.get("N", 0.0)))
+	return expected_damage_for_target()
+
+
+## Shielded targets use damageValue(S|D|A) when declared; unshielded targets
+## use the documented armor-class value. Falls back to damageValue(N).
+func expected_damage_for_target() -> float:
+	var key := target_armor
+	if target_shield_class != "" and target_shield_max > 0.0 and damage.has(target_shield_class):
+		key = target_shield_class
+	return float(damage.get(key, damage.get("N", 0.0)))
+
+
+## BZCC documents shieldRatio N/A=1.0, S=0.75, D=0.5. DamageShield from the
+## ordnance scales this multiplier (APPROXIMATED preview model).
+func shield_damage_ratio() -> float:
+	if target_shield_class == "":
+		return 1.0
+	var base := 1.0
+	match target_shield_class:
+		"S": base = 0.75
+		"D": base = 0.5
+		"N", "A": base = 1.0
+	return maxf(0.0, base * damage_shield)
 
 
 func range_estimate() -> float:

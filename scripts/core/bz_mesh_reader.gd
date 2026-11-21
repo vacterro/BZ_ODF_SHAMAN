@@ -45,6 +45,115 @@ static func resolve_msh_for_geometry(index: ResourceIndex, geometry_name: String
 	return ""
 
 
+## Inspect embedded BZCC DOCB animation metadata without inventing skinning.
+## Returns pose/bone/animation counts and the actual baked file identity. A
+## standalone .msha is only reported as a companion DOCB asset; no real sample
+## is available on this host, so no skeletal bind pose is claimed.
+static func inspect_animation(path: String, index: ResourceIndex = null,
+		geometry_name: String = "") -> Dictionary:
+	var out := {
+		"ok": false, "path": path, "msha_path": "", "source": "", "bone_count": 0,
+		"pose_count": 0, "animation_count": 0, "animation_detected": false,
+		"node_count": 0, "errors": [],
+	}
+	if path == "" or not FileAccess.file_exists(path):
+		out.errors.append("animation source not found: " + path)
+		return out
+	var msh_path := path
+	if not path.to_lower().ends_with(".msh") and geometry_name != "" and index != null:
+		msh_path = resolve_msh_for_geometry(index, geometry_name)
+	if msh_path == "" or not FileAccess.file_exists(msh_path):
+		out.errors.append("baked .msh source not found for animation inspection")
+		return out
+	var bytes := FileAccess.get_file_as_bytes(msh_path)
+	if bytes.size() < 64 or bytes.slice(0, 4).get_string_from_ascii() != MAGIC:
+		out.errors.append("not a DOCB animation source: " + msh_path.get_file())
+		return out
+	out.ok = true
+	out.path = msh_path
+	out.source = "DOCB .msh embedded animation metadata"
+	if geometry_name != "":
+		var base := geometry_name.get_basename()
+		out.msha_path = index.find_asset_near(base + ".msha", ["msha"], "") if index != null else ""
+	var sp := StreamPeerBuffer.new()
+	sp.data_array = bytes
+	sp.big_endian = false
+	sp.seek(52)
+	var _root := _read_text(sp, bytes)
+	sp.seek(sp.get_position() + 4 + 76)
+	for elem in [12, 12, 8, 4, 20]:
+		if not _skip_array(sp, bytes.size(), elem):
+			out.errors.append("unreadable geometry section while reaching animation metadata")
+			return out
+	var n_surf := sp.get_u32()
+	if n_surf > MAX_COUNT:
+		out.errors.append("bad surface count")
+		return out
+	for _i in n_surf:
+		sp.seek(sp.get_position() + 12)
+		_read_mat_record(sp, bytes)
+	var n_weights := sp.get_u32()
+	if n_weights > MAX_COUNT:
+		out.errors.append("bad weight count")
+		return out
+	for _i in n_weights:
+		var k := sp.get_u32()
+		if k > MAX_COUNT or sp.get_position() + k * 6 > bytes.size():
+			out.errors.append("bad weight list")
+			return out
+		sp.seek(sp.get_position() + k * 6)
+	var n_reg := sp.get_u32()
+	if n_reg > MAX_COUNT:
+		out.errors.append("bad region count")
+		return out
+	for _i in n_reg:
+		sp.seek(sp.get_position() + 16)
+		_read_mat_record(sp, bytes)
+	if not _skip_array(sp, bytes.size(), 2) or not _skip_array(sp, bytes.size(), 16):
+		out.errors.append("unreadable surf/plane sections")
+		return out
+	var bone_count := sp.get_u32()
+	if bone_count > MAX_COUNT or sp.get_position() + bone_count * 64 > bytes.size():
+		out.errors.append("bad bone count")
+		return out
+	sp.seek(sp.get_position() + bone_count * 64)
+	var n_poses := sp.get_u32()
+	if n_poses > MAX_COUNT or sp.get_position() + n_poses * 36 > bytes.size():
+		out.errors.append("bad pose count")
+		return out
+	sp.seek(sp.get_position() + n_poses * 36)
+	var n_anim := sp.get_u32()
+	out.bone_count = int(bone_count)
+	out.pose_count = int(n_poses)
+	out.animation_count = int(n_anim)
+	out.animation_detected = n_poses > 0 or n_anim > 0
+	var scene := build_scene(msh_path, index)
+	if bool(scene.get("ok", false)):
+		out.node_count = int((scene.get("provenance", {}) as Dictionary).get("node_count", 0))
+	var scene_root = scene.get("root", null)
+	if scene_root != null and scene_root is Node:
+		(scene_root as Node).free()
+	return out
+
+
+## Parse a DOCB .msha file's header identity. This only proves the asset is a
+## DOCB animation container; it does not decode tracks or skin weights.
+static func inspect_msha_file(path: String) -> Dictionary:
+	var out := {"ok": false, "path": path, "version": 0, "layout": 0, "body_len": 0, "errors": []}
+	if path == "" or not FileAccess.file_exists(path):
+		out.errors.append("msha file not found")
+		return out
+	var bytes := FileAccess.get_file_as_bytes(path)
+	if bytes.size() < 52 or bytes.slice(0, 4).get_string_from_ascii() != MAGIC:
+		out.errors.append("not a DOCB .msha file")
+		return out
+	out.ok = true
+	out.version = int(bytes.decode_u32(4))
+	out.layout = int(bytes.decode_u32(8))
+	out.body_len = int(bytes.decode_u32(48))
+	return out
+
+
 ## Parse a DOCB .msh file and build a Godot Node3D tree + provenance metadata.
 ## Returns {ok, root, hardpoints, turret_y, turret_x, bounds, provenance, errors}.
 static func build_scene(msh_path: String, index: ResourceIndex = null,
