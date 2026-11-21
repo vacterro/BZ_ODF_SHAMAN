@@ -27,11 +27,11 @@
      write that field name next to a concrete id anywhere in this file. -->
 
 ## DOING
-- [/] T-37 [P1] GitHub publication: initialize/verify git repo, verify .gitignore excludes build/.godot/ephemeral state, and push BZ_ODF_SHAMAN cleanly to https://github.com/vacterro/BZ_ODF_SHAMAN | verify: git status && git ls-remote origin | owner: saipen | claim_time: 2026-11-21T21:37:32Z
 
 ## TODO
 
 ## DONE
+- [x] T-37 [P1] GitHub publication: initialize/verify git repo, verify .gitignore excludes build/.godot/ephemeral state, and push BZ_ODF_SHAMAN cleanly to https://github.com/vacterro/BZ_ODF_SHAMAN | verify: git status && git ls-remote origin | owner: saipen | claim_time: 2026-11-21T21:40:02Z | closure_mode: own_patch | publication_state: pending
 - [x] T-41 [P2] Wave E: Visual Laboratory & Simulation upgrade — Damage/Shield/Ammo vertical slice with 3D shield glow and hit normals, Live Parameter Inspection panel, animated ribbon trails & particle curves, and real BZCC .msha/.skeleton animation inspection | regression: required | verify: cmd /c tools\\\\run_tests.cmd | owner: saipen | claim_time: 2026-11-21T21:30:03Z | closure_mode: own_patch | publication_state: pending
 - [x] T-42 [P2] Wave F: Release hardening — full regression matrix, Windows build, GPU GUI self-verification, performance benchmark, read-only GitHub pre-push audit, and full 9-doc synchronization | verify: cmd /c tools\\\\run_tests.cmd && cmd /c tools\\\\build_windows.cmd | owner: saipen | claim_time: 2026-11-21T20:43:27Z | closure_mode: own_patch | publication_state: pending
 - [x] T-40 [P1] Wave D: Centralized checked durable native session transitions (STATE_PERSIST_FAILED/RECOVERY_PENDING) and bounded asynchronous NativeProcessMonitor with PID/exe/mission/probe state machine and restart recovery (P1-02, P1-03; ND-11..ND-15, SM-01..SM-07) | regression: required | verify: cmd /c tools\\\\run_tests.cmd | owner: saipen | claim_time: 2026-11-21T20:30:46Z | closure_mode: own_patch | publication_state: pending
