@@ -27,7 +27,6 @@
      write that field name next to a concrete id anywhere in this file. -->
 
 ## DOING
-- [/] T-37 [P1] GitHub publication: initialize/verify git repo, verify .gitignore excludes build/.godot/ephemeral state, and push BZ_ODF_SHAMAN cleanly to https://github.com/vacterro/BZ_ODF_SHAMAN | verify: git status && git ls-remote origin | owner: saipen | claim_time: 2026-11-21T18:54:28Z
 
 ## TODO
 
@@ -67,6 +66,7 @@
 - [x] T-1 [P2] Autonomous shift: ODF non-inherited semantics, Weapons Lab parameter sweep, Windows packaged build | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-001 | owner: saipen | claim_time: 2026-11-21T04:58:11Z | closure_mode: own_patch | publication_state: pending
 
 ## BLOCKED
+- [ ] T-37 [P1] GitHub publication: initialize/verify git repo, verify .gitignore excludes build/.godot/ephemeral state, and push BZ_ODF_SHAMAN cleanly to https://github.com/vacterro/BZ_ODF_SHAMAN | verify: git status && git ls-remote origin | owner: saipen | claim_time: 2026-11-21T18:54:28Z | blocker: BLOCKED_EXTERNAL: GITHUB_AUTH_REQUIRED -- local git repo ready on main (.gitignore excludes BZ_ODF_SHAMAN.exe/*.exe/*.pck, origin=https://github.com/vacterro/BZ_ODF_SHAMAN.git); isolated agent session SAIAG_9fabb0d5 has no GitHub auth (gh/GCM/SSH); operator run: git push -u origin main | blocker_scope: ticket
 - [ ] T-20 [P2] Wave D: First real native BZCC experiment (preflight, launch, observation, comparison) (P2-01) | verify: reproducible staged native BZCC scenario executed or exact engine blocker documented with real evidence artifacts | blocker: Phase A preflight + /config + LuaMission staging + strict evidence gate verified; live battlezone2.exe launch blocked by missing steam_appid.txt in read-only BZ2R (exit 53) | blocker_scope: ticket
 - [ ] T-17 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-011 | owner: saipen | claim_time: 2026-11-21T13:28:22Z | blocker: Waves A,B,C,E verified (481 core + 97 UI + Win exe + GPU GUI); live BZCC launch blocked by missing steam_appid.txt in read-only BZ2R (exit 53); P1-07 deferred | blocker_scope: ticket
 - [ ] T-16 [P0] Battery test scaffolding | verify: n/a | blocker: created accidentally with placeholder verify; superseded by T-12..T-15, no implementation | blocker_scope: ticket
