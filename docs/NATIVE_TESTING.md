@@ -2,24 +2,30 @@
 
 ## Current state
 
-**Structurally valid LuaMission BZN generation, exact stage-to-BZCC mount mapping, Steam launch
-capability routing, controlled `WriteToFile` LuaMission scripting, process-local trusted session
-attestation, and MD5-verified staging cleanup are implemented and regression-tested.**
-No live native BZCC execution or calibration is claimed (`NATIVE_VERIFIED: 0`). T-20 reproduced the
-full staged launch: logged-in Steam client, `steam_appid.txt` present in read-only `BZ2R`, and
-`steam.exe -applaunch 624970` spawning `battlezone2.exe` with the staged `/config` and
-`shaman_shot.bzn`. BZCC 2.0.185 then showed a modal fatal dialog: `Unable to load console font
-'ds16.brf' -- check MOD installation and/or .cfg`; the font is absent from the read-only
-game installation and Steam injects `/logconsole` through global launch options. No
-`Config: 'AddDirRecurse'` or mission initialization line appeared and no session-bound LuaMission
-observation artifact was produced. Evidence: `.saipen/evidence/native/T-20-native-probe-1136976.json`
-and `.saipen/evidence/native/T-20-font-blocker.md`.
-The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was session-specific and is no longer the
-current blocker. Nothing claims `NATIVE_VERIFIED`.
+**Structurally valid LuaMission BZN generation, exact stage-to-BZCC mount mapping (with stock `@rootdir\maps`),
+opt-in `/logconsole` (disabled by default), `/config` rootdir-compatibility diagnostics, session-correlated
+crash-log forensics, strict stock/VSR resource closure, app-owned non-blocking `NativeSessionService` GUI
+monitoring across tabs, automatic session-bound observation collection in `poll_monitor`, checked
+`process_monitors.json` persistence, event-driven Lua states (`contract_version: 2`, no time-based `SHOT_OBSERVED`),
+and MD5-verified staging cleanup are implemented and regression-tested.**
+
+No live native BZCC calibration is claimed (`NATIVE_VERIFIED: 0`). Controlled T-60 diagnosis corrected the
+earlier T-20 misdiagnosis (`.saipen/evidence/native/T-60-native-startup-diagnosis.md`):
+
+- Visual inspection of `.saipen/evidence/native/t20_bzcc_fatal_dialog.png` shows the actual dialog string is
+  `Unable to load console font 'ds_16.bmf' -- check MOD installation and/or .cfg` (NOT `ds16.brf`).
+- Stock **`ds_16.bmf` EXISTS** in `V:\__STORE_V\_SOFT\Steam\steamapps\common\BZ2R\bz2r_res\interface\Fonts\DS\ds_16.bmf`.
+- Read-only inspection of Steam's `localconfig.vdf:69` confirms Steam LaunchOptions are `/disablemipmaps /nointro /tps 30`
+  (Steam does **NOT** inject `/logconsole`; SHAMAN itself previously injected `/logconsole`, now opt-in `false`).
+- **Control A** (stock Steam launch) boots cleanly to the shell (`Battlezone 2026-11-22 11.26.43.3718.log`, 49,164 bytes) with zero font errors.
+- **Control C / E2** (SHAMAN `/config` with absolute `C:\...` or relative `..\..\...` path outside `@rootdir`) logs `Command line /config used` and skips `ConfigureFileSystem()` completely (0 `AddDirRecurse` lines), leaving `@rootdir\bz2r_res` unmounted so `ds_16.bmf` cannot be loaded (`CONFIG_PATH_NOT_LOADED_NO_FILESYS`).
+- **Control E_REF** (bare filename inside `@rootdir`, e.g. `VRV_T960_*.cfg`) parses `ConfigureFileSystem()` and loads missions normally (`Battlezone 2026-11-22 01.15.56.6515.log`, 43,965 bytes).
+- **Steam UX constraint:** `steam.exe -applaunch 624970 <args>` displays Steam's interactive `"Launch Game with custom arguments"` confirmation modal.
+- Because `SafeStageManager` keeps `BZ2R` strictly read-only, SHAMAN does not silently drop `.cfg` files into `BZ2R`; `diagnose_config_path_compatibility()` reports `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` and gives exact operator instructions.
 
 Implemented in `scripts/native/` (`native_experiment_session.gd`, `native_resource_closure.gd`,
 `safe_stage_manager.gd`, `native_test_adapter.gd`, `native_experiment_runner.gd`,
-`native_process_monitor.gd`):
+`native_process_monitor.gd`, `native_session_service.gd`):
 
 - **Single immutable experiment identity (`NativeExperimentSession`)** — binds `session_id`,
   `launch_nonce`, `scenario_hash`, `stage_root`, `observation_path`, `expected_odf_hashes`, and
@@ -102,10 +108,10 @@ What already existed and still applies:
 | Bounded asynchronous `NativeProcessMonitor` with PID/exe verification, mission/probe state machine, restart recovery, timeout/cancel | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `SM-01..SM-07` (`T-40`) |
 | Live Steam BZCC execution & engine health-delta calibration | `NOT_VERIFIED` (`NATIVE_VERIFIED: 0`) | T-20 reproduced staged `STEAM_MANAGED` launch; engine exits before mission init; no Lua observation artifact; original `BZ2R` untouched |
 
-## Remaining adapter work (when the engine reaches mission initialization)
+## Remaining adapter work (for an operator-authorized `@rootdir` run)
 
-1. **Engine-side startup font** — BZCC 2.0.185 requires `ds16.brf` for its console and Steam injects `/logconsole`; the read-only game installation lacks that font. Resolving it belongs to the game installation, not the Godot project.
-2. **Engine observation & calibration (`NOT_IMPLEMENTED` until live run completes)** — confirm real `battlezone2.exe` process + LuaMission load + resource probe + `WriteToFile` output, then compare Godot vs native BZCC before marking any scenario `NATIVE_VERIFIED`.
+1. **Operator-authorized `@rootdir` `.cfg` placement** — Because BZCC 2.0.185 `select_bzone_cfg` only resolves `/config <bare_name.cfg>` inside `@rootdir` (`BZ2R\`) and `BZ2R` is read-only by safety policy, an operator who wants live native execution must place or copy the staged `shaman_native.cfg` into `BZ2R\` and confirm Steam's custom-arguments dialog (or launch `battlezone2.exe` in the logged-in Steam user session).
+2. **Engine observation & calibration (`NOT_IMPLEMENTED` until live run completes)** — confirm real `battlezone2.exe` process + LuaMission load + resource probe + `WriteToFile` output (`contract_version: 2`), then compare Godot vs native BZCC before marking any scenario `NATIVE_VERIFIED`.
 
 ## Reload semantics (must be stated per change)
 

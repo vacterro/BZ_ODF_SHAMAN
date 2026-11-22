@@ -1,6 +1,6 @@
 # Evidence
 
-All results below were produced on this machine on 2026-11-21 with
+All results below were refreshed on this machine on 2026-11-22 with
 Godot `4.7.2.stable.official.ed1daf0bf`.
 
 ## Environment verified
@@ -23,14 +23,16 @@ Command:
 Godot_v4.7.2-stable_win64.exe --headless --path . --script res://tests/test_runner.gd
 ```
 
-Result: `803 checks, 0 failure(s)` · `RESULT: PASS` (`TESTED_HEADLESS`), with no ObjectDB leak warning, no
+Result: `990 checks, 0 failure(s)` · `RESULT: PASS` (`TESTED_HEADLESS`, `29.9 s`), with no ObjectDB leak warning, no
 `JSON.parse_string` parse errors, and completely empty stderr (covering all prior P0–P4 checks,
-Reset Safety `RST-01..RST-14`, Native Durability & Honest Evidence `N-D01..N-D10` / `N-E01..N-E08`,
-`T-36` Titan `fvatank` → `garc_c` → `arcbolt` `BoltBeamNode` & `garc_a` `ArcCannonClass` `ordName=NULL`,
+Reset Safety `RST-01..RST-22`, Native Startup Diagnosis & Crash Log Correlation `NB-01..NB-08`,
+Native Resource Closure & Auto Observation / Monitor Persistence `RC-01..RC-07`, `NM-03..NM-08`,
+`N-D01..N-D10`, `N-E01..N-E08`, `ND-11..ND-15`, `SM-01..SM-07`, Persistent Combat State
+`CombatActorState` / `CombatScenario` `CS-01..CS-12`, Particle Fidelity & real 44-byte `.msha`
+inspection `PF-01..PF-04`, `T-36` Titan `fvatank` → `garc_c` → `arcbolt` `BoltBeamNode` & `garc_a`,
 rigid floor `sim_ember` bounce & `BottomInteractsWithTerrain` clamping, homing missile `omegaTurn`
-tracking, sloped terrain ramps, moving shooter velocity, multi-target splash, and `T-34` persistent
-`ModLoadout` profiles with explicit conflict winners matching identically across `ResourceIndex` and
-`NativeResourceClosureBuilder`).
+tracking, sloped terrain ramps, moving shooter velocity, multi-target splash, and `T-34`/`T-39` strict
+`ModLoadout` profiles).
 
 Highlights:
 
@@ -108,15 +110,14 @@ Command:
 Godot_v4.7.2-stable_win64.exe --headless --path . res://tests/ui_smoke.tscn
 ```
 
-Result: `225 checks, 0 failure(s)` · `RESULT: PASS` (`TESTED_HEADLESS`, empty stderr; includes authentic
+Result: `252 checks, 0 failure(s)` · `RESULT: PASS` (`TESTED_HEADLESS`, empty stderr; includes authentic
 `ivtank00.msh`, `fvtitan_skel.msh`, `ivscav00.msh` loading, `hp_cannon_1` turret yaw origin/direction,
-live explosion FX edit + undo, Reset Safety `RST-01..RST-14` confirmation/cancel/scoped Particle Lab
-reset/UI reset loadout isolation, Houdini Value Ladder MMB/RMB resets, Titan `garc_c` & `garc_a` live
-`BoltBeamNode` lightning persisting in `effect_root`, rigid `StaticBody3D` floors in both Labs,
-Sandbox `wiggle`/`orbit` Moving Target + `lead`/`track` Shooter Aim + Wall/Terrain Ramp/Pillar props,
-Particle Lab Texture Browser (`120` FX textures) + `11` emitter presets + Mute/Solo + rate/CPU/GPU cost
-metrics, Live-Swap (`Off`/`Object A`/`Object B`/`Weapon`/`Auto`), persistent `ModLoadout` save/load,
-Saved 3D Scene Presets, and Camera Bookmarks).
+live explosion FX edit + undo, Reset Safety `RST-01..RST-22`, strict `ModLoadout` `ML-06`,
+app-owned `NativeSessionService` non-blocking GUI polling surviving tab switch to Particle Lab (`NM-01`, `NM-02`, `NM-09`),
+3D Combat Actor HUD (Target Shield bar + Shooter Ammo/Energy readout), Houdini Value Ladder MMB/RMB resets,
+Titan `garc_c` & `garc_a` live `BoltBeamNode` lightning, rigid `StaticBody3D` floors in both Labs,
+Sandbox props, Particle Lab Texture Browser (`120` FX textures) + `11` emitter presets + Mute/Solo + rate/cost metrics,
+Live-Swap, persistent `ModLoadout` save/load, Saved 3D Scene Presets, and Camera Bookmarks).
 
 The smoke run exports `BZ_SHAMAN_WORKSPACE_ROOT` to a unique `user://smoke_workspace_*` root
 and deletes only that root; production `user://workspace` is never the target. Settings are
@@ -234,14 +235,14 @@ Command:
 tools\run_bench.cmd
 ```
 
-Result (measurement only, no thresholds, 2026-11-21 Wave F `T-42` release hardening run, Godot `4.7.2-stable`):
+Result (measurement only, no thresholds, 2026-11-22 Wave F `T-64` release hardening run, Godot `4.7.2-stable`):
 
 ```
-index: 17028 ODFs, 37161 asset names in 1323.1 ms
-parse: 500 ODFs, 0.55 MB in 606.3 ms (0.9 MB/s)
-inheritance: 100 cold merges of ivtank_vsr in 110.1 ms (1.10 ms each, 131 rows)
-sim: 500 shots in 4250.0 ms (8.50 ms each, 500 hits)
-memory: 147.9 MB static
+index: 17028 ODFs, 37161 asset names in 1208.9 ms
+parse: 500 ODFs, 0.55 MB in 760.0 ms (0.7 MB/s)
+inheritance: 100 cold merges of ivtank_vsr in 126.9 ms (1.27 ms each, 131 rows)
+sim: 500 shots in 5790.6 ms (11.58 ms each, 500 hits)
+memory: 148.3 MB static
 ```
 
 ## Windows package
@@ -252,23 +253,35 @@ Command:
 tools\build_windows.cmd
 ```
 
-Result: exit 0, `build/BZ_ODF_SHAMAN.exe` (`112,090,664` bytes, MD5 `f0c33c0a40926e104419dd7641e61e95`,
+Result: exit 0, `build/BZ_ODF_SHAMAN.exe` (`112,150,720` bytes, MD5 `84b9e51c57cfc6ceec08a2bfd0c3f196`,
 x86_64, embedded PCK, Godot 4.7.2 templates resolved from self-contained `editor_data/export_templates`),
-rebuilt 2026-11-21 after Waves B/C/E/F/G (`T-32`, `T-33`, `T-36`, `T-34`, `T-35`, `T-39`, `T-40`, `T-42`).
-The embedded PCK now includes `scripts/native/native_process_monitor.gd` and the checked native
-transition changes.
+rebuilt 2026-11-22 after Waves B–F (`T-60..T-64`).
+The embedded PCK includes `scripts/native/native_session_service.gd`, `scripts/sim/combat_actor_state.gd`,
+`scripts/sim/combat_scenario.gd`, and all Wave B–E upgrades.
 
 Interactive windowed GPU verification (`TESTED_GUI`, `BZ_SHAMAN_VERIFY_GUI_DIR`, isolated `BZ_SHAMAN_WORKSPACE_ROOT`):
 - Exit code `0`, `theme=goldendefault`, `font_aa=none`, `ui_scale=1.0`, `master_volume=0.85`, viewport `1920x1061`
-- Indexed `17028 ODFs, 37161 asset names` in `1276 ms`
-- Authentic base-game `ivtank00.msh` (`1110` tris), `fvtitan_skel.msh` (`6458` tris, `27` nodes, `fvatank00_d.dds`, `hp_cannon_1`/`hp_cannon_2`), and `ivscav00.msh` (`1942` tris) rendered with non-whitewashed `EMISSION_OP_MULTIPLY` materials, rigid `StaticBody3D` floors (`rigid_floor_weapon_lab=true`, `rigid_floor_particle_lab=true`), Wall & sloped Terrain Ramp props, and 1bpp crisp `Verdana_m1` Golden Default chrome
-- `titan_bolt_rendered=true`: Titan `fvatank` → `garc_c` → `arcbolt` rendered animated forked cyan `BoltBeamNode` (`draw_bolt`, `86.0 m`, `0.80 s`) + `garc_c.flash` muzzle + `xarccar_a.odf` impact burst + `arc02.wav`/`lhit.wav` SFX on bounded 8-channel pool (`plays=4`, `steals=0`, `timeline_events=7`)
-- Particle Lab rendered `xstabcar_c.odf` 8-node graph + Quick Render Inspector (`M`/`S` Mute/Solo, rate/CPU/GPU cost metrics, ColorPickers, `renderBase`/`simulateBase`/`textureBlend` dropdowns, `120` Texture Browser FX textures, `11` emitter presets, `save_deps_button=true`), `live_swap_modes=5`
-- `NATIVE PREFLIGHT` reported `status=STRUCTURALLY_VALID`, `route=STEAM_MANAGED` in this isolated GUI session; it is still only structural validation and never claims `NATIVE_VERIFIED` without a live attested run
-- Original `BZ2R/battlezone2.exe` MD5 verified unchanged (`e2fa7458cf2604315f48915acd288689`); `steam_appid.txt` now exists in the read-only game root but no live launch was attempted in this ticket
+- Indexed `17028 ODFs, 37161 asset names` in `1369 ms`
+- Authentic base-game `ivtank00.msh`, `fvtitan_skel.msh` (`6458` tris, `27` nodes, `fvatank00_d.dds`, `hp_cannon_1`/`hp_cannon_2`), and `ivscav00.msh` (`1942` tris) rendered with non-whitewashed `EMISSION_OP_MULTIPLY` materials, rigid `StaticBody3D` floors (`rigid_floor_weapon_lab=true`, `rigid_floor_particle_lab=true`), and 1bpp crisp `Verdana_m1` Golden Default chrome
+- `titan_bolt_rendered=true`, `spawned_effects=3`, `audio_pool={active:2, capacity:8, plays:4, steals:0}`, `timeline_events=7`
+- Original `BZ2R/battlezone2.exe` MD5 verified unchanged (`e2fa7458cf2604315f48915acd288689`)
 - Captured & visually inspected screenshots: `.saipen/evidence/gui_verify/exe_weapons_lab.png`, `exe_particle_lab.png`, `exe_titan_lightning.png`, `gui_verify_report.txt`
 
 The exported binary also headless-boots cleanly (`build\BZ_ODF_SHAMAN.exe --headless --quit-after 120`, exit 0).
+
+## Capability Status Table (2026-11-22)
+
+| Capability | Status | Evidence |
+|---|---|---|
+| Lossless ODF parser/serializer (1,478 stock roundtrip) | `TESTED_HEADLESS` | `tests/test_runner.gd` |
+| Persistent Combat Lab (`CombatActorState`/`CombatScenario`) | `TESTED_HEADLESS` / `TESTED_GUI` / `APPROXIMATED` | `CS-01..CS-12`, `exe_weapons_lab.png` |
+| Native startup diagnosis & `/config` classifier | `TESTED_HEADLESS` / `NATIVE_EXECUTION_OBSERVED` | `T-60-native-startup-diagnosis.md`, `NB-01..NB-08` |
+| Native resource closure & `NativeSessionService` GUI monitor | `TESTED_HEADLESS` / `TESTED_GUI` / `NATIVE_STRUCTURALLY_VALID` | `RC-01..RC-07`, `NM-01..NM-10`, `native-probe-771162.json` |
+| Particle Lab blend modes, UV animation & budgets | `TESTED_HEADLESS` / `TESTED_GUI` / `APPROXIMATED` | `PF-01..PF-04`, `exe_particle_lab.png` |
+| Authentic DOCB `.msh` geometry & hardpoints | `TESTED_HEADLESS` / `TESTED_GUI` | `gui_verify_report.txt` |
+| DOCB `.msha` header identity (44-byte stubs) | `TESTED_HEADLESS` | `PF-04` |
+| `.msha` skeletal animation / skin weights | `NOT_IMPLEMENTED` | Explicitly reported in `BzMeshReader` |
+| Live native BZCC LuaMission calibration | `NOT_IMPLEMENTED` (`NATIVE_VERIFIED: 0`) | Blocked by `@rootdir` `/config` read-only policy + Steam custom-args modal |
 
 ## Schema / coverage evidence
 
@@ -280,7 +293,7 @@ preview APPROXIMATED 47, NOT_IMPLEMENTED 1443; native NOT_TESTED 1490
 
 ## Not evidenced (explicitly)
 
-- Live native BZCC observation and comparison. T-20 reproduced a staged `STEAM_MANAGED` launch with a logged-in Steam client, but BZCC 2.0.185 showed `Unable to load console font 'ds16.brf'` and never reached mission initialization; no session-bound LuaMission artifact appeared (`.saipen/evidence/native/T-20-native-probe-1136976.json`, `.saipen/evidence/native/T-20-font-blocker.md`; `NATIVE_VERIFIED = 0`). The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was session-specific.
-- `.msha` files and skeletal/bone animations.
+- Live native BZCC LuaMission observation and comparison (`NATIVE_VERIFIED = 0`). Controlled T-60 diagnostics (`.saipen/evidence/native/T-60-native-startup-diagnosis.md`) established that stock BZCC boots cleanly (`Battlezone 2026-11-22 11.26.43.3718.log`) and stock `ds_16.bmf` exists in `bz2r_res/interface/Fonts/DS/ds_16.bmf`; external `/config` paths outside `@rootdir` are skipped by BZCC 2.0.185 (`select_bzone_cfg`) while `BZ2R` remains strictly read-only.
+- `.msha` skeletal/bone animation tracks and skin weights.
 - OS-level mouse/keyboard click injection outside the Godot UI smoke / self-verify harness.
 - Parameter sweep chart (CSV export exists and is tested).

@@ -15,6 +15,9 @@ const LEDGER_SCHEMA := 1
 const LUA_CONTRACT_VERSION := 1
 const REASON_STATE_PERSIST_FAILED := "STATE_PERSIST_FAILED"
 const STATE_RECOVERY_PENDING := "RECOVERY_PENDING"
+const STATUS_MONITOR_STATE_SAVED := "MONITOR_STATE_SAVED"
+const STATUS_MONITOR_PERSIST_FAILED := "MONITOR_PERSIST_FAILED"
+const REASON_RESOURCE_CLOSURE_INCOMPLETE := "RESOURCE_CLOSURE_INCOMPLETE"
 const NativeAdapterScript = preload("res://scripts/native/native_test_adapter.gd")
 const NativeSessionScript = preload("res://scripts/native/native_experiment_session.gd")
 const ResourceClosureScript = preload("res://scripts/native/native_resource_closure.gd")
@@ -62,6 +65,7 @@ var fault_fail_session_write := false
 var fault_fail_ledger_write := false
 var fault_fail_operator_instructions_write := false
 var fault_fail_evidence_write := false
+var fault_fail_monitor_persist := false
 
 
 static func ledger_dir() -> String:
@@ -667,8 +671,9 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 		extra_odfs["assets/ODF/" + profile.ordnance_path.get_file()] = profile.ordnance_doc.to_bytes()
 
 	var files: Dictionary = NativeAdapterScript.build_experiment_files_for_session(sess, profile, extra_odfs)
+	var require_closure := bool(options.get("require_complete_closure", false))
 	var closure_spec: Dictionary = {}
-	if index != null or bool(options.get("check_closure", false)):
+	if index != null or bool(options.get("check_closure", false)) or require_closure:
 		closure_spec = {
 			"shooter_odf": shooter_name,
 			"target_odf": target_name,
@@ -687,6 +692,18 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 	var pre: Dictionary = NativeAdapterScript.preflight_experiment(
 		stage_root, files, sess.scenario, disc, steam_override, sess, index if not closure_spec.is_empty() else null, closure_spec
 	)
+	if require_closure and index == null:
+		pre["ok"] = false
+		pre["structurally_valid"] = false
+		pre["launch_ready"] = false
+		pre["status"] = "FAILED"
+		pre["reason"] = REASON_RESOURCE_CLOSURE_INCOMPLETE
+		var pre_issues: Array = pre.get("issues", [])
+		pre_issues.append("Complete resource closure required but no ResourceIndex was supplied (synthetic probe cannot claim full native closure)")
+		pre["issues"] = pre_issues
+	elif not closure_spec.is_empty() and not bool((pre.get("resource_closure", {}) as Dictionary).get("ok", true)):
+		pre["closure_incomplete"] = true
+		pre["closure_code"] = REASON_RESOURCE_CLOSURE_INCOMPLETE
 	var preflight_passed := bool(pre.get("structurally_valid", false))
 	var state := "PREFLIGHT_OK" if bool(pre.get("launch_ready", false)) else ("BLOCKED" if preflight_passed else "FAILED")
 	sess.add_checkpoint(state, "Preflight finished: route=%s reason=%s" % [str(pre.get("launch_route", "")), str(pre.get("reason", ""))])
@@ -1201,10 +1218,14 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 		return {"ok": false, "state": "BLOCKED", "route": "UNSUPPORTED", "reason": str(record.reason)}
 
 	var mission_bzn := str(sess.mission_basename) + ".bzn"
-	var cmd: Dictionary = NativeAdapterScript.build_launch_command(route, disc, str(sess.config_path), mission_bzn)
+	var include_logconsole := bool(options.get("include_logconsole", false))
+	var cmd: Dictionary = NativeAdapterScript.build_launch_command(route, disc, str(sess.config_path), mission_bzn, include_logconsole)
 	var now := Time.get_datetime_string_from_system()
 
 	if route == "OPERATOR_MANUAL" or route == "STEAM_LAUNCH_OPTIONS":
+		var cfg_diag: Dictionary = cmd.get("config_diagnostics", {}) if cmd.get("config_diagnostics", {}) is Dictionary else {}
+		var cfg_arg := str(cfg_diag.get("config_arg", str(sess.config_path).replace("/", "\\")))
+		var flags_prefix := "/nointro /win /logconsole" if include_logconsole else "/nointro /win"
 		var instr_lines := PackedStringArray([
 			"BZ_ODF_SHAMAN Native Experiment Operator Handoff",
 			"session_id=" + str(sess.session_id),
@@ -1213,8 +1234,10 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 			"route=" + route,
 			"steam_app_id=" + NativeAdapterScript.STEAM_APP_ID,
 			"config_path=" + str(sess.config_path).replace("/", "\\"),
+			"config_arg=" + cfg_arg,
+			"config_compatibility=" + str(cfg_diag.get("code", "")),
 			"mission_bzn=" + mission_bzn,
-			"launch_options=/nointro /win /logconsole /config \"%s\" \"%s\"" % [str(sess.config_path).replace("/", "\\"), mission_bzn],
+			"launch_options=%s /config \"%s\" \"%s\"" % [flags_prefix, cfg_arg, mission_bzn],
 			"observation_expected_path=" + str(sess.observation_expected_path),
 			"instructions=" + str(cmd.get("instructions", cmd.get("launch_options_text", ""))),
 		])
@@ -1593,14 +1616,51 @@ func _capture_preexisting_game_pids() -> Array:
 	return out
 
 
-func _save_monitors() -> void:
-	if not sessions.is_empty():
-		var doc := {"schema": LEDGER_SCHEMA, "updated": Time.get_datetime_string_from_system(), "monitors": {}}
-		for sid in monitors:
-			doc["monitors"][sid] = (monitors[sid] as RefCounted).to_dict()
-		WorkspaceStore.atomic_write_abs(
-			ledger_dir().path_join("process_monitors.json"), JSON.stringify(doc, "  ").to_utf8_buffer()
-		)
+func _save_monitors() -> Dictionary:
+	if sessions.is_empty():
+		return {"ok": true, "status": STATUS_MONITOR_STATE_SAVED, "recovery_pending": false, "error": ""}
+	var doc := {"schema": LEDGER_SCHEMA, "updated": Time.get_datetime_string_from_system(), "monitors": {}}
+	for sid in monitors:
+		doc["monitors"][sid] = (monitors[sid] as RefCounted).to_dict()
+	var wres: Dictionary = {"ok": false, "error": "injected process_monitors.json write failure"} if fault_fail_monitor_persist else WorkspaceStore.atomic_write_abs(
+		ledger_dir().path_join("process_monitors.json"), JSON.stringify(doc, "  ").to_utf8_buffer()
+	)
+	if not bool(wres.get("ok", false)):
+		return {
+			"ok": false,
+			"status": STATUS_MONITOR_PERSIST_FAILED,
+			"reason": STATUS_MONITOR_PERSIST_FAILED,
+			"recovery_pending": true,
+			"state": STATE_RECOVERY_PENDING,
+			"persist_failed": true,
+			"error": str(wres.get("error", "process_monitors.json write failed")),
+		}
+	return {"ok": true, "status": STATUS_MONITOR_STATE_SAVED, "recovery_pending": false, "error": ""}
+
+
+func _fail_monitor_persist(session_id: String, monitor, save_res: Dictionary) -> Dictionary:
+	var err := str(save_res.get("error", "process_monitors.json write failed"))
+	if monitor != null:
+		monitor.last_error = err
+		monitor.reason = STATUS_MONITOR_PERSIST_FAILED
+	var record: Dictionary = sessions.get(session_id, {})
+	if not record.is_empty():
+		record["recovery_pending"] = true
+		record["monitor_persist_status"] = STATUS_MONITOR_PERSIST_FAILED
+		record["last_error"] = err
+		sessions[session_id] = record
+	var out: Dictionary = monitor.result() if monitor != null else {}
+	out["ok"] = false
+	out["session_id"] = session_id
+	out["status"] = STATUS_MONITOR_PERSIST_FAILED
+	out["state"] = STATE_RECOVERY_PENDING
+	out["reason"] = STATUS_MONITOR_PERSIST_FAILED
+	out["recovery_pending"] = true
+	out["persist_failed"] = true
+	out["verified"] = false
+	out["native_verified"] = false
+	out["error"] = err
+	return out
 
 
 func _start_monitor(session_id: String, sess: RefCounted, disc: Dictionary, options: Dictionary, pre_captured: bool) -> Dictionary:
@@ -1616,8 +1676,10 @@ func _start_monitor(session_id: String, sess: RefCounted, disc: Dictionary, opti
 	record["monitor"] = monitor.to_dict()
 	sessions[session_id] = record
 	monitors[session_id] = monitor
-	_save_monitors()
-	return {"ok": true, "session_id": session_id, "state": monitor.state, "active": monitor.active}
+	var ms := _save_monitors()
+	if not bool(ms.get("ok", false)):
+		return _fail_monitor_persist(session_id, monitor, ms)
+	return {"ok": true, "session_id": session_id, "state": monitor.state, "active": monitor.active, "monitor_persist_status": STATUS_MONITOR_STATE_SAVED}
 
 
 func _persist_monitor_state(session_id: String, monitor, record: Dictionary, state: String) -> bool:
@@ -1630,8 +1692,9 @@ func _persist_monitor_state(session_id: String, monitor, record: Dictionary, sta
 
 
 ## Advance an active monitor by one bounded poll. `now_s` is an injectable clock
-## so tests never depend on real waits; `observation_path` may supply an on-disk
-## artifact when the monitor has already confirmed mission + resource probe.
+## so tests never depend on real waits; when `observation_path` is omitted, the
+## session-bound `observation_expected_path` is resolved automatically (P1-NATIVE-04).
+## Monitor checkpoints persist on state changes and verify write results (P1-NATIVE-05).
 func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: String = "") -> Dictionary:
 	if not monitors.has(session_id):
 		return {"ok": false, "state": "NO_ACTIVE_MONITOR", "reason": "NO_ACTIVE_MONITOR", "active": false}
@@ -1641,6 +1704,7 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 		d["ok"] = false
 		d["reason"] = "MONITOR_NOT_ACTIVE"
 		return d
+	var prev_state := str(monitor.state)
 	# Explicit now_s is a relative test clock; production poll uses wall time.
 	var explicit_clock := now_s >= 0.0
 	var t: float = now_s if explicit_clock else Time.get_unix_time_from_system()
@@ -1653,8 +1717,12 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 			commit["session_id"] = session_id
 			return commit
 		monitor.timeout()
-		_save_monitors()
-		return monitor.result()
+		var ms_to := _save_monitors()
+		if not bool(ms_to.get("ok", false)):
+			return _fail_monitor_persist(session_id, monitor, ms_to)
+		var r_to: Dictionary = monitor.result()
+		r_to["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
+		return r_to
 
 	if monitor.state == "STEAM_PROCESS_STARTED":
 		var det: Dictionary = monitor.detect_game(process_inspector, game_process_detector)
@@ -1664,8 +1732,12 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 				var failed := _fail_transition(session_id, record0, "GAME_PROCESS_DETECTED", "checked transition persist failed")
 				failed["session_id"] = session_id
 				return failed
-			_save_monitors()
-			return monitor.result()
+			var ms_g := _save_monitors()
+			if not bool(ms_g.get("ok", false)):
+				return _fail_monitor_persist(session_id, monitor, ms_g)
+			var r_g: Dictionary = monitor.result()
+			r_g["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
+			return r_g
 
 	elif monitor.state in ["GAME_PROCESS_DETECTED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED"]:
 		var sess = NativeSessionScript.from_dict((sessions.get(session_id, {}) as Dictionary).get("session", {}))
@@ -1673,27 +1745,62 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 			return {"ok": false, "state": "INVALID_SESSION", "reason": "INVALID_SESSION", "active": false}
 		var probe := _observe_mission_and_probe(sess)
 		monitor.apply_mission_probe(probe)
-		var record1: Dictionary = sessions.get(session_id, {})
-		if not _persist_monitor_state(session_id, monitor, record1, monitor.state):
-			var failed1 := _fail_transition(session_id, record1, monitor.state, "checked probe transition persist failed")
-			failed1["session_id"] = session_id
-			return failed1
+		var state_changed := str(monitor.state) != prev_state
+		if state_changed:
+			var record1: Dictionary = sessions.get(session_id, {})
+			if not _persist_monitor_state(session_id, monitor, record1, monitor.state):
+				var failed1 := _fail_transition(session_id, record1, monitor.state, "checked probe transition persist failed")
+				failed1["session_id"] = session_id
+				return failed1
 
-		if monitor.state == "RESOURCE_PROBE_CONFIRMED" and observation_path != "":
-			var obs_res := collect_observation(session_id, observation_path)
+		# P1-NATIVE-04: Automatically resolve session-bound expected observation
+		# path when caller did not supply an explicit override.
+		var resolved_obs_path := observation_path.strip_edges()
+		if resolved_obs_path == "":
+			resolved_obs_path = str(sess.observation_expected_path).strip_edges()
+		var obs_ready := resolved_obs_path != "" and FileAccess.file_exists(resolved_obs_path)
+		if monitor.state == "RESOURCE_PROBE_CONFIRMED" and obs_ready:
+			var obs_res := collect_observation(session_id, resolved_obs_path)
 			var out: Dictionary = monitor.result()
+			out["observation_path"] = resolved_obs_path
 			out["observation_collected"] = bool(obs_res.get("ok", false))
 			out["comparison_complete"] = bool(obs_res.get("comparison_complete", obs_res.get("ok", false)))
 			out["verified"] = bool(obs_res.get("verified", false))
 			out["state"] = str(obs_res.get("state", monitor.state))
+			out["reason"] = str(obs_res.get("reason", out.get("reason", "")))
 			out["native_verified"] = bool(obs_res.get("verified", false))
+			if bool(obs_res.get("persist_failed", false)):
+				out["persist_failed"] = true
+				out["recovery_pending"] = true
+			if not bool(obs_res.get("ok", false)) and str(obs_res.get("reason", "")) != "":
+				# Foreign-session or corrupt observation rejected: keep monitor active
+				# or record rejection without false completion.
+				out["ok"] = false
+				out["rejected_observation"] = true
+				var ms_rej := _save_monitors()
+				if not bool(ms_rej.get("ok", false)):
+					return _fail_monitor_persist(session_id, monitor, ms_rej)
+				out["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
+				return out
 			monitor.finish_collection(out)
-			_save_monitors()
+			var ms_col := _save_monitors()
+			if not bool(ms_col.get("ok", false)):
+				return _fail_monitor_persist(session_id, monitor, ms_col)
+			out["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
 			return out
 
+		if state_changed:
+			var ms_st := _save_monitors()
+			if not bool(ms_st.get("ok", false)):
+				return _fail_monitor_persist(session_id, monitor, ms_st)
+			var r_st: Dictionary = monitor.result()
+			r_st["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
+			return r_st
+
 	monitor.polls = int(monitor.polls)
-	_save_monitors()
-	return monitor.result()
+	var r_idle: Dictionary = monitor.result()
+	r_idle["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
+	return r_idle
 
 
 func resume_monitor(session_id: String) -> Dictionary:
@@ -1724,9 +1831,16 @@ func cancel_monitor(session_id: String) -> Dictionary:
 	var monitor = monitors[session_id]
 	monitor.cancel()
 	var record: Dictionary = sessions.get(session_id, {})
-	_commit_transition(session_id, record, "CANCELLED", "Monitor cancelled by operator")
-	_save_monitors()
-	return monitor.result()
+	var commit := _commit_transition(session_id, record, "CANCELLED", "Monitor cancelled by operator")
+	if not bool(commit.get("ok", false)):
+		commit["session_id"] = session_id
+		return commit
+	var ms := _save_monitors()
+	if not bool(ms.get("ok", false)):
+		return _fail_monitor_persist(session_id, monitor, ms)
+	var out: Dictionary = monitor.result()
+	out["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
+	return out
 
 
 ## Step 5: Safe MD5-verified cleanup of the staged directory via SafeStageManager.

@@ -21,6 +21,7 @@ var terrain_clamped_emitters: Array[Dictionary] = []
 ## root child count and CPUParticles3D introspection remain unchanged while
 ## particles genuinely bounce on y = floor_y and scene obstacles!
 var bouncing_groups: Array[Dictionary] = []
+var uv_animated_materials: Array[Dictionary] = []
 var bounce_events_count: int = 0
 var min_simulated_y: float = 999.0
 
@@ -37,6 +38,15 @@ func step_simulation(delta: float) -> void:
 	if light_node != null and is_instance_valid(light_node) and light_peak_energy > 0.0:
 		var t: float = clampf(age / maxf(0.05, duration * 0.7), 0.0, 1.0)
 		light_node.light_energy = light_peak_energy * (1.0 - t) * (1.0 - t)
+	for uvm in uv_animated_materials:
+		var mat = uvm.get("material", null)
+		if mat is StandardMaterial3D:
+			var speed := float(uvm.get("texture_speed", 0.0))
+			var rate := float(uvm.get("texture_rate", 0.0))
+			if absf(speed) > 0.0001:
+				(mat as StandardMaterial3D).uv1_offset.y += speed * delta * 0.25
+			if absf(rate) > 0.0001:
+				(mat as StandardMaterial3D).uv1_offset.x += rate * delta * 0.15
 	_update_terrain_clamping()
 	_step_bouncing_groups(delta)
 

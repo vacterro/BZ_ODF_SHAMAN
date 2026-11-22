@@ -237,6 +237,56 @@ static func _register_burst_physics(root: EffectBurst, node: Node) -> void:
 	if node.has_meta("bouncing_group"):
 		var bg: Dictionary = node.get_meta("bouncing_group")
 		root.bouncing_groups.append(bg)
+	if node.has_meta("uv_anim"):
+		var uva: Dictionary = node.get_meta("uv_anim")
+		root.uv_animated_materials.append(uva)
+
+
+## Parse BZCC textureBlend ("SourceMode DestMode TextureMethod") into a Godot
+## BaseMaterial3D.BlendMode + human label (Wave E particle fidelity).
+static func parse_texture_blend(raw_blend: String, render_base: String = "") -> Dictionary:
+	var blend := raw_blend.strip_edges().to_lower()
+	if render_base.to_lower() == "draw_light" or blend.contains("one one") or blend.contains("srcalpha one") or blend.ends_with(" add"):
+		return {"mode": BaseMaterial3D.BLEND_MODE_ADD, "label": "ADDITIVE", "is_additive": true}
+	if blend.contains("dstcolor zero") or blend.contains("zero srccolor") or blend.contains("modulate mul") or blend == "multiply":
+		return {"mode": BaseMaterial3D.BLEND_MODE_MUL, "label": "MULTIPLY", "is_additive": false}
+	if blend.contains("invsrc invsrc") or blend.contains("zero invsrc") or blend.ends_with(" sub"):
+		return {"mode": BaseMaterial3D.BLEND_MODE_SUB, "label": "SUBTRACT", "is_additive": false}
+	return {"mode": BaseMaterial3D.BLEND_MODE_MIX, "label": "ALPHA_MIX", "is_additive": false}
+
+
+## Compute editor-only per-emitter performance budget and render semantics
+## summary (never exported to native BZCC ODFs).
+static func compute_emitter_budget(doc: OdfDocument, header: String) -> Dictionary:
+	if doc == null or header == "":
+		return {"rate_per_s": 0.0, "max_active": 0, "tier": "LOW", "blend": "ALPHA_MIX", "uv_animated": false}
+	var base := doc.get_value(header, "renderBase", "").to_lower()
+	var life := clampf(doc.get_float(header, "lifeTime", doc.get_float(header, "lifeSpan", 1.0)), 0.08, 30.0)
+	var emit_delay := doc.get_float(header, "emitDelay", 0.0)
+	var max_cnt := doc.get_int(header, "maxCount", 0)
+	var rate := (1.0 / maxf(0.01, emit_delay)) if emit_delay > 0.001 else (float(maxi(1, max_cnt)) / life)
+	var est_active := mini(MAX_PARTICLES, maxi(1, int(ceilf(rate * life))))
+	var tier := "LOW"
+	if est_active >= 64 or rate >= 40.0:
+		tier = "HIGH"
+	elif est_active >= 20 or rate >= 15.0:
+		tier = "MEDIUM"
+	var binfo := parse_texture_blend(doc.get_value(header, "textureBlend", ""), base)
+	var tex_speed := doc.get_float(header, "textureSpeed", 0.0)
+	var tex_rate := doc.get_float(header, "textureRate", 0.0)
+	return {
+		"header": header,
+		"render_base": base,
+		"lifetime_s": life,
+		"emit_delay_s": emit_delay,
+		"rate_per_s": rate,
+		"max_active": est_active,
+		"tier": tier,
+		"blend": str(binfo.label),
+		"uv_animated": absf(tex_speed) > 0.0001 or absf(tex_rate) > 0.0001,
+		"texture_speed": tex_speed,
+		"texture_rate": tex_rate,
+	}
 
 
 ## Build live preview nodes for every render header in a single ODF document
@@ -608,16 +658,19 @@ static func _build_particle_emitter(doc: OdfDocument, header: String, base: Stri
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mat.billboard_keep_scale = true
 
-	var blend := doc.get_value(header, "textureBlend", "").to_lower()
-	var is_additive := blend.contains("one one") or blend.contains("srcalpha one") or blend.ends_with(" add") or base == "draw_light"
-	var is_sub := blend.contains("invsrc invsrc") or blend.contains("zero invsrc")
-	if is_additive:
-		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	elif is_sub:
-		mat.blend_mode = BaseMaterial3D.BLEND_MODE_SUB
-	else:
-		mat.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+	var blend_info := parse_texture_blend(doc.get_value(header, "textureBlend", ""), base)
+	var is_additive := bool(blend_info.is_additive)
+	mat.blend_mode = int(blend_info.mode)
 	mat.albedo_color = Color(1, 1, 1, 1)
+	var tex_speed := doc.get_float(header, "textureSpeed", 0.0)
+	var tex_rate := doc.get_float(header, "textureRate", 0.0)
+	if absf(tex_speed) > 0.0001 or absf(tex_rate) > 0.0001:
+		p.set_meta("uv_anim", {
+			"material": mat,
+			"texture_speed": tex_speed,
+			"texture_rate": tex_rate,
+		})
+	p.set_meta("blend_label", str(blend_info.label))
 
 	var tex_name: String = doc.get_value(header, "textureName", "")
 	if base == "draw_light" and tex_name == "":
@@ -783,8 +836,13 @@ static func _build_light(doc: OdfDocument, header: String, scale_factor: float) 
 	light.light_color = Color(sc.r, sc.g, sc.b)
 	var frad: float = doc.get_float(header, "finishRadius", 20.0)
 	var srad: float = doc.get_float(header, "startRadius", 20.0)
+	var att_const := maxf(0.0, doc.get_float(header, "attenuateConstant", 1.0))
+	var att_lin := maxf(0.0, doc.get_float(header, "attenuateLinear", 0.0))
+	var att_quad := maxf(0.0, doc.get_float(header, "attenuateQuadratic", 0.0))
 	light.omni_range = clampf(maxf(srad, frad) * 0.45 * scale_factor, 3.0, 90.0)
-	light.light_energy = clampf(3.5 + doc.get_float(header, "attenuateConstant", 1.0), 1.0, 8.0)
+	light.light_energy = clampf(3.5 + att_const, 1.0, 8.0)
+	# Approximate BZCC constant/linear/quadratic falloff onto Godot omni_attenuation exponent.
+	light.omni_attenuation = clampf(1.0 + att_lin * 2.5 + att_quad * 8.0, 0.5, 4.0)
 	light.shadow_enabled = false
 	return light
 

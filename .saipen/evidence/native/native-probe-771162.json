@@ -1,0 +1,78 @@
+{
+  "cleanup": {
+    "ok": true,
+    "state": "CLEANED_UP"
+  },
+  "diagnostics": {},
+  "discovery": {
+    "addon_root": "",
+    "build_id": "3807009",
+    "build_id_error": "",
+    "build_id_valid": true,
+    "data_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Data",
+    "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+    "exe_bytes": 5316976,
+    "exe_md5": "e2fa7458cf2604315f48915acd288689",
+    "game_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R",
+    "limitations": [
+      "Live BZCC launch via Steam requires an active logged-in Steam client session for AppID 624970.",
+      "Application-level trusted receipts verify runner provenance in-process, not cryptographic tamper resistance.",
+      "ODF resource reload timing in BZCC requires a fresh mission start.",
+      "Workshop mount order in the editor is an editor policy until verified per-mod in BZCC."
+    ],
+    "luamission_dll_present": true,
+    "missions_dll_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Missions",
+    "ok": true,
+    "res_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res",
+    "steam": {
+      "active_pid": 30756,
+      "active_user": 0,
+      "detail": "steam.exe present but not running in current Windows session (ActiveUser=0x0)",
+      "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+      "steam_logged_in": false,
+      "steam_present": true,
+      "steam_running": false,
+      "supported_routes": [
+        "STEAM_MANAGED",
+        "STEAM_LAUNCH_OPTIONS",
+        "OPERATOR_MANUAL",
+        "DIRECT_EXECUTABLE"
+      ]
+    },
+    "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+    "workshop_root": "V:/__STORE_V/_SOFT/Steam/steamapps/workshop/content/624970"
+  },
+  "finished_at": "2026-11-22T11:42:44",
+  "fixture": "stock_only",
+  "launch": {},
+  "monitor": {},
+  "observation": {},
+  "preflight": {
+    "closure_status": "RESOURCE_CLOSURE_PARTIAL",
+    "config_diagnostics": {
+      "code": "CONFIG_REQUIRES_ROOTDIR_PLACEMENT",
+      "config_arg": "C:\\Users\\SAIAG_9fabb0d5\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\shaman_stock_1128597_1283143632\\shaman_native.cfg",
+      "in_game_root": false,
+      "ok": false,
+      "recommended_rootdir_filename": "shaman_native.cfg",
+      "requires_rootdir_placement": true,
+      "warning": "BZCC 2.0.185 /config only resolves bare filenames inside @rootdir (V:\\__STORE_V\\_SOFT\\Steam\\steamapps\\common\\BZ2R). Passing an external path causes BZCC to skip ConfigureFileSystem() and fail loading ds_16.bmf. BZ2R is kept strictly read-only; operator may copy C:\\Users\\SAIAG_9fabb0d5\\AppData\\Roaming\\Godot\\app_userdata\\BZ_ODF_SHAMAN\\native_tests\\shaman_stock_1128597_1283143632\\shaman_native.cfg into @rootdir and pass /config shaman_native.cfg."
+    },
+    "launch_ready": false,
+    "launch_route": "OPERATOR_MANUAL",
+    "ok": true,
+    "reason": "STEAM_USER_NOT_LOGGED_IN",
+    "session_id": "shaman_sess_1128742_1",
+    "state": "BLOCKED"
+  },
+  "reason": "Complete resource closure staged; pass --launch to execute authorized BZCC launch",
+  "schema": 2,
+  "stage": {
+    "ok": true,
+    "stage_root": "C:/Users/SAIAG_9fabb0d5/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/native_tests/shaman_stock_1128597_1283143632",
+    "state": "STAGED"
+  },
+  "started_at": "2026-11-22T11:42:43",
+  "verdict": "STAGED_DRY_RUN",
+  "workspace_root": "user://native_probe_770927"
+}

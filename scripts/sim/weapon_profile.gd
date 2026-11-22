@@ -53,6 +53,7 @@ var ordnance_class_label: String = ""
 var recoil_node_name: String = ""
 var weapon_hardpoints: Array[String] = []
 var ammo_cost: int = 0
+var weapon_energy_cost: float = 0.0
 var damage_shield: float = 1.0
 var damage: Dictionary = {}
 var damage_radius: float = 0.0
@@ -61,6 +62,12 @@ var xpl_vehicle: String = ""
 var xpl_expire: String = ""
 var render_name: String = ""
 var shot_geometry: String = ""
+
+# Shooter-owned combat resource properties (P1-SIM-01, P1-SIM-03)
+var shooter_ammo_max: int = 0
+var shooter_energy_max: float = 0.0
+var shooter_health_max: float = 1000.0
+var shooter_armor: String = "H"
 
 # Target values
 var target_health_max: float = 0.0
@@ -289,9 +296,24 @@ func refresh() -> void:
 	if shooter_doc != null:
 		shooter_geometry = _find_value(shooter_doc, ["geometryName"])
 		shooter_geometry_scale = _float_or(_find_value(shooter_doc, ["geometryScale"]), 1.0)
+		var sh_ammo := _find_value(shooter_doc, ["maxAmmo"])
+		shooter_ammo_max = maxi(0, sh_ammo.to_int()) if sh_ammo != "" else 0
+		var sh_energy := _find_value(shooter_doc, ["maxEnergy", "energyMax"])
+		shooter_energy_max = maxf(0.0, sh_energy.to_float()) if sh_energy != "" else 0.0
+		var sh_hp := _find_value(shooter_doc, ["maxHealth"])
+		shooter_health_max = maxf(1.0, sh_hp.to_float()) if sh_hp != "" else 1000.0
+		var sh_arm := _find_value(shooter_doc, ["armorClass"])
+		shooter_armor = sh_arm.strip_edges().to_upper().substr(0, 1) if sh_arm != "" else "H"
 	if target_doc != null:
 		target_geometry = _find_value(target_doc, ["geometryName"])
 		target_geometry_scale = _float_or(_find_value(target_doc, ["geometryScale"]), 1.0)
+		var t_hp := _find_value(target_doc, ["maxHealth"])
+		if t_hp != "":
+			target_health_max = maxf(1.0, t_hp.to_float())
+			target_health_documented = true
+		var t_arm := _find_value(target_doc, ["armorClass"])
+		if t_arm != "":
+			target_armor = t_arm.strip_edges().to_upper().substr(0, 1)
 		# Shield/ammo are live-tunable preview fields; re-read on every refresh
 		# so set_override() from the sweep and inspector edits take effect.
 		var shield_max := _find_value(target_doc, ["maxShield", "shieldHealth"])
@@ -347,6 +369,11 @@ func refresh() -> void:
 		xpl_vehicle = _find_value(ordnance_doc, ["xplVehicle"])
 		xpl_expire = _find_value(ordnance_doc, ["xplExpire"])
 		ammo_cost = maxi(0, _int_or(_find_value(ordnance_doc, ["ammoCost"]), 0))
+		if ammo_cost == 0 and weapon_doc != null:
+			ammo_cost = maxi(0, _int_or(_find_value(weapon_doc, ["ammoCost"]), 0))
+		weapon_energy_cost = maxf(0.0, _float_or(_find_value(ordnance_doc, ["energyCost"]), 0.0))
+		if weapon_energy_cost <= 0.0 and weapon_doc != null:
+			weapon_energy_cost = maxf(0.0, _float_or(_find_value(weapon_doc, ["energyCost"]), 0.0))
 		damage_shield = maxf(0.0, _float_or(_find_value(ordnance_doc, ["DamageShield"]), 1.0))
 		damage.clear()
 		for letter in ["N", "L", "H", "S", "D", "A"]:
@@ -369,19 +396,29 @@ func expected_damage() -> float:
 ## Shielded targets use damageValue(S|D|A) when declared; unshielded targets
 ## use the documented armor-class value. Falls back to damageValue(N).
 func expected_damage_for_target() -> float:
-	var key := target_armor
-	if target_shield_class != "" and target_shield_max > 0.0 and damage.has(target_shield_class):
-		key = target_shield_class
+	return damage_for_actor(target_armor, target_shield_class, target_shield_max)
+
+
+func damage_for_actor(p_armor: String, p_shield_class: String = "", p_shield_current: float = 0.0) -> float:
+	var key := p_armor if p_armor != "" else "N"
+	var sc := p_shield_class.strip_edges().to_upper().substr(0, 1) if p_shield_class != "" else ""
+	if sc != "" and p_shield_current > 0.0 and damage.has(sc):
+		key = sc
 	return float(damage.get(key, damage.get("N", 0.0)))
 
 
 ## BZCC documents shieldRatio N/A=1.0, S=0.75, D=0.5. DamageShield from the
 ## ordnance scales this multiplier (APPROXIMATED preview model).
 func shield_damage_ratio() -> float:
-	if target_shield_class == "":
+	return shield_damage_ratio_for_class(target_shield_class)
+
+
+func shield_damage_ratio_for_class(sclass: String) -> float:
+	var sc := sclass.strip_edges().to_upper().substr(0, 1) if sclass != "" else ""
+	if sc == "":
 		return 1.0
 	var base := 1.0
-	match target_shield_class:
+	match sc:
 		"S": base = 0.75
 		"D": base = 0.5
 		"N", "A": base = 1.0

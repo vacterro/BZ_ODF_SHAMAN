@@ -15,10 +15,12 @@ const CAMERA_PRESETS := ["overview", "muzzle", "target", "side", "top"]
 const TARGET_MOTION_MODES := ["stationary", "strafe", "wiggle", "orbit", "approach"]
 const SHOOTER_AIM_MODES := ["manual", "track", "lead", "fixed_forward"]
 
+const CombatScenarioScript = preload("res://scripts/sim/combat_scenario.gd")
 var index: ResourceIndex
 var schema: SchemaRegistry
 var profile: WeaponProfile
-var sim := ProjectileSim.new(20261121)
+var combat_scenario = CombatScenarioScript.new(20261121)
+var sim: ProjectileSim = combat_scenario.sim
 
 const BzMeshReaderScript = preload("res://scripts/core/bz_mesh_reader.gd")
 const NativeAdapterScript = preload("res://scripts/native/native_test_adapter.gd")
@@ -141,11 +143,15 @@ var telemetry: TextEdit
 var stats_label: RichTextLabel
 var health_bar: ProgressBar
 var health_label: Label
+var shield_bar: ProgressBar
+var shield_label: Label
+var shooter_resource_label: Label
 var sweep_property: OptionButton
 var sweep_from: HBoxContainer
 var sweep_to: HBoxContainer
 var sweep_steps: HBoxContainer
 var sweep_output: TextEdit
+var native_session_service = null
 var native_runner = null
 var active_native_session_id: String = ""
 var native_preflight_button: Button
@@ -155,10 +161,13 @@ var native_handoff_button: Button
 var native_collect_button: Button
 var native_compare_button: Button
 var native_cleanup_button: Button
+var native_cancel_button: Button
+var native_resume_button: Button
 var reset_ab_button: Button
 var reset_aim_button: Button
 var reset_scene_button: Button
 var native_status_label: Label
+var native_monitor_label: Label
 var default_shooter_path: String = ""
 var default_target_path: String = ""
 
@@ -175,17 +184,29 @@ var _cam_focus := Vector3(0, 1.5, -5.0)
 var _dragging := false
 var _drag_last := Vector2.ZERO
 var _current_health := 1000.0
+var _current_shield := 0.0
 var last_sweep: Dictionary = {}
 
 
-func setup(p_index: ResourceIndex, p_schema: SchemaRegistry) -> void:
+func setup(p_index: ResourceIndex, p_schema: SchemaRegistry, p_native_service = null) -> void:
 	index = p_index
 	schema = p_schema
-	native_runner = NativeRunnerScript.new()
-	var rec: Dictionary = native_runner.recover_sessions()
+	native_session_service = p_native_service
+	var rec: Dictionary = {}
+	if native_session_service != null:
+		native_session_service.ensure_initialized()
+		native_runner = native_session_service.runner
+		if not native_session_service.session_updated.is_connected(_on_native_session_updated):
+			native_session_service.session_updated.connect(_on_native_session_updated)
+		active_native_session_id = str(native_session_service.active_session_id)
+	else:
+		native_runner = NativeRunnerScript.new()
+		rec = native_runner.recover_sessions()
 	_build_ui()
 	_build_world()
-	if int(rec.get("recovered", 0)) > 0:
+	if active_native_session_id != "":
+		_update_native_controls()
+	elif int(rec.get("recovered", 0)) > 0:
 		var latest: Array = native_runner.list_sessions()
 		if not latest.is_empty():
 			active_native_session_id = str((latest[0] as Dictionary).get("session_id", ""))
@@ -442,7 +463,8 @@ func _build_ui() -> void:
 	stats_label.custom_minimum_size = Vector2(0, 36)
 	stats_row.add_child(stats_label)
 	var health_box := VBoxContainer.new()
-	health_box.custom_minimum_size = Vector2(170, 0)
+	health_box.custom_minimum_size = Vector2(215, 0)
+	health_box.add_theme_constant_override("separation", 2)
 	stats_row.add_child(health_box)
 	health_label = Label.new()
 	health_label.text = "Target hull: -"
@@ -451,7 +473,22 @@ func _build_ui() -> void:
 	health_bar.max_value = 1000
 	health_bar.value = 1000
 	health_bar.show_percentage = false
+	health_bar.custom_minimum_size = Vector2(0, 10)
 	health_box.add_child(health_bar)
+	shield_label = Label.new()
+	shield_label.text = "Target shield: none"
+	shield_label.add_theme_color_override("font_color", Color("#7cd8ff"))
+	health_box.add_child(shield_label)
+	shield_bar = ProgressBar.new()
+	shield_bar.max_value = 100
+	shield_bar.value = 0
+	shield_bar.show_percentage = false
+	shield_bar.custom_minimum_size = Vector2(0, 8)
+	health_box.add_child(shield_bar)
+	shooter_resource_label = Label.new()
+	shooter_resource_label.text = "Shooter ammo: ∞  energy: ∞"
+	shooter_resource_label.add_theme_color_override("font_color", Color("#F0D060"))
+	health_box.add_child(shooter_resource_label)
 
 	# 5 focused bottom workbench tabs: Telemetry | Timeline | Scene & Targets | Sweep | Native BZCC
 	bottom_tabs = TabContainer.new()
@@ -866,10 +903,22 @@ func _build_ui() -> void:
 	native_cleanup_button.tooltip_text = "MD5-verified SafeStageManager cleanup (preserves modified/unknown files)"
 	native_cleanup_button.pressed.connect(func(): run_native_cleanup())
 	native_row.add_child(native_cleanup_button)
+	native_cancel_button = _mk_button("CANCEL MONITOR")
+	native_cancel_button.tooltip_text = "Stop automatic non-blocking polling for the active native session"
+	native_cancel_button.pressed.connect(func(): run_native_cancel_monitor())
+	native_row.add_child(native_cancel_button)
+	native_resume_button = _mk_button("RESUME MONITOR")
+	native_resume_button.tooltip_text = "Resume automatic non-blocking monitoring for a pending native session"
+	native_resume_button.pressed.connect(func(): run_native_resume_monitor())
+	native_row.add_child(native_resume_button)
 	native_status_label = Label.new()
 	native_status_label.text = "Native: idle (NATIVE_VERIFIED: 0)"
 	native_status_label.add_theme_color_override("font_color", Color("#9C9371"))
 	nat_tab.add_child(native_status_label)
+	native_monitor_label = Label.new()
+	native_monitor_label.text = "SESSION: - | STATE: IDLE | PID: 0 | MISSION: WAITING | PROBE: WAITING | OBS: NONE | ELAPSED: 0.0s / 30.0s"
+	native_monitor_label.add_theme_color_override("font_color", Color("#F0D060"))
+	nat_tab.add_child(native_monitor_label)
 
 
 func _build_world() -> void:
@@ -1623,7 +1672,9 @@ func set_weapon_override(weapon_ref: String) -> bool:
 	if not candidate.resolve(index, shooter_path, target_path, weapon_ref.strip_edges()):
 		return false
 	profile = candidate
-	_current_health = profile.target_health_max
+	combat_scenario.configure_from_profile(profile, target_node.position if target_node != null else Vector3(0, 0, -50), true)
+	_current_health = combat_scenario.primary_target().hull_current
+	_current_shield = combat_scenario.primary_target().shield_current
 	_clear_projectiles()
 	sim.reset()
 	_update_stats()
@@ -1724,7 +1775,9 @@ func _reload_scenario() -> void:
 		return
 	profile = WeaponProfile.new()
 	var ok := profile.resolve(index, shooter_path, target_path)
-	_current_health = profile.target_health_max if profile != null else 1000.0
+	combat_scenario.configure_from_profile(profile, target_node.position if target_node != null else Vector3(0, 0, -50), false)
+	_current_health = combat_scenario.primary_target().hull_current if profile != null else 1000.0
+	_current_shield = combat_scenario.primary_target().shield_current if profile != null else 0.0
 	_clear_projectiles()
 	sim.reset()
 	fx_log.clear()
@@ -2534,12 +2587,33 @@ func _update_stats() -> void:
 func _update_health_display() -> void:
 	if health_bar == null or profile == null:
 		return
-	health_bar.max_value = max(1.0, profile.target_health_max)
+	var prim = combat_scenario.primary_target()
+	var hp_max := float(prim.hull_max) if prim != null else maxf(1.0, profile.target_health_max)
+	if prim != null:
+		_current_health = float(prim.hull_current)
+		_current_shield = float(prim.shield_current)
+	health_bar.max_value = maxf(1.0, hp_max)
 	if _current_health < 0.0:
-		_current_health = profile.target_health_max
+		_current_health = hp_max
 	health_bar.value = _current_health
-	health_label.text = "Target hull: %.0f / %.0f  (armor %s)" % [_current_health, profile.target_health_max, profile.target_armor]
-	var frac: float = _current_health / maxf(1.0, profile.target_health_max)
+	var destroyed_tag := " [DESTROYED]" if (prim != null and bool(prim.destroyed)) else ""
+	health_label.text = "Target hull: %.0f / %.0f  (armor %s)%s" % [_current_health, hp_max, profile.target_armor, destroyed_tag]
+	if shield_bar != null and shield_label != null:
+		var sh_max := float(prim.shield_max) if prim != null else profile.target_shield_max
+		var sh_cur := float(prim.shield_current) if prim != null else _current_shield
+		var sh_cls := str(prim.shield_class) if prim != null else profile.target_shield_class
+		shield_bar.max_value = maxf(1.0, sh_max)
+		shield_bar.value = sh_cur if sh_max > 0.0 else 0.0
+		if sh_max > 0.0:
+			shield_label.text = "Target shield: %.0f / %.0f  (class %s)" % [sh_cur, sh_max, sh_cls if sh_cls != "" else "N"]
+		else:
+			shield_label.text = "Target shield: none"
+	if shooter_resource_label != null and combat_scenario.shooter != null:
+		var sh = combat_scenario.shooter
+		var ammo_s := "∞" if bool(sh.ammo_unlimited) else "%d/%d" % [int(sh.ammo_current), int(sh.ammo_max)]
+		var energy_s := "∞" if bool(sh.energy_unlimited) else "%.0f/%.0f" % [float(sh.energy_current), float(sh.energy_max)]
+		shooter_resource_label.text = "Shooter ammo: %s  energy: %s  (cost %d)" % [ammo_s, energy_s, profile.ammo_cost]
+	var frac: float = _current_health / maxf(1.0, hp_max)
 	target_material = null
 	if target_node:
 		for c in target_node.get_children():
@@ -2624,9 +2698,14 @@ func restart_test() -> void:
 	pause_button.set_pressed_no_signal(false)
 	pause_button.text = "PAUSE"
 	if profile != null:
-		_current_health = profile.target_health_max
+		combat_scenario.configure_from_profile(profile, target_node.position if target_node != null else Vector3(0, 0, -50), false)
+		_current_health = combat_scenario.primary_target().hull_current
+		_current_shield = combat_scenario.primary_target().shield_current
 	for et in extra_targets:
 		et["health"] = float(et.get("max_health", _current_health))
+		et["shield"] = float(et.get("max_shield", 0.0))
+		if et.get("actor_state", null) != null and et.get("actor_state").has_method("reset_to_initial"):
+			et["actor_state"].reset_to_initial()
 	_rebuild_timeline_panel()
 	_update_health_display()
 	status_changed.emit("Test reset.", "muted")
@@ -2649,7 +2728,25 @@ func _fire_one(use_alt: bool = false) -> void:
 	if shooter_speed_spin != null and absf(float(shooter_speed_spin.value)) > 0.01:
 		var fwd := Vector3(0.0, 0.0, -1.0).rotated(Vector3.UP, deg_to_rad(shooter_yaw_offset_deg))
 		shooter_vel = fwd * float(shooter_speed_spin.value)
-	var shot := sim.spawn(prof, origin, geom.direction, target_pos, _current_health, extra_targets, obstacles, shooter_vel)
+	# Sync shooter ammo/energy & target shield max from live profile edits without
+	# resetting depleted persistent combat state between sequential shots.
+	if combat_scenario.shooter == null or combat_scenario.primary_target() == null:
+		combat_scenario.configure_from_profile(prof, target_pos, false)
+	var fire_chk: Dictionary = combat_scenario.shooter.can_fire(prof.ammo_cost, prof.weapon_energy_cost, false)
+	if not bool(fire_chk.get("ok", false)):
+		var rej := str(fire_chk.get("reason", "INSUFFICIENT_RESOURCES"))
+		_append_telemetry(sim.sim_time, "FIRE_REJECTED", "%s: ammo=%d (cost %d), energy=%.1f (cost %.1f)" % [
+			rej, int(combat_scenario.shooter.ammo_current), prof.ammo_cost,
+			float(combat_scenario.shooter.energy_current), prof.weapon_energy_cost
+		])
+		status_changed.emit("Fire blocked: " + rej, "warning")
+		_update_health_display()
+		return
+	var fire_res: Dictionary = combat_scenario.fire_shot(prof, origin, geom.direction, target_pos, obstacles, shooter_vel, false, extra_targets)
+	var shot = fire_res.get("shot", null)
+	if shot == null:
+		return
+	_update_health_display()
 	_record_timeline(sim.sim_time, "WEAPON_ACTIVATE", "%s -> %s (hp=%s)" % [prof.weapon_name, prof.ordnance_name, hardpoint_mode], prof.weapon_path, "ordName")
 
 	# Barrel recoil kick (APPROXIMATED from kickVeloc / recoilNameN).
@@ -3173,16 +3270,27 @@ func _num(v: float) -> String:
 	return "%.3f" % v
 
 
-func _update_native_controls(note: String = "") -> void:
+func _on_native_session_updated(session_id: String, snap: Dictionary) -> void:
+	if session_id != "":
+		active_native_session_id = session_id
+	_update_native_controls("", snap)
+
+
+func _update_native_controls(note: String = "", snap_override: Dictionary = {}) -> void:
 	if native_status_label == null:
 		return
+	var snap: Dictionary = snap_override
+	if snap.is_empty() and native_session_service != null:
+		snap = native_session_service.get_status_snapshot(active_native_session_id)
 	if active_native_session_id == "" or native_runner == null:
 		native_status_label.text = note if note != "" else "Native: idle (NATIVE_VERIFIED: 0)"
+		if native_monitor_label != null:
+			native_monitor_label.text = "SESSION: - | STATE: IDLE | PID: 0 | MISSION: WAITING | PROBE: WAITING | OBS: NONE | ELAPSED: 0.0s / 30.0s"
 		return
 	var rec: Dictionary = native_runner.get_session_record(active_native_session_id)
-	var st := str(rec.get("state", "IDLE"))
-	var rt := str(rec.get("launch_route", ""))
-	var rsn := str(rec.get("reason", ""))
+	var st := str(snap.get("state", rec.get("state", "IDLE")))
+	var rt := str(snap.get("launch_route", rec.get("launch_route", "")))
+	var rsn := str(snap.get("reason", rec.get("reason", "")))
 	var txt := "Native [%s]: %s" % [active_native_session_id.substr(0, 18), st]
 	if rt != "":
 		txt += " · " + rt
@@ -3191,6 +3299,17 @@ func _update_native_controls(note: String = "") -> void:
 	if note != "":
 		txt += " — " + note
 	native_status_label.text = txt
+	if native_monitor_label != null:
+		native_monitor_label.text = "SESSION: %s | STATE: %s | PID: %d | MISSION: %s | PROBE: %s | OBS: %s | ELAPSED: %.1fs / %.1fs" % [
+			active_native_session_id.substr(0, 18),
+			st,
+			int(snap.get("game_pid", 0)),
+			str(snap.get("mission_status", "WAITING")),
+			str(snap.get("resource_probe", "WAITING")),
+			str(snap.get("observation_status", "WAITING")),
+			float(snap.get("elapsed_s", 0.0)),
+			float(snap.get("timeout_s", 30.0)),
+		]
 
 
 func run_native_preflight_only(options: Dictionary = {}) -> Dictionary:
@@ -3198,8 +3317,8 @@ func run_native_preflight_only(options: Dictionary = {}) -> Dictionary:
 		status_changed.emit("Native preflight: load a weapon scenario first.", "warning")
 		return {"ok": false}
 	if native_runner == null:
-		native_runner = NativeRunnerScript.new()
-	var res: Dictionary = native_runner.preflight(profile, index, options)
+		native_runner = native_session_service.runner if native_session_service != null else NativeRunnerScript.new()
+	var res: Dictionary = native_session_service.preflight(profile, index, options) if native_session_service != null else native_runner.preflight(profile, index, options)
 	active_native_session_id = str(res.get("session_id", ""))
 	var pre: Dictionary = res.get("preflight", {})
 	var disc: Dictionary = pre.get("discovery", {})
@@ -3219,7 +3338,7 @@ func run_native_stage(options: Dictionary = {}) -> Dictionary:
 		var pre := run_native_preflight_only(options)
 		if not bool(pre.get("ok", false)) and str(pre.get("session_id", "")) == "":
 			return pre
-	var res: Dictionary = native_runner.stage(active_native_session_id, {}, options)
+	var res: Dictionary = native_session_service.stage(active_native_session_id, {}, options) if native_session_service != null else native_runner.stage(active_native_session_id, {}, options)
 	_append_telemetry(sim.sim_time, "NATIVE_STG", "Session=%s  state=%s  stage=%s" % [
 		active_native_session_id, str(res.get("state", "FAILED")), str((res.get("staged", {}) as Dictionary).get("stage", ""))
 	])
@@ -3234,12 +3353,30 @@ func run_native_launch(execute_process: bool = false, options: Dictionary = {}) 
 		return {"ok": false, "reason": "NO_ACTIVE_SESSION"}
 	var opts := options.duplicate(true)
 	opts["execute_process"] = execute_process
-	var res: Dictionary = native_runner.launch(active_native_session_id, opts)
+	var res: Dictionary = native_session_service.launch(active_native_session_id, opts) if native_session_service != null else native_runner.launch(active_native_session_id, opts)
 	_append_telemetry(sim.sim_time, "NATIVE_RUN", "Session=%s  state=%s  route=%s  reason=%s" % [
 		active_native_session_id, str(res.get("state", "")), str(res.get("route", "")), str(res.get("reason", ""))
 	])
 	_update_native_controls()
 	status_changed.emit("Native launch: %s [%s]" % [str(res.get("state", "")), str(res.get("route", ""))], "success" if bool(res.get("ok", false)) else "warning")
+	return res
+
+
+func run_native_cancel_monitor() -> Dictionary:
+	if active_native_session_id == "" or native_runner == null:
+		return {"ok": false, "reason": "NO_ACTIVE_MONITOR"}
+	var res: Dictionary = native_session_service.cancel_monitoring(active_native_session_id) if native_session_service != null else native_runner.cancel_monitor(active_native_session_id)
+	_append_telemetry(sim.sim_time, "NATIVE_MON", "Monitor cancelled: state=%s" % str(res.get("state", "")))
+	_update_native_controls()
+	return res
+
+
+func run_native_resume_monitor() -> Dictionary:
+	if active_native_session_id == "" or native_runner == null:
+		return {"ok": false, "reason": "NO_MONITOR_TO_RESUME"}
+	var res: Dictionary = native_session_service.resume_monitoring(active_native_session_id) if native_session_service != null else native_runner.resume_monitor(active_native_session_id)
+	_append_telemetry(sim.sim_time, "NATIVE_MON", "Monitor resumed: state=%s active=%s" % [str(res.get("state", "")), str(res.get("active", false))])
+	_update_native_controls()
 	return res
 
 
@@ -3253,7 +3390,7 @@ func run_native_collect(observation_path_override: String = "") -> Dictionary:
 	if active_native_session_id == "" or native_runner == null:
 		status_changed.emit("Native collect: no active session.", "warning")
 		return {"ok": false, "reason": "NO_ACTIVE_SESSION"}
-	var res: Dictionary = native_runner.collect_observation(active_native_session_id, observation_path_override)
+	var res: Dictionary = native_session_service.collect_observation(active_native_session_id, observation_path_override) if native_session_service != null else native_runner.collect_observation(active_native_session_id, observation_path_override)
 	_append_telemetry(sim.sim_time, "NATIVE_OBS", "Session=%s  state=%s  verified=%s  reason=%s" % [
 		active_native_session_id, str(res.get("state", "")), str(res.get("verified", false)), str(res.get("reason", ""))
 	])
@@ -3266,7 +3403,7 @@ func run_native_cleanup() -> Dictionary:
 	if active_native_session_id == "" or native_runner == null:
 		status_changed.emit("Native cleanup: no active session.", "warning")
 		return {"ok": false, "reason": "NO_ACTIVE_SESSION"}
-	var res: Dictionary = native_runner.cleanup_stage(active_native_session_id)
+	var res: Dictionary = native_session_service.cleanup_stage(active_native_session_id) if native_session_service != null else native_runner.cleanup_stage(active_native_session_id)
 	_append_telemetry(sim.sim_time, "NATIVE_CLN", "Session=%s  state=%s" % [active_native_session_id, str(res.get("state", ""))])
 	_update_native_controls()
 	status_changed.emit("Native cleanup: %s" % str(res.get("state", "")), "success" if bool(res.get("ok", false)) else "warning")

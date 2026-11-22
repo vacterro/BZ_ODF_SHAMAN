@@ -86,6 +86,10 @@ func _initialize() -> void:
 	_test_t40_wave_d_durable_transitions_and_monitor()
 	_test_t41_damage_shield_ammo_and_hit_normals()
 	_test_t41_ribbons_and_animation_inspection()
+	_test_t60_wave_b_native_startup_diagnosis()
+	_test_t61_wave_c_native_completeness()
+	_test_t62_wave_d_persistent_combat_state()
+	_test_t63_wave_e_particle_fidelity_and_msha()
 	# Static document cache holds strong references by design; release it before
 	# the engine's own shutdown so a passing run exits with no ObjectDB leak.
 	OdfDocument.clear_all_cache()
@@ -1098,7 +1102,10 @@ func _test_steam_launch_routes() -> void:
 	_check(bool(pre_s2.get("launch_ready", false)) and str(pre_s2.get("launch_route", "")) == "STEAM_MANAGED", "S2: logged-in Steam selects STEAM_MANAGED launch_ready=true")
 	var lcmd: Dictionary = pre_s2.get("launch_command", {})
 	var sargs: Array = lcmd.get("args", [])
-	_check(sargs.has("-applaunch") and sargs.has("624970") and sargs.has("/config") and sargs.has("/logconsole") and sargs.has("shaman_shot.bzn"), "S2: STEAM_MANAGED preserves -applaunch 624970 /config /logconsole shaman_shot.bzn")
+	_check(sargs.has("-applaunch") and sargs.has("624970") and sargs.has("/config") and sargs.has("shaman_shot.bzn"), "S2: STEAM_MANAGED preserves -applaunch 624970 /config shaman_shot.bzn")
+	_check(not sargs.has("/logconsole"), "S2 / NB-03: STEAM_MANAGED omits /logconsole by default (opt-in only)")
+	var lcmd_lc := NativeAdapterScript.build_launch_command("STEAM_MANAGED", disc, stage.path_join("shaman_native.cfg"), "shaman_shot.bzn", true)
+	_check((lcmd_lc.get("args", []) as Array).has("/logconsole"), "S2 / NB-04: explicit include_logconsole=true adds /logconsole")
 	# S3: Launch without test mission is GAME_STARTED, never SUCCESS or verified.
 	var s3 := NativeAdapterScript.classify_launch_result("STEAM_MANAGED", 0, true, false, false, false)
 	_eq(str(s3.get("state", "")), "GAME_STARTED", "S3: process open without mission is GAME_STARTED")
@@ -3617,6 +3624,340 @@ startColor=\"80 200 255 255\"
 	_eq(str(msha_check.get("errors", [])), '["not a DOCB .msha file"]', "TR-04: non-DOCB .msha rejected")
 	if holder != null and holder is Node:
 		(holder as Node).free()
+	OdfDocument.clear_all_cache()
+	_remove_tree(tmp_dir)
+
+
+func _test_t60_wave_b_native_startup_diagnosis() -> void:
+	_start("T-60 Wave B Native Startup Diagnosis, Config Compat & Crash Log Correlation (NB-01..NB-08, P1-EVIDENCE-01)")
+	var old_root := WorkspaceStore.root_override
+	var ws := "user://t60_native_diag_" + str(Time.get_ticks_usec())
+	WorkspaceStore.root_override = ws
+	var abs_ws := ProjectSettings.globalize_path(ws)
+
+	var disc := NativeAdapterScript.discover()
+	var game_root := str(disc.get("game_root", NativeAdapterScript.DEFAULT_GAME_ROOT))
+	var stage := SafeStageScript.allocate_stage_dir("t60_nb")
+	var files := NativeAdapterScript.build_experiment_files(null, "t60_nb", {}, stage)
+	var cfg_txt := str(files.get("shaman_native.cfg", ""))
+	_check(cfg_txt.contains("@rootdir\\bz2r_res") and cfg_txt.contains("@rootdir\\bz2r_loc") and cfg_txt.contains("@rootdir\\maps"), "NB-05: shaman_native.cfg mounts stock bz2r_res, bz2r_loc, and maps streams")
+
+	# NB-03 / NB-04: /logconsole opt-in only.
+	var cmd_def := NativeAdapterScript.build_launch_command("STEAM_MANAGED", disc, stage.path_join("shaman_native.cfg"), "shaman_shot.bzn")
+	_check(not (cmd_def.get("game_args", []) as Array).has("/logconsole"), "NB-03: /logconsole absent by default")
+	var cmd_opt := NativeAdapterScript.build_launch_command("STEAM_MANAGED", disc, stage.path_join("shaman_native.cfg"), "shaman_shot.bzn", true)
+	_check((cmd_opt.get("game_args", []) as Array).has("/logconsole"), "NB-04: /logconsole present when explicitly requested")
+
+	# NB-08 / Config path compatibility diagnostics.
+	var diag_ext := NativeAdapterScript.diagnose_config_path_compatibility(stage.path_join("shaman_native.cfg"), game_root)
+	_check(bool(diag_ext.get("requires_rootdir_placement", false)) and str(diag_ext.get("code", "")) == "CONFIG_REQUIRES_ROOTDIR_PLACEMENT", "NB-05/08: external stage config flagged as CONFIG_REQUIRES_ROOTDIR_PLACEMENT")
+	var diag_in := NativeAdapterScript.diagnose_config_path_compatibility(game_root.path_join("shaman_native.cfg"), game_root)
+	_check(bool(diag_in.get("ok", false)) and str(diag_in.get("config_arg", "")) == "shaman_native.cfg", "NB-05: @rootdir config uses bare filename argument")
+
+	# NB-07: Startup failure classification distinguishes unmounted /config from missing font.
+	var log_unmounted := "DIAG| i76win:1209 |00:39:02|664 |Command line /config used, skipping global config mod setup :\nDIAG| input:1418 |Handling Window OnActivate\n"
+	var cls_cfg := NativeAdapterScript.classify_startup_failure(log_unmounted, "Unable to load console font 'ds_16.bmf' -- check MOD installation and/or .cfg")
+	_eq(str(cls_cfg.get("code", "")), "CONFIG_PATH_NOT_LOADED_NO_FILESYS", "NB-07: unmounted /config + ds_16.bmf classified as CONFIG_PATH_NOT_LOADED_NO_FILESYS")
+	_check(not bool(cls_cfg.get("font_missing_externally", true)), "NB-07: unmounted /config does not falsely blame external missing font")
+	var log_mounted := "DIAG| filesys:946 |Config: 'AddDirRecurse' :: '@rootdir\\bz2r_res'\nDIAG| filesys:957 |Config: 'AddDirRecurse' ** Adding Recurse bz2r_res\n"
+	var cls_ok := NativeAdapterScript.classify_startup_failure(log_mounted, "")
+	_eq(str(cls_ok.get("code", "")), "STARTUP_FILESYS_MOUNTED", "NB-07: mounted filesys log classified as STARTUP_FILESYS_MOUNTED")
+	var cls_ext := NativeAdapterScript.classify_startup_failure(log_mounted, "Unable to load console font 'ds_16.bmf'")
+	_eq(str(cls_ext.get("code", "")), "EXTERNAL_MISSING_FONT", "NB-07: font failure AFTER bz2r_res mount classified as EXTERNAL_MISSING_FONT")
+
+	# NB-06 / P1-EVIDENCE-01: Crash log correlation prefers session-matched log over newer unrelated log.
+	var logs_dir := abs_ws.path_join("fake_docs")
+	DirAccess.make_dir_recursive_absolute(logs_dir)
+	var matched_log := logs_dir.path_join("Battlezone-Crashed 2026-11-22 10.00.01.log")
+	var newer_unrelated := logs_dir.path_join("Battlezone-Crashed 2026-11-22 10.00.05.log")
+	_write(matched_log, "Commandline param (5/6): '%s\\shaman_native.cfg'\nCommandline param (6/6): 'shaman_shot.bzn'\nsession=sess_t60_abc\n" % stage.replace("/", "\\"))
+	OS.delay_msec(20)
+	_write(newer_unrelated, "Commandline param (1/2): 'battlezone2.exe'\nCommandline param (2/2): 'other_mod_map.bzn'\n")
+	var corr := NativeAdapterScript.correlate_crash_logs(logs_dir, {
+		"stage_root": stage,
+		"stage_id": stage.get_file(),
+		"session_id": "sess_t60_abc",
+		"config_path": stage.path_join("shaman_native.cfg"),
+		"mission_bzn": "shaman_shot.bzn",
+	}, 0)
+	_check(bool(corr.get("matched", false)) and str(corr.get("confidence", "")) == "CONFIRMED", "NB-06: session-matched log achieves CONFIRMED correlation")
+	_eq(str(corr.get("selected_log", "")).get_file(), matched_log.get_file(), "NB-06 / P1-EVIDENCE-01: collector selects session-matched log over newer unrelated crash log")
+
+	# Verify stock ds_16.bmf actually exists in BZ2R read-only installation.
+	var stock_font := game_root.path_join("bz2r_res/interface/Fonts/DS/ds_16.bmf")
+	_check(FileAccess.file_exists(stock_font), "NB-01/Control F: stock ds_16.bmf verified present in bz2r_res/interface/Fonts/DS/")
+
+	WorkspaceStore.root_override = old_root
+	_remove_tree(abs_ws)
+
+
+func _test_t61_wave_c_native_completeness() -> void:
+	_start("T-61 Wave C Native Resource Closure, Auto Observation Path, Monitor Persistence & Event-Driven Lua (RC-01..07, NM-04..05, P1-NATIVE-06)")
+	var old_root := WorkspaceStore.root_override
+	var ws := "user://t61_native_complete_" + str(Time.get_ticks_usec())
+	WorkspaceStore.root_override = ws
+	var abs_ws := ProjectSettings.globalize_path(ws)
+
+	var disc := NativeAdapterScript.discover()
+	var steam_ok := {"steam_exe": str(disc.get("steam_exe", "V:/__STORE_V/_SOFT/Steam/steam.exe")), "steam_present": true, "steam_running": true, "steam_logged_in": true}
+	var runner = NativeRunnerScript.new()
+
+	# RC-07: Synthetic ordnance-only probe cannot claim complete closure.
+	var syn_pre: Dictionary = runner.preflight(null, null, {
+		"discovery": disc,
+		"steam_override": steam_ok,
+		"require_complete_closure": true,
+		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": "[OrdnanceClass]\ndamageValue(H)=100\n".to_utf8_buffer()},
+	})
+	_check(not bool(syn_pre.get("ok", true)), "RC-07: synthetic ordnance-only probe rejected when require_complete_closure=true")
+	_eq(str((syn_pre.get("preflight", {}) as Dictionary).get("reason", "")), "RESOURCE_CLOSURE_INCOMPLETE", "RC-07: synthetic probe returns RESOURCE_CLOSURE_INCOMPLETE")
+
+	# RC-01..04 & RC-05 & RC-06: Strict ResourceIndex closure checks.
+	var real_idx := ResourceIndex.new()
+	real_idx.roots = [
+		{"path": BASE, "label": "base", "kind": "game", "priority": 10, "enabled": true},
+		{"path": WORKSHOP, "label": "workshop", "kind": "workshop", "priority": 30, "enabled": true},
+	]
+	real_idx.scan(true)
+	real_idx.set_active_packages([], true)
+	var stock_shooter := real_idx.resolve_path("ivtank")
+	var stock_target := real_idx.resolve_path("ivscav")
+	var stock_prof := WeaponProfile.new()
+	_check(stock_prof.resolve(real_idx, stock_shooter, stock_target), "RC-05 setup: stock-only ivtank -> ivscav profile resolved")
+	var pre_stock: Dictionary = runner.preflight(stock_prof, real_idx, {
+		"discovery": disc,
+		"steam_override": steam_ok,
+		"check_closure": true,
+		"require_complete_closure": true,
+		"active_packages": [],
+	})
+	_check(bool(pre_stock.get("ok", false)) and bool(pre_stock.get("launch_ready", false)), "RC-05: complete stock-only scenario passes strict closure preflight")
+
+	# RC-06: VSR scenario rejected when stock-only (VSR package not active/mounted).
+	var pre_vsr_unmounted: Dictionary = runner.preflight(null, real_idx, {
+		"discovery": disc,
+		"steam_override": steam_ok,
+		"check_closure": true,
+		"require_complete_closure": true,
+		"active_packages": [],
+		"shooter_odf": "ivtank_vsr",
+		"target_odf": "ivscav_vsr",
+		"weapon_odf": "gatstabvsr_c",
+		"ordnance_odf": "atstabvsr_c",
+	})
+	_check(not bool(pre_vsr_unmounted.get("ok", true)) and bool((pre_vsr_unmounted.get("preflight", {}) as Dictionary).get("closure_incomplete", false)), "RC-06: VSR scenario without active VSR package rejected as closure_incomplete")
+
+	# P1-NATIVE-06: Generated Lua has no time-based SHOT_OBSERVED promotion.
+	var stage_l := SafeStageScript.allocate_stage_dir("t61_lua")
+	var lfiles := NativeAdapterScript.build_experiment_files(stock_prof, "t61_lua", {}, stage_l)
+	var lua_src := str(lfiles.get("assets/Missions/shaman_shot.lua", ""))
+	_check(not lua_src.contains("elapsed >= 0.1") and not lua_src.contains("SHOT_OBSERVED"), "P1-NATIVE-06: Lua mission removes fake time-based SHOT_OBSERVED")
+	_check(lua_src.contains("FIRE_CONFIRMED") and lua_src.contains("HEALTH_DELTA_OBSERVED") and lua_src.contains("SHOT_COUNT_UNKNOWN"), "P1-NATIVE-06: Lua separates FIRE_REQUESTED, FIRE_CONFIRMED, HEALTH_DELTA_OBSERVED, and SHOT_COUNT_UNKNOWN")
+
+	# NM-04: poll_monitor(sid) automatically resolves observation_expected_path & rejects foreign session.
+	var sid_ok := str(pre_stock.get("session_id", ""))
+	var stg_ok: Dictionary = runner.stage(sid_ok)
+	_check(bool(stg_ok.get("ok", false)), "NM-04 setup: staged stock session")
+	runner.process_launcher = func(_exe: String, _args: Array) -> Dictionary:
+		return {"ok": true, "pid": 5501, "exit_code": 0}
+	var fake_state := {"game_up": false, "probe_ready": false}
+	runner.process_inspector = func() -> Array:
+		if not bool(fake_state["game_up"]):
+			return []
+		return [{"pid": 6602, "name": "battlezone2.exe", "exe_path": str(disc.get("exe", "")), "exe_md5": str(disc.get("exe_md5", ""))}]
+	runner.mission_observer = func(_s) -> Dictionary:
+		var pr := bool(fake_state["probe_ready"])
+		return {
+			"mission_observed": pr,
+			"mission_loaded_at": "2026-11-22T11:35:00" if pr else "",
+			"resource_probe_confirmed": pr,
+			"startup_log_path": "",
+		}
+	var lch: Dictionary = runner.launch(sid_ok, {"execute_process": true, "preexisting_game_pids": [], "monitor_started_at_s": 0.0, "monitor_timeout_s": 30.0})
+	_eq(str(lch.get("state", "")), "STEAM_PROCESS_STARTED", "NM-04 setup: launch entered STEAM_PROCESS_STARTED")
+	fake_state["game_up"] = true
+	var p1: Dictionary = runner.poll_monitor(sid_ok, 1.0)
+	_eq(str(p1.get("state", "")), "GAME_PROCESS_DETECTED", "NM-03/04: late battlezone2.exe detected")
+	fake_state["probe_ready"] = true
+	var rec_s: Dictionary = (runner.get_session_record(sid_ok).get("session", {}) as Dictionary)
+	var exp_obs := str(rec_s.get("observation_expected_path", ""))
+	DirAccess.make_dir_recursive_absolute(exp_obs.get_base_dir())
+	# Write foreign-session observation first -> must be rejected!
+	var foreign_obs := {
+		"contract_version": 2, "session_id": "foreign_session_999", "launch_nonce": "bad_nonce",
+		"scenario_id": str(rec_s.get("scenario_id", "")), "state": "MEASUREMENT_COMPLETE",
+		"shooter": "ivtank", "target": "ivscav", "weapon": stock_prof.weapon_name, "ordnance": stock_prof.ordnance_name,
+		"hp_before": 1000.0, "hp_after": 900.0, "hp_max": 1000.0, "damage": 100.0,
+		"elapsed_mission_s": 1.2, "tps": 20, "mount_marker": "WRONG", "resources_mounted": false,
+	}
+	_write(exp_obs, JSON.stringify(foreign_obs))
+	var p_bad: Dictionary = runner.poll_monitor(sid_ok, 2.0)
+	_check(not bool(p_bad.get("ok", true)) and not bool(p_bad.get("verified", true)), "NM-04: foreign-session observation at expected path rejected")
+	# Now write genuine session-matching observation -> poll_monitor(sid) auto-collects without explicit path!
+	var good_obs := {
+		"contract_version": 2, "session_id": sid_ok, "launch_nonce": str(rec_s.get("launch_nonce", "")),
+		"scenario_id": str(rec_s.get("scenario_id", "")), "state": "MEASUREMENT_COMPLETE",
+		"shooter": "ivtank", "target": "ivscav", "weapon": stock_prof.weapon_name, "ordnance": stock_prof.ordnance_name,
+		"hp_before": 1000.0, "hp_after": 900.0, "hp_max": 1000.0, "damage": 100.0,
+		"elapsed_mission_s": 1.5, "tps": 20, "mount_marker": str(rec_s.get("mount_marker", "")), "resources_mounted": true,
+	}
+	_write(exp_obs, JSON.stringify(good_obs))
+	var p_auto: Dictionary = runner.poll_monitor(sid_ok, 3.0)
+	_check(bool(p_auto.get("observation_collected", false)) and bool(p_auto.get("comparison_complete", false)), "NM-04/08: poll_monitor(sid) auto-resolved expected path and completed comparison")
+	DirAccess.remove_absolute(exp_obs)
+	runner.cleanup_stage(sid_ok)
+
+	# NM-05: Inject process_monitors.json write failure -> MONITOR_PERSIST_FAILED / RECOVERY_PENDING.
+	var pre_pf: Dictionary = runner.preflight(stock_prof, real_idx, {"discovery": disc, "steam_override": steam_ok, "check_closure": true, "active_packages": []})
+	var sid_pf := str(pre_pf.get("session_id", ""))
+	runner.stage(sid_pf)
+	fake_state["game_up"] = false
+	fake_state["probe_ready"] = false
+	runner.fault_fail_monitor_persist = true
+	var lch_pf: Dictionary = runner.launch(sid_pf, {"execute_process": true, "preexisting_game_pids": [], "monitor_started_at_s": 0.0})
+	_check(not bool(lch_pf.get("ok", true)) and str(lch_pf.get("reason", "")) == "MONITOR_PERSIST_FAILED" and str(lch_pf.get("state", "")) == "RECOVERY_PENDING", "NM-05: process_monitors.json failure reports MONITOR_PERSIST_FAILED / RECOVERY_PENDING")
+	runner.fault_fail_monitor_persist = false
+	runner.cleanup_stage(sid_pf)
+
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.root_override = old_root
+	_remove_tree(abs_ws)
+
+
+func _test_t62_wave_d_persistent_combat_state() -> void:
+	_start("T-62 Wave D Persistent Combat State: Shooter Ammo/Energy, Persistent Shield, Multi-Target & Replay (CS-01..CS-12)")
+	var tmp_dir := ProjectSettings.globalize_path("user://t62_combat_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+	var sh := tmp_dir.path_join("sh.odf")
+	var wp := tmp_dir.path_join("wp.odf")
+	var ord := tmp_dir.path_join("or.odf")
+	var xpl := tmp_dir.path_join("xp.odf")
+	var tg := tmp_dir.path_join("tg.odf")
+	_write(sh, "[GameObjectClass]\nweaponName1=\"wp\"\nmaxAmmo=30\nmaxEnergy=50\nmaxHealth=1000\narmorClass=\"H\"\n")
+	_write(wp, "[WeaponClass]\nordName=\"or\"\nshotDelay=0.5\nenergyCost=15\n")
+	_write(ord, "[OrdnanceClass]\nshotSpeed=120\nlifeSpan=2.0\nshotRadius=0.5\nammoCost=10\nDamageShield=1.0\ndamageValue(H)=60\nxplVehicle=\"xp\"\n")
+	_write(xpl, "[ExplosionClass]\ndamageRadius=15.0\n")
+	_write(tg, "[GameObjectClass]\nmaxHealth=500\narmorClass=\"H\"\nshieldClass=\"N\"\nmaxShield=100\nmaxAmmo=1\n")
+
+	var idx := ResourceIndex.new()
+	idx.roots = [{"path": tmp_dir, "label": "t62", "kind": "game", "priority": 10, "enabled": true}]
+	idx.scan(false)
+	var prof := WeaponProfile.new()
+	_check(prof.resolve(idx, sh, tg), "CS setup: combat ODF chain resolved")
+
+	# CS-01: Target maxAmmo=1 NEVER caps shooter ammo_spent (must be 10 from shooter's 30!).
+	var single := ProjectileSim.run_once(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), Vector3(0, 2, -40))
+	_eq(int(single.ammo_spent), 10, "CS-01: shooter ammo_spent=10 is independent of target maxAmmo=1")
+	prof.set_override("maxAmmo", "999")  # even overriding target/merged should not invent target coupling
+	prof.clear_overrides()
+
+	# CS-02, CS-03, CS-04, CS-05, CS-06: Persistent multi-shot scenario (ammo 30, cost 10, energy 50, cost 15; target shield 100, hull 500, dmg 60).
+	var CombatScenarioScript = preload("res://scripts/sim/combat_scenario.gd")
+	var CombatActorStateScript = preload("res://scripts/sim/combat_actor_state.gd")
+	var scn = CombatScenarioScript.new(4242)
+	var prim_pos := Vector3(0, 2, -40)
+	scn.configure_from_profile(prof, prim_pos, false)
+	# Impact occurs at front surface (0, 2, -37.5) because target_radius=2.0 + shotRadius=0.5.
+	# Placing secondary at (7.5, 2, -37.5) puts it exactly 7.5 m from impact -> 50% falloff = 30.0 splash!
+	var sec = CombatActorStateScript.create_target("sec_1", "Secondary", 300.0, "H", 40.0, "N", Vector3(7.5, 2, -37.5), 2.0)
+	scn.add_or_update_target(sec)
+
+	# Shot 1: shooter ammo 30->20, energy 50->35; primary shield 100->40, hull 500; secondary splash (50% of 60 = 30) -> shield 40->10, hull 300!
+	var r1: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), prim_pos)
+	_check(bool(r1.get("ok", false)), "CS-02: Shot 1 fired")
+	_eq(int(r1.get("ammo_remaining", -1)), 20, "CS-02: Shot 1 reduced shooter ammo 30 -> 20")
+	_check(is_equal_approx(float(r1.get("energy_remaining", -1.0)), 35.0), "CS-04: Shot 1 reduced shooter energy 50 -> 35")
+	_check(is_equal_approx(float(r1.get("shield_remaining", -1.0)), 40.0), "CS-05: Shot 1 reduced primary shield 100 -> 40")
+	_check(is_equal_approx(float(r1.get("hull_remaining", -1.0)), 500.0), "CS-05: Shot 1 kept primary hull intact at 500")
+	_check(is_equal_approx(sec.shield_current, 10.0), "CS-07/08: Splash absorbed by secondary target's own shield (40 -> 10)")
+	_check(is_equal_approx(sec.hull_current, 300.0), "CS-08: Splash did not bypass secondary target shield")
+
+	# Shot 2: shooter ammo 20->10, energy 35->20; primary shield 40->0, 20 spills to hull 500->480; secondary splash 30 -> shield 10->0, 20 spills to hull 300->280!
+	var r2: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), prim_pos)
+	_check(bool(r2.get("ok", false)), "CS-02: Shot 2 fired")
+	_eq(int(r2.get("ammo_remaining", -1)), 10, "CS-02: Shot 2 reduced shooter ammo 20 -> 10")
+	_check(is_equal_approx(float(r2.get("shield_remaining", -1.0)), 0.0), "CS-05: Shot 2 depleted persistent shield 40 -> 0 (no shield resurrection)")
+	_check(is_equal_approx(float(r2.get("hull_remaining", -1.0)), 480.0), "CS-06: Shot 2 spilled remaining 20 damage to primary hull (500 -> 480)")
+	_check(is_equal_approx(sec.shield_current, 0.0) and is_equal_approx(sec.hull_current, 280.0), "CS-07/08: Shot 2 splash depleted secondary shield 10->0 and spilled 20 to secondary hull 300->280")
+
+	# Shot 3: ammo 10->0, energy 20->5; primary hull 480->420.
+	var r3: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), prim_pos)
+	_check(bool(r3.get("ok", false)), "CS-02: Shot 3 fired")
+	_eq(int(r3.get("ammo_remaining", -1)), 0, "CS-02: Shot 3 reduced shooter ammo 10 -> 0")
+	_check(is_equal_approx(float(r3.get("hull_remaining", -1.0)), 420.0), "CS-06: Shot 3 damaged primary hull 480 -> 420")
+
+	# Shot 4: rejected for insufficient ammo (CS-03)!
+	var r4: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), prim_pos)
+	_check(not bool(r4.get("ok", true)) and str(r4.get("reason", "")) == "INSUFFICIENT_AMMO", "CS-03: Shot 4 rejected with INSUFFICIENT_AMMO when ammo=0")
+
+	# CS-04: Test insufficient energy block independently.
+	scn.shooter.ammo_current = 30
+	scn.shooter.energy_current = 5.0
+	var r_eng: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), prim_pos)
+	_check(not bool(r_eng.get("ok", true)) and str(r_eng.get("reason", "")) == "INSUFFICIENT_ENERGY", "CS-04: shot rejected with INSUFFICIENT_ENERGY when energy < cost")
+
+	# CS-09 & CS-10: Replay reproduces identical multi-shot results, and reset restores initial state!
+	var replay: Dictionary = scn.replay_deterministic(prof)
+	_eq(int(replay.get("shots_replayed", 0)), 3, "CS-10: replay_deterministic replayed all 3 valid shots")
+	_eq(int(replay.get("shooter_ammo", -1)), 0, "CS-10: replayed shooter ammo matches (0)")
+	_check(is_equal_approx(float((replay.get("targets", {}) as Dictionary).get("primary", {}).get("hull", -1.0)), 420.0), "CS-10: replayed primary hull matches (420)")
+	_check(is_equal_approx(float((replay.get("targets", {}) as Dictionary).get("sec_1", {}).get("hull", -1.0)), 250.0), "CS-10: replayed secondary hull matches (250 after 3x30 splash against 40 shield)")
+	scn.reset("ALL")
+	_check(scn.shooter.ammo_current == 30 and is_equal_approx(scn.primary_target().shield_current, 100.0) and is_equal_approx(scn.primary_target().hull_current, 500.0) and is_equal_approx(sec.shield_current, 40.0), "CS-09: reset restores all actor states deterministically")
+
+	# CS-11 & CS-12: ODF edit changes combat damage; Undo restores previous behavior!
+	var odoc := prof.ordnance_doc
+	var dent = odoc.find_entry("OrdnanceClass", "damageValue(H)")
+	odoc.set_entry_value(dent, "120")
+	var re_edit: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), prim_pos)
+	_check(is_equal_approx(float(re_edit.get("shield_remaining", -1.0)), 0.0) and is_equal_approx(float(re_edit.get("hull_remaining", -1.0)), 480.0), "CS-11: ODF edit damageValue(H)=120 immediately breaks 100 shield and deals 20 hull")
+	odoc.undo()
+	scn.reset("ALL")
+	var re_undo: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), prim_pos)
+	_check(is_equal_approx(float(re_undo.get("shield_remaining", -1.0)), 40.0) and is_equal_approx(float(re_undo.get("hull_remaining", -1.0)), 500.0), "CS-12: Undo restores damageValue(H)=60 and original shield/hull result")
+
+	OdfDocument.clear_all_cache()
+	_remove_tree(tmp_dir)
+
+
+func _test_t63_wave_e_particle_fidelity_and_msha() -> void:
+	_start("T-63 Wave E Particle Fidelity (Blend Modes, UV Anim, Budgets) & Real .msha Inspection")
+	var tmp_dir := ProjectSettings.globalize_path("user://t63_fx_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+
+	# PF-01: Blend mode parsing.
+	_eq(int(EffectRuntime.parse_texture_blend("one one modulate").mode), BaseMaterial3D.BLEND_MODE_ADD, "PF-01: 'one one modulate' -> BLEND_MODE_ADD")
+	_eq(int(EffectRuntime.parse_texture_blend("dstcolor zero modulate").mode), BaseMaterial3D.BLEND_MODE_MUL, "PF-01: 'dstcolor zero modulate' -> BLEND_MODE_MUL")
+	_eq(int(EffectRuntime.parse_texture_blend("zero invsrc modulate").mode), BaseMaterial3D.BLEND_MODE_SUB, "PF-01: 'zero invsrc modulate' -> BLEND_MODE_SUB")
+	_eq(int(EffectRuntime.parse_texture_blend("srcalpha invsrcalpha modulatealpha").mode), BaseMaterial3D.BLEND_MODE_MIX, "PF-01: 'srcalpha invsrcalpha' -> BLEND_MODE_MIX")
+
+	# PF-02 & PF-03: UV scroll animation in EffectBurst + per-emitter budget computation.
+	var fx_path := tmp_dir.path_join("xpl_t63.odf")
+	_write(fx_path, "[ExplosionClass]\nparticleTypes=1\nparticleClass1=\"Flash\"\nparticleCount1=1\n\n[Flash]\nrenderBase=\"draw_sprite\"\ntextureBlend=\"one one modulate\"\nlifeTime=1.5\nemitDelay=0.05\ntextureSpeed=-4.0\ntextureRate=2.0\nstartRadius=0.5\nfinishRadius=2.5\n")
+	var idx := ResourceIndex.new()
+	idx.roots = [{"path": tmp_dir, "label": "t63", "kind": "game", "priority": 10, "enabled": true}]
+	idx.scan(false)
+	var fdoc := OdfDocument.load_cached(fx_path)
+	var bres := EffectRuntime.build(idx, fx_path, Vector3.ZERO)
+	_check(bool(bres.get("ok", false)) and bres.get("root", null) != null, "PF-02: UV-animated explosion burst built")
+	var burst: EffectBurst = bres.root
+	_check(burst.uv_animated_materials.size() >= 1, "PF-02: EffectBurst registered UV-animated material")
+	var mat0: StandardMaterial3D = burst.uv_animated_materials[0].material
+	var uv_before := mat0.uv1_offset
+	burst.step_simulation(0.5)
+	_check(not mat0.uv1_offset.is_equal_approx(uv_before), "PF-02: step_simulation animates UV offset using textureSpeed/textureRate")
+	var budget := EffectRuntime.compute_emitter_budget(fdoc, "Flash")
+	_eq(str(budget.get("blend", "")), "ADDITIVE", "PF-03: emitter budget reports ADDITIVE blend")
+	_check(bool(budget.get("uv_animated", false)) and int(budget.get("max_active", 0)) >= 20, "PF-03: emitter budget reports UV animation and active count")
+	burst.free()
+
+	# PF-04: Real 44-byte BZCC Workshop .msha file inspection (no fabricated tracks).
+	var real_msha := WORKSHOP.path_join("1322678425/objects/ISDF/buildings/ibcommand/bindata/ibcommand00_r1_kp.msha")
+	if FileAccess.file_exists(real_msha):
+		var mres := BzMeshReaderScript.inspect_msha_file(real_msha)
+		_check(bool(mres.get("ok", false)) and int(mres.get("version", 0)) == 1, "PF-04: real 44-byte BZCC .msha header parsed cleanly (DOCB v1)")
+		_check(bool(mres.get("is_empty_stub", false)) and not bool(mres.get("skeletal_skinning_supported", true)), "PF-04: empty .msha stub and unimplemented skeletal skinning reported honestly")
+
 	OdfDocument.clear_all_cache()
 	_remove_tree(tmp_dir)
 

@@ -1,0 +1,70 @@
+{
+  "op_id": "sub-collect-e362b9b8",
+  "operation": "sub_collect",
+  "created_at": "2026-11-22T09:14:26Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "63875c6247ceb7ca",
+  "preconditions": {
+    ".saipen/LOG.md": "61e88bd0867ecb16",
+    ".saipen/BOARD.md": "aa650cbf927fe1fc",
+    ".saipen/STATE.md": "6e23f70a53cf4ab4",
+    ".saipen/extensions/subs/MANIFEST.md": "cc7fe9ff8a887262"
+  },
+  "read_preconditions": {
+    ".": "source-identity-v1:a3b119c9c8455e3ea29458aaff7dd965292a95ea6ce8294982c5a32450480d19",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saihunt.md": "60558e6d7590fab8",
+    ".saipen/extensions/subs/saihunt/kitchen/OUTBOX.md": "4d10ab4f60eefafc"
+  },
+  "verification_policy": "sub_collect",
+  "status": "COMMITTED",
+  "progress_index": 4,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "61e88bd0867ecb16",
+      "after_hash": "c68fd2f93bf585a4",
+      "applied": true
+    },
+    {
+      "path": ".saipen/BOARD.md",
+      "role": "board",
+      "action": "write",
+      "before_hash": "aa650cbf927fe1fc",
+      "after_hash": "5653340706b441da",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "6e23f70a53cf4ab4",
+      "after_hash": "b67dad827758e511",
+      "applied": true
+    },
+    {
+      "path": ".saipen/extensions/subs/MANIFEST.md",
+      "role": "manifest",
+      "action": "write",
+      "before_hash": "cc7fe9ff8a887262",
+      "after_hash": "3db7906814a8b584",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "sub_collect",
+    "status": "COMMITTED",
+    "package_identities": [
+      "sha256:fb597a16548a60849928d203760a886e600889ce8ade138bdd8cedf7de7510ac"
+    ],
+    "producers": [
+      "saihunt"
+    ],
+    "tickets": [
+      "T-59"
+    ]
+  }
+}

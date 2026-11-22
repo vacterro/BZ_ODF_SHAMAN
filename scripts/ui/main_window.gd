@@ -8,6 +8,7 @@ const GAME_ROOT := "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R"
 const HoudiniScrubberScript = preload("res://scripts/ui/houdini_scrubber.gd")
 const ModLoadoutScript = preload("res://scripts/core/mod_loadout.gd")
 const BzMeshReaderScript = preload("res://scripts/core/bz_mesh_reader.gd")
+const NativeSessionServiceScript = preload("res://scripts/native/native_session_service.gd")
 const UI_SCALE_PRESETS := [0.75, 0.85, 1.0, 1.15, 1.25, 1.5, 1.75, 2.0]
 
 var index: ResourceIndex
@@ -95,6 +96,7 @@ var actor_picker_tree: Tree
 var weapon_lab: WeaponLab
 var particle_lab: ParticleLab
 var audio_lab: AudioLab
+var native_session_service = null
 var open_dialog: FileDialog
 var export_dialog: FileDialog
 var overwrite_dialog: ConfirmationDialog
@@ -116,6 +118,10 @@ func _ready() -> void:
 	theme_engine = WintageTheme.new()
 	theme_engine.load_themes()
 	index = ResourceIndex.new()
+	native_session_service = NativeSessionServiceScript.new()
+	native_session_service.name = "NativeSessionService"
+	add_child(native_session_service)
+	native_session_service.recover_pending_sessions()
 	_build_ui()
 	_apply_theme("goldendefault")
 	apply_master_volume(master_volume, master_muted)
@@ -366,7 +372,7 @@ func _build_ui() -> void:
 	right_hsplit.add_child(doc_tabs)
 	weapon_lab = WeaponLab.new()
 	weapon_lab.name = "Weapons Lab"
-	weapon_lab.setup(index, schema)
+	weapon_lab.setup(index, schema, native_session_service)
 	weapon_lab.status_changed.connect(_set_status)
 	weapon_lab.scenario_loaded.connect(_on_scenario_loaded)
 	weapon_lab.timeline_event_selected.connect(_on_timeline_event_selected)

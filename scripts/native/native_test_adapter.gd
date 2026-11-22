@@ -60,8 +60,9 @@ const LUA_EXPERIMENT_STATES := [
 	"WEAPON_ASSIGNED",
 	"READY",
 	"FIRE_REQUESTED",
-	"SHOT_OBSERVED",
-	"IMPACT_OBSERVED",
+	"FIRE_CONFIRMED",
+	"HEALTH_DELTA_OBSERVED",
+	"IMPACT_CONFIRMED",
 	"MEASUREMENT_COMPLETE",
 	"TIMEOUT",
 	"FAILED",
@@ -786,6 +787,7 @@ static func build_experiment_files(profile: WeaponProfile, stage_id: String,
 		"\t\tAddDirRecurse(\"@rootdir\\bz2r_res\");",
 		"\t\tAddLangDir(\"@rootdir\\bz2r_loc\");",
 		"\t\tAddDir(\"@rootdir\\bz2r_loc\");",
+		"\t\tAddDirRecurse(\"@rootdir\\maps\");",
 		"\t}",
 		"\tSetActiveStream(\"base\");",
 		"\tSetPilotsDirectory(\"@mydocsdir\\pilots\");",
@@ -818,9 +820,10 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 	# @mydocsdir\Logs), PrintConsoleMessage, GetTerrainHeightAndNormal,
 	# GetCurHealth/GetMaxHealth/GetHealth, GetTime/GetTPS, OpenODF/GetODFString,
 	# BuildObject, GiveWeapon, SetWeaponMask, FireAt, Attack. Never uses io.open.
+	# Never invents SHOT_OBSERVED solely from elapsed time (P1-NATIVE-06).
 	var lines := [
 		"-- Auto-generated controlled BZCC LuaMission probe for BZ_ODF_SHAMAN",
-		"-- State machine: INITIALIZING -> OBJECTS_SPAWNED -> WEAPON_ASSIGNED -> READY -> FIRE_REQUESTED -> SHOT_OBSERVED -> IMPACT_OBSERVED -> MEASUREMENT_COMPLETE | TIMEOUT | FAILED",
+		"-- Event-driven states: INITIALIZING -> OBJECTS_SPAWNED -> WEAPON_ASSIGNED -> READY -> FIRE_REQUESTED -> [FIRE_CONFIRMED] -> HEALTH_DELTA_OBSERVED / IMPACT_CONFIRMED -> MEASUREMENT_COMPLETE | TIMEOUT | FAILED",
 		"local SESSION_ID = \"%s\"" % str(p.session_id),
 		"local LAUNCH_NONCE = \"%s\"" % str(p.launch_nonce),
 		"local SCENARIO_ID = \"%s\"" % str(p.scenario_id),
@@ -836,6 +839,10 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 		"local state = \"INITIALIZING\"",
 		"local shooter, target = nil, nil",
 		"local hp_before, hp_max, ratio_before = 0, 0, 1.0",
+		"local ammo_before = -1.0",
+		"local fire_confirmed = false",
+		"local health_delta_observed = false",
+		"local shot_count_status = \"SHOT_COUNT_UNKNOWN\"",
 		"local start_time, fire_time, impact_time = 0.0, 0.0, 0.0",
 		"local odf_probe_damage, odf_probe_speed, odf_probe_life, mount_marker_seen = -1.0, -1.0, -1.0, \"\"",
 		"local err_msg = \"\"",
@@ -855,15 +862,17 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 		"  local dmg = hp_before - hp_now",
 		"  local tps = GetTPS and GetTPS() or 20",
 		"  local mounted_ok = (mount_marker_seen == EXPECTED_MARKER) and \"true\" or \"false\"",
+		"  local fc_str = fire_confirmed and \"true\" or \"false\"",
+		"  local hd_str = health_delta_observed and \"true\" or \"false\"",
 		"  -- Expected vs observed ODF semantics: LuaMission has OpenODF/GetODFFloat,",
 		"  -- never file hashing, so observed_odf_md5 stays empty instead of echoing",
 		"  -- EXPECTED_ODF_MD5 as if Lua computed a digest.",
 		"  local json = string.format(",
-		"    '{\"contract_version\":1,\"measurement_method\":\"GetCurHealth_delta\",\"session_id\":\"%s\",\"launch_nonce\":\"%s\",\"scenario_id\":\"%s\",\"state\":\"%s\",\"shooter\":\"%s\",\"target\":\"%s\",\"weapon\":\"%s\",\"ordnance\":\"%s\",\"hp_before\":%.3f,\"hp_after\":%.3f,\"hp_max\":%.3f,\"health_ratio_before\":%.6f,\"health_ratio_after\":%.6f,\"damage\":%.3f,\"elapsed_mission_s\":%.4f,\"fire_to_impact_s\":%.4f,\"tps\":%d,\"odf_probe_damage\":%.3f,\"odf_probe_speed\":%.3f,\"odf_probe_life\":%.3f,\"expected_odf_md5\":\"%s\",\"observed_odf_md5\":\"\",\"observed_odf_hash_available\":false,\"mount_marker\":\"%s\",\"resources_mounted\":%s,\"error\":\"%s\"}\\n',",
+		"    '{\"contract_version\":2,\"measurement_method\":\"GetCurHealth_delta\",\"session_id\":\"%s\",\"launch_nonce\":\"%s\",\"scenario_id\":\"%s\",\"state\":\"%s\",\"shooter\":\"%s\",\"target\":\"%s\",\"weapon\":\"%s\",\"ordnance\":\"%s\",\"hp_before\":%.3f,\"hp_after\":%.3f,\"hp_max\":%.3f,\"health_ratio_before\":%.6f,\"health_ratio_after\":%.6f,\"damage\":%.3f,\"elapsed_mission_s\":%.4f,\"fire_to_impact_s\":%.4f,\"tps\":%d,\"odf_probe_damage\":%.3f,\"odf_probe_speed\":%.3f,\"odf_probe_life\":%.3f,\"expected_odf_md5\":\"%s\",\"observed_odf_md5\":\"\",\"observed_odf_hash_available\":false,\"mount_marker\":\"%s\",\"resources_mounted\":%s,\"fire_confirmed\":%s,\"health_delta_observed\":%s,\"shot_count_status\":\"%s\",\"error\":\"%s\"}\\n',",
 		"    esc(SESSION_ID), esc(LAUNCH_NONCE), esc(SCENARIO_ID), esc(state),",
 		"    esc(SHOOTER_ODF), esc(TARGET_ODF), esc(WEAPON_ODF), esc(ORDNANCE_ODF),",
 		"    hp_before, hp_now, hp_max, ratio_before, ratio_now, dmg,",
-		"    elapsed, flight, tps, odf_probe_damage, odf_probe_speed, odf_probe_life, esc(EXPECTED_ODF_MD5), esc(mount_marker_seen), mounted_ok, esc(err_msg)",
+		"    elapsed, flight, tps, odf_probe_damage, odf_probe_speed, odf_probe_life, esc(EXPECTED_ODF_MD5), esc(mount_marker_seen), mounted_ok, fc_str, hd_str, esc(shot_count_status), esc(err_msg)",
 		"  )",
 		"  WriteToFile(OBS_FILE, json, false)",
 		"  PrintConsoleMessage(\"SHAMAN_OBSERVATION_WRITTEN: \" .. OBS_FILE .. \" state=\" .. state)",
@@ -897,6 +906,7 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 		"  ratio_before = GetHealth(target)",
 		"  GiveWeapon(shooter, WEAPON_ODF)",
 		"  if SetWeaponMask then SetWeaponMask(shooter, 1) end",
+		"  if GetCurAmmo then ammo_before = GetCurAmmo(shooter) end",
 		"  state = \"WEAPON_ASSIGNED\"",
 		"  state = \"READY\"",
 		"  fire_time = GetTime()",
@@ -912,12 +922,18 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 		"  local alive = IsValid(target)",
 		"  local hp_now = alive and GetCurHealth(target) or 0",
 		"  local ratio_now = alive and GetHealth(target) or 0.0",
-		"  if state == \"FIRE_REQUESTED\" and elapsed >= 0.1 then",
-		"    state = \"SHOT_OBSERVED\"",
+		"  if not fire_confirmed and IsValid(shooter) and GetCurAmmo and ammo_before >= 0 then",
+		"    local ammo_now = GetCurAmmo(shooter)",
+		"    if ammo_now < ammo_before then",
+		"      fire_confirmed = true",
+		"      shot_count_status = \"AMMO_DELTA_CONFIRMED\"",
+		"      state = \"FIRE_CONFIRMED\"",
+		"    end",
 		"  end",
 		"  if hp_now < hp_before then",
 		"    impact_time = GetTime()",
-		"    state = \"IMPACT_OBSERVED\"",
+		"    health_delta_observed = true",
+		"    state = fire_confirmed and \"IMPACT_CONFIRMED\" or \"HEALTH_DELTA_OBSERVED\"",
 		"    write_observation(\"MEASUREMENT_COMPLETE\", hp_now, ratio_now)",
 		"    return",
 		"  end",
@@ -930,11 +946,188 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 	return "\n".join(lines) + "\n"
 
 
+## Diagnose whether a `/config` path can be opened by BZCC 2.0.185's
+## select_bzone_cfg (i76win.cpp RVA 0xfbc34), which only loads bare filenames
+## inside @rootdir and skips ConfigureFileSystem() for arbitrary absolute or
+## parent-traversal paths outside BZ2R.
+static func diagnose_config_path_compatibility(cfg_path: String, game_root: String = DEFAULT_GAME_ROOT) -> Dictionary:
+	var c_cfg := WorkspaceStore.canonical(cfg_path)
+	var c_root := WorkspaceStore.canonical(game_root)
+	var cfg_dir := c_cfg.get_base_dir()
+	var in_root := _same_path(cfg_dir, c_root)
+	var bare_name := c_cfg.get_file()
+	return {
+		"ok": in_root,
+		"in_game_root": in_root,
+		"config_arg": bare_name if in_root else _to_win_path(c_cfg),
+		"recommended_rootdir_filename": bare_name,
+		"requires_rootdir_placement": not in_root,
+		"code": "CONFIG_IN_ROOTDIR" if in_root else "CONFIG_REQUIRES_ROOTDIR_PLACEMENT",
+		"warning": "" if in_root else (
+			"BZCC 2.0.185 /config only resolves bare filenames inside @rootdir (%s). " % _to_win_path(c_root)
+			+ "Passing an external path causes BZCC to skip ConfigureFileSystem() and fail loading ds_16.bmf. "
+			+ "BZ2R is kept strictly read-only; operator may copy %s into @rootdir and pass /config %s." % [_to_win_path(c_cfg), bare_name]
+		),
+	}
+
+
+## Classify a BZCC startup failure from startup log text and/or fatal dialog
+## text without conflating unmounted `/config` paths with missing game fonts.
+static func classify_startup_failure(log_text: String, dialog_text: String = "") -> Dictionary:
+	var low_log := log_text.to_lower()
+	var low_dlg := dialog_text.to_lower()
+	var used_cmd_config := low_log.contains("command line /config used")
+	var has_mounts := low_log.contains("config: 'adddirrecurse'") or low_log.contains("adding recurse")
+	var mentions_font := low_dlg.contains("ds_16.bmf") or low_dlg.contains("ds16.brf") or low_dlg.contains("unable to load console font") or low_log.contains("ds_16.bmf")
+	if used_cmd_config and not has_mounts:
+		return {
+			"code": "CONFIG_PATH_NOT_LOADED_NO_FILESYS",
+			"cause": "SHAMAN_OR_CMDLINE_CONFIG_OUTSIDE_ROOTDIR",
+			"font_missing_externally": false,
+			"stock_resources_mounted": false,
+			"detail": "BZCC recognized /config but parsed zero AddDirRecurse mounts; @rootdir\\bz2r_res was never mounted so stock ds_16.bmf could not load.",
+		}
+	if mentions_font and has_mounts:
+		return {
+			"code": "EXTERNAL_MISSING_FONT",
+			"cause": "GAME_INSTALLATION_RESOURCE_MISSING",
+			"font_missing_externally": true,
+			"stock_resources_mounted": true,
+			"detail": "Console font ds_16.bmf failed to load even after bz2r_res mounted; verify Steam game files.",
+		}
+	if low_dlg.contains("launch game with custom arguments"):
+		return {
+			"code": "STEAM_CUSTOM_ARGS_MODAL_PENDING",
+			"cause": "STEAM_CONFIRMATION_REQUIRED",
+			"font_missing_externally": false,
+			"stock_resources_mounted": has_mounts,
+			"detail": "Steam requires interactive Continue confirmation for custom launch arguments.",
+		}
+	if has_mounts:
+		return {
+			"code": "STARTUP_FILESYS_MOUNTED",
+			"cause": "NONE",
+			"font_missing_externally": false,
+			"stock_resources_mounted": true,
+			"detail": "BZCC mounted filesystem streams normally.",
+		}
+	return {
+		"code": "UNKNOWN_STARTUP_STATE",
+		"cause": "INSUFFICIENT_LOG_EVIDENCE",
+		"font_missing_externally": false,
+		"stock_resources_mounted": false,
+		"detail": "Log lacks /config and filesys lines.",
+	}
+
+
+## Correlate BZCC startup/crash logs against a specific SHAMAN session instead
+## of blindly picking the newest Battlezone-Crashed*.log file (P1-EVIDENCE-01).
+static func correlate_crash_logs(docs_dir: String, session_info: Dictionary,
+		launch_started_unix: int = 0) -> Dictionary:
+	var result := {
+		"matched": false,
+		"confidence": "UNRELATED",
+		"selected_log": "",
+		"selected_score": 0,
+		"selected_tail": "",
+		"candidates": [],
+	}
+	var dir := DirAccess.open(docs_dir)
+	if dir == null:
+		return result
+	var stage_root := str(session_info.get("stage_root", "")).replace("/", "\\").to_lower()
+	var stage_id := str(session_info.get("stage_id", "")).to_lower()
+	var session_id := str(session_info.get("session_id", "")).to_lower()
+	var cfg_name := str(session_info.get("config_path", "")).get_file().to_lower()
+	var mission_bzn := str(session_info.get("mission_bzn", DEFAULT_MISSION_BASE + ".bzn")).to_lower()
+	var best_score := -1
+	var best_path := ""
+	var best_tail := ""
+	var best_conf := "UNRELATED"
+	for name in dir.get_files():
+		var sname := str(name)
+		var low_name := sname.to_lower()
+		if not low_name.ends_with(".log"):
+			continue
+		if not (low_name.begins_with("battlezone-crashed") or low_name.begins_with("battlezone ")):
+			continue
+		var full := docs_dir.path_join(sname)
+		var mtime := int(FileAccess.get_modified_time(full))
+		var txt := FileAccess.get_file_as_string(full)
+		var low_txt := txt.to_lower()
+		var score := 0
+		var reasons: Array[String] = []
+		var time_ok := launch_started_unix <= 0 or mtime >= (launch_started_unix - 2)
+		if not time_ok:
+			reasons.append("predates_launch")
+		if stage_root != "" and (low_txt.contains(stage_root) or low_txt.contains(stage_root.replace("\\", "/"))):
+			score += 60
+			reasons.append("stage_root_match")
+		if stage_id != "" and low_txt.contains(stage_id):
+			score += 40
+			reasons.append("stage_id_match")
+		if session_id != "" and low_txt.contains(session_id):
+			score += 50
+			reasons.append("session_id_match")
+		if cfg_name != "" and low_txt.contains(cfg_name):
+			score += 25
+			reasons.append("config_name_match")
+		if mission_bzn != "" and low_txt.contains(mission_bzn):
+			score += 25
+			reasons.append("mission_bzn_match")
+		if time_ok and launch_started_unix > 0:
+			var delta := absi(mtime - launch_started_unix)
+			if delta <= 180:
+				score += 10
+				reasons.append("timestamp_window")
+		var conf := "UNRELATED"
+		if score >= 60 and time_ok:
+			conf = "CONFIRMED"
+		elif score >= 35 and time_ok:
+			conf = "HIGH"
+		elif score >= 10 and time_ok:
+			conf = "POSSIBLY_RELATED_LOG"
+		var cand := {
+			"path": full,
+			"name": sname,
+			"mtime": mtime,
+			"score": score,
+			"confidence": conf,
+			"reasons": reasons,
+		}
+		(result["candidates"] as Array).append(cand)
+		if time_ok and score > best_score and conf != "UNRELATED":
+			best_score = score
+			best_path = full
+			best_conf = conf
+			var lines := txt.split("\n")
+			var tail_arr: Array[String] = []
+			for i in range(maxi(0, lines.size() - 16), lines.size()):
+				tail_arr.append(str(lines[i]).strip_edges())
+			best_tail = "\n".join(tail_arr)
+	if best_path != "":
+		result["matched"] = best_conf in ["CONFIRMED", "HIGH"]
+		result["confidence"] = best_conf
+		result["selected_log"] = best_path
+		result["selected_score"] = best_score
+		result["selected_tail"] = best_tail
+	return result
+
+
 ## Build exact launch command descriptor for a given launch capability route.
+## `/logconsole` is opt-in (default false) so SHAMAN never injects extra flags
+## behind the operator's back (P0-NATIVE-01).
 static func build_launch_command(route: String, discovery: Dictionary, cfg_path: String,
-		mission_bzn: String = DEFAULT_MISSION_BASE + ".bzn") -> Dictionary:
-	var cfg_win := _to_win_path(cfg_path)
-	var game_args: Array[String] = ["/nointro", "/win", "/logconsole", "/config", cfg_win, mission_bzn]
+		mission_bzn: String = DEFAULT_MISSION_BASE + ".bzn",
+		include_logconsole: bool = false) -> Dictionary:
+	var game_root := str(discovery.get("game_root", DEFAULT_GAME_ROOT))
+	var cfg_diag := diagnose_config_path_compatibility(cfg_path, game_root)
+	var cfg_arg := str(cfg_diag.get("config_arg", _to_win_path(cfg_path)))
+	var game_args: Array[String] = ["/nointro", "/win"]
+	if include_logconsole:
+		game_args.append("/logconsole")
+	game_args.append_array(["/config", cfg_arg, mission_bzn])
+	var flags_prefix := "/nointro /win /logconsole" if include_logconsole else "/nointro /win"
 	match route:
 		"STEAM_MANAGED":
 			var steam_exe := str(discovery.get("steam_exe", ""))
@@ -945,6 +1138,8 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 				"executable": steam_exe,
 				"args": sargs,
 				"game_args": game_args,
+				"include_logconsole": include_logconsole,
+				"config_diagnostics": cfg_diag,
 				"steam_app_id": STEAM_APP_ID,
 				"game_version": str(discovery.get("build_id", "UNKNOWN")),
 				"supported": steam_exe != "" and FileAccess.file_exists(steam_exe),
@@ -955,7 +1150,9 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 				"executable": str(discovery.get("steam_exe", "")),
 				"args": game_args,
 				"game_args": game_args,
-				"launch_options_text": "/nointro /win /logconsole /config \"%s\" \"%s\"" % [cfg_win, mission_bzn],
+				"include_logconsole": include_logconsole,
+				"config_diagnostics": cfg_diag,
+				"launch_options_text": "%s /config \"%s\" \"%s\"" % [flags_prefix, cfg_arg, mission_bzn],
 				"steam_app_id": STEAM_APP_ID,
 				"game_version": str(discovery.get("build_id", "UNKNOWN")),
 				"supported": str(discovery.get("steam_exe", "")) != "",
@@ -966,9 +1163,14 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 				"executable": str(discovery.get("steam_exe", "")),
 				"args": game_args,
 				"game_args": game_args,
+				"include_logconsole": include_logconsole,
+				"config_diagnostics": cfg_diag,
 				"steam_app_id": STEAM_APP_ID,
 				"game_version": str(discovery.get("build_id", "UNKNOWN")),
-				"instructions": "Log into Steam for AppID %s and launch BZCC with /nointro /win /logconsole /config \"%s\" \"%s\"" % [STEAM_APP_ID, cfg_win, mission_bzn],
+				"instructions": "Log into Steam for AppID %s and launch BZCC with %s /config \"%s\" \"%s\"%s" % [
+					STEAM_APP_ID, flags_prefix, cfg_arg, mission_bzn,
+					(" (Note: " + str(cfg_diag.warning) + ")") if str(cfg_diag.warning) != "" else ""
+				],
 				"supported": true,
 			}
 		"DIRECT_EXECUTABLE":
@@ -977,6 +1179,8 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 				"executable": str(discovery.get("exe", "")),
 				"args": game_args,
 				"game_args": game_args,
+				"include_logconsole": include_logconsole,
+				"config_diagnostics": cfg_diag,
 				"steam_app_id": STEAM_APP_ID,
 				"game_version": str(discovery.get("build_id", "UNKNOWN")),
 				"supported": bool(discovery.get("ok", false)),
@@ -987,6 +1191,8 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 				"executable": "",
 				"args": [],
 				"game_args": [],
+				"include_logconsole": include_logconsole,
+				"config_diagnostics": cfg_diag,
 				"steam_app_id": STEAM_APP_ID,
 				"game_version": str(discovery.get("build_id", "UNKNOWN")),
 				"supported": false,

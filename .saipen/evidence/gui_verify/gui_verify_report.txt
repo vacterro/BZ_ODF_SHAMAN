@@ -1,9 +1,9 @@
 BZ_ODF_SHAMAN GUI Self-Verify
 theme=goldendefault
 viewport=(1920.0, 1061.0)
-index=17028 ODFs, 37161 asset names indexed in 1276 ms
-shooter_model={"bounds":"[P: (-5.135679, -0.02853, -6.20615), S: (10.27136, 6.257637, 12.17932)]","errors":[],"hardpoints":{"hp_cannon_1":"hp_cannon_1:<Node3D#2021671350484>","hp_cannon_2":"hp_cannon_2:<Node3D#2021839122654>","hp_com_1":"hp_com_1:<Node3D#2019104436409>","hp_dummyroot_1":"hp_dummyroot_1:<Node3D#2017527378467>","hp_eyepoint":"hp_eyepoint:<Node3D#2020882821318>","hp_gun_1":"hp_gun_1:<Node3D#2021587464399>","hp_gun_2":"hp_gun_2:<Node3D#2021755236569>","hp_smoke_1":"hp_smoke_1:<Node3D#2019087659192>"},"ok":true,"provenance":{"hardpoints":["hp_dummyroot_1","hp_smoke_1","hp_com_1","hp_eyepoint","hp_gun_1","hp_cannon_1","hp_gun_2","hp_cannon_2"],"materials":["fvtitan_skel_fvatank00.material","fvtitan_skel_treads1.material","fvtitan_skel_phong1.material","fvtitan_skel_fbextw02.material","fvtitan_skel_cockpit.material"],"msh_path":"V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/baked/Scion/Vehicles/fvtitan_skel.msh","node_count":27,"source_format":"DOCB .msh (from fvtitan_skel.fbx)","textures_loaded":["fvatank00_d.dds","fvtread.dds","fbextw02_d.dds","glareNEW.dds"],"triangle_count":6458,"vertex_count":4808},"root":"hp_dummyroot_1:<Node3D#2017527378467>","turret_x":"turret_x:<MeshInstance3D#2019221876925>","turret_y":"turret_y:<MeshInstance3D#2019121213626>"}
-target_model={"bounds":"[P: (-3.8, -0.0, -3.721037), S: (7.599999, 8.925084, 7.498049)]","errors":[],"hardpoints":{"hp_com":"hp_com:<Node3D#2023030305008>","hp_dust_1":"hp_dust_1:<Node3D#2024523477246>","hp_dust_2":"hp_dust_2:<Node3D#2024607363332>","hp_eyepoint":"hp_eyepoint:<Node3D#2023047082223>","hp_light_1":"hp_light_1:<Node3D#2023063859443>","hp_smoke_1":"hp_smoke_1:<Node3D#2024624140549>"},"ok":true,"provenance":{"hardpoints":["hp_com","hp_eyepoint","hp_light_1","hp_dust_1","hp_dust_2","hp_smoke_1"],"materials":["ivscav00_phong1.material","ivscav00_ivscav00.material","ivscav00_ivscav01.material","ivscav00_tread.material"],"msh_path":"V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/baked/ISDF/vehicles/ivscav00.msh","node_count":13,"source_format":"DOCB .msh (from ivscav00.fbx)","textures_loaded":["ivscav00.dds","ivscav01.dds","tread.dds"],"triangle_count":1942,"vertex_count":2196},"root":"dummy:<MeshInstance3D#2022090780905>","turret_x":null,"turret_y":null}
+index=17028 ODFs, 37161 asset names indexed in 1369 ms
+shooter_model={"bounds":"[P: (-5.135679, -0.02853, -6.20615), S: (10.27136, 6.257637, 12.17932)]","errors":[],"hardpoints":{"hp_cannon_1":"hp_cannon_1:<Node3D#2047206274445>","hp_cannon_2":"hp_cannon_2:<Node3D#2047374046616>","hp_com_1":"hp_com_1:<Node3D#2044639360424>","hp_dummyroot_1":"hp_dummyroot_1:<Node3D#2043062298180>","hp_eyepoint":"hp_eyepoint:<Node3D#2046417745305>","hp_gun_1":"hp_gun_1:<Node3D#2047122388372>","hp_gun_2":"hp_gun_2:<Node3D#2047290160530>","hp_smoke_1":"hp_smoke_1:<Node3D#2044622583207>"},"ok":true,"provenance":{"hardpoints":["hp_dummyroot_1","hp_smoke_1","hp_com_1","hp_eyepoint","hp_gun_1","hp_cannon_1","hp_gun_2","hp_cannon_2"],"materials":["fvtitan_skel_fvatank00.material","fvtitan_skel_treads1.material","fvtitan_skel_phong1.material","fvtitan_skel_fbextw02.material","fvtitan_skel_cockpit.material"],"msh_path":"V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/baked/Scion/Vehicles/fvtitan_skel.msh","node_count":27,"source_format":"DOCB .msh (from fvtitan_skel.fbx)","textures_loaded":["fvatank00_d.dds","fvtread.dds","fbextw02_d.dds","glareNEW.dds"],"triangle_count":6458,"vertex_count":4808},"root":"hp_dummyroot_1:<Node3D#2043062298180>","turret_x":"turret_x:<MeshInstance3D#2044756800932>","turret_y":"turret_y:<MeshInstance3D#2044656137637>"}
+target_model={"bounds":"[P: (-3.8, -0.0, -3.721037), S: (7.599999, 8.925084, 7.498049)]","errors":[],"hardpoints":{"hp_com":"hp_com:<Node3D#2048565228609>","hp_dust_1":"hp_dust_1:<Node3D#2050058400822>","hp_dust_2":"hp_dust_2:<Node3D#2050142286908>","hp_eyepoint":"hp_eyepoint:<Node3D#2048582006131>","hp_light_1":"hp_light_1:<Node3D#2048598783044>","hp_smoke_1":"hp_smoke_1:<Node3D#2050159064125>"},"ok":true,"provenance":{"hardpoints":["hp_com","hp_eyepoint","hp_light_1","hp_dust_1","hp_dust_2","hp_smoke_1"],"materials":["ivscav00_phong1.material","ivscav00_ivscav00.material","ivscav00_ivscav01.material","ivscav00_tread.material"],"msh_path":"V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/baked/ISDF/vehicles/ivscav00.msh","node_count":13,"source_format":"DOCB .msh (from ivscav00.fbx)","textures_loaded":["ivscav00.dds","ivscav01.dds","tread.dds"],"triangle_count":1942,"vertex_count":2196},"root":"dummy:<MeshInstance3D#2047625704826>","turret_x":null,"turret_y":null}
 hardpoint_mode=mesh:hp_cannon_1
 spawned_effects=3
 titan_bolt_rendered=true
@@ -12,10 +12,10 @@ rigid_floor_particle_lab=true
 texture_browser_count=120
 emitter_presets=11
 live_swap_modes=5
-preflight_status=STRUCTURALLY_VALID
-preflight_route=STEAM_MANAGED
-preflight_reason=
-audio_pool={"active":3,"capacity":8,"plays":4,"size":8,"steals":0}
+preflight_status=BLOCKED
+preflight_route=OPERATOR_MANUAL
+preflight_reason=STEAM_USER_NOT_LOGGED_IN
+audio_pool={"active":2,"capacity":8,"plays":4,"size":8,"steals":0}
 camera_presets=5
 save_deps_button=true
 font_aa=none

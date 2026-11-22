@@ -10,6 +10,7 @@ signal shot_finished(result: Dictionary)
 const GRAVITY := 9.81
 const SUBSTEP := 1.0 / 240.0
 const MAX_SUBSTEPS := 64
+const ActorStateScript = preload("res://scripts/sim/combat_actor_state.gd")
 
 class Shot:
 	var origin: Vector3 = Vector3.ZERO
@@ -53,10 +54,18 @@ class Shot:
 	var target_shield: float = 0.0
 	var target_shield_class: String = ""
 	var shield_damage_ratio: float = 1.0
+	var damage_shield_mult: float = 1.0
+	var damage_table: Dictionary = {}
 	var shield_damage_applied: float = 0.0
 	var damage_to_hull: float = 0.0
 	var ammo_cost: int = 0
 	var ammo_spent: int = 0
+	var energy_cost: float = 0.0
+	var energy_spent: float = 0.0
+	var shooter_ammo_remaining: int = 0
+	var shooter_energy_remaining: float = 0.0
+	var shooter_state: RefCounted = null
+	var target_state: RefCounted = null
 	var splash_hits: Array[Dictionary] = []
 	var extra_targets: Array = []
 	var obstacles: Array = []
@@ -83,12 +92,15 @@ func reset() -> void:
 
 func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_position: Vector3,
 		target_health: float = -1.0, p_extra_targets: Array = [], p_obstacles: Array = [],
-		shooter_velocity: Vector3 = Vector3.ZERO) -> Shot:
+		shooter_velocity: Vector3 = Vector3.ZERO, p_shooter_state: RefCounted = null,
+		p_target_state: RefCounted = null) -> Shot:
 	profile.refresh()
 	var s := Shot.new()
 	s.origin = origin
 	s.position = origin
 	s.previous = origin
+	s.shooter_state = p_shooter_state
+	s.target_state = p_target_state
 	var launch_dir := direction.normalized()
 	if profile.shot_variance > 0.00001:
 		var yaw_off := rng.randf_range(-profile.shot_variance, profile.shot_variance)
@@ -102,14 +114,43 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
 	s.speed = maxf(profile.shot_speed, s.velocity.length())
 	s.life_span = profile.life_span
 	s.radius = profile.shot_radius
-	s.damage_value = profile.expected_damage_for_target()
+	s.damage_table = profile.damage.duplicate(true)
+	s.damage_shield_mult = profile.damage_shield
 	s.damage_radius = profile.damage_radius
-	s.target_shield_max = profile.target_shield_max
-	s.target_shield = profile.target_shield_max
-	s.target_shield_class = profile.target_shield_class
-	s.shield_damage_ratio = profile.shield_damage_ratio()
+	# P1-SIM-02: Preserve persistent actor shield/hull instead of recreating full
+	# shield per projectile when a persistent CombatActorState is bound.
+	if p_target_state != null:
+		s.target_shield_max = p_target_state.shield_max
+		s.target_shield = p_target_state.shield_current
+		s.target_shield_class = p_target_state.shield_class
+		s.target_armor = p_target_state.armor_class
+		s.target_health = p_target_state.hull_current
+		s.target_health_max = p_target_state.hull_max
+		s.shield_damage_ratio = profile.shield_damage_ratio_for_class(s.target_shield_class)
+		s.damage_value = profile.damage_for_actor(s.target_armor, s.target_shield_class, s.target_shield)
+	else:
+		s.target_shield_max = profile.target_shield_max
+		s.target_shield = profile.target_shield_max
+		s.target_shield_class = profile.target_shield_class
+		s.target_armor = profile.target_armor
+		s.target_health = profile.target_health_max if target_health < 0.0 else target_health
+		s.target_health_max = profile.target_health_max
+		s.shield_damage_ratio = profile.shield_damage_ratio()
+		s.damage_value = profile.expected_damage_for_target()
+	# P1-SIM-01: Ammo and energy consumption belong strictly to the shooter,
+	# NEVER derived from target.maxAmmo.
 	s.ammo_cost = profile.ammo_cost
-	s.ammo_spent = mini(s.ammo_cost, profile.target_ammo_max if profile.target_ammo_max > 0 else s.ammo_cost)
+	s.energy_cost = profile.weapon_energy_cost
+	if p_shooter_state != null:
+		s.ammo_spent = s.ammo_cost if p_shooter_state.ammo_unlimited else mini(s.ammo_cost, p_shooter_state.ammo_max)
+		s.energy_spent = s.energy_cost if p_shooter_state.energy_unlimited else minf(s.energy_cost, p_shooter_state.energy_max)
+		s.shooter_ammo_remaining = p_shooter_state.ammo_current
+		s.shooter_energy_remaining = p_shooter_state.energy_current
+	else:
+		s.ammo_spent = mini(s.ammo_cost, profile.shooter_ammo_max) if profile.shooter_ammo_max > 0 else s.ammo_cost
+		s.energy_spent = minf(s.energy_cost, profile.shooter_energy_max) if profile.shooter_energy_max > 0.0 else s.energy_cost
+		s.shooter_ammo_remaining = maxi(0, profile.shooter_ammo_max - s.ammo_spent) if profile.shooter_ammo_max > 0 else 0
+		s.shooter_energy_remaining = maxf(0.0, profile.shooter_energy_max - s.energy_spent) if profile.shooter_energy_max > 0.0 else 0.0
 	s.gravity = GRAVITY if profile.is_arcing else 0.0
 	s.omega_turn = profile.omega_turn
 	s.is_homing = profile.is_homing
@@ -124,9 +165,6 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
 		s.target_bbox_center = target_position + rot_off
 	else:
 		s.target_bbox_center = target_position
-	s.target_health = profile.target_health_max if target_health < 0.0 else target_health
-	s.target_health_max = profile.target_health_max
-	s.target_armor = profile.target_armor
 	s.xpl_vehicle = profile.xpl_vehicle
 	s.xpl_ground = profile.xpl_ground
 	s.xpl_expire = profile.xpl_expire
@@ -285,30 +323,36 @@ func _finish(s: Shot, kind: String) -> void:
 		_log("collision", "Collision detected (%s) at %s" % [s.hit_target_id if s.hit_target_id != "" else "primary", _fmt_vec(s.position)])
 		var xpl := s.xpl_vehicle if s.xpl_vehicle != "" else s.xpl_ground
 		_log("explosion", "Explosion ODF selected: %s" % (xpl if xpl != "" else "(none declared)"))
-		var applied := s.damage_value
-		s.damage_applied = applied
-		var to_hull := _apply_shield(s, applied)
-		s.damage_to_hull = to_hull
 		if s.hit_target_id != "" and s.hit_target_id != "primary":
 			var matched_extra: Dictionary = {}
 			for et in s.extra_targets:
 				if et is Dictionary and str(et.get("id", "")) == s.hit_target_id:
-					var hp_cur := float(et.get("health", s.target_health_max))
-					var hp_max := float(et.get("max_health", s.target_health_max))
-					et["health"] = maxf(0.0, hp_cur - to_hull)
 					matched_extra = et
-					_log("damage", "Damage calculated on %s: %.2f (armor class %s, shield class %s) -> hull %.2f / %.2f" % [
-						str(et.get("name", s.hit_target_id)), applied, str(et.get("armor", s.target_armor)),
-						s.target_shield_class, float(et["health"]), hp_max
+					var ext_dmg_res := _apply_damage_to_extra_target(s, et, 1.0, "direct")
+					s.damage_applied = float(ext_dmg_res.get("raw_damage", 0.0))
+					s.shield_damage_applied = float(ext_dmg_res.get("shield_absorbed", 0.0))
+					s.damage_to_hull = float(ext_dmg_res.get("hull_damage", 0.0))
+					_log("damage", "Damage calculated on %s: %.2f (armor %s, shield %s %.2f/%.2f) -> hull %.2f / %.2f" % [
+						str(et.get("name", s.hit_target_id)), s.damage_applied, str(et.get("armor", "N")),
+						str(ext_dmg_res.get("shield_class", "none")), float(ext_dmg_res.get("shield_remaining", 0.0)),
+						float(ext_dmg_res.get("shield_max", 0.0)), float(ext_dmg_res.get("hull_remaining", 0.0)),
+						float(ext_dmg_res.get("hull_max", s.target_health_max))
 					])
 					break
 			if matched_extra.is_empty():
-				s.target_health = max(0.0, s.target_health - to_hull)
+				var fallback_res := _apply_primary_damage(s, s.damage_value, "direct")
+				s.damage_applied = float(fallback_res.get("raw_damage", 0.0))
+				s.shield_damage_applied = float(fallback_res.get("shield_absorbed", 0.0))
+				s.damage_to_hull = float(fallback_res.get("hull_damage", 0.0))
 		else:
-			s.target_health = max(0.0, s.target_health - to_hull)
-			_log("damage", "Damage calculated: %.2f (armor class %s, shield class %s) -> target hull %.2f / %.2f" % [
-				applied, s.target_armor, s.target_shield_class if s.target_shield_class != "" else "none",
-				s.target_health, s.target_health_max
+			var raw_prim := _damage_for_actor_from_shot(s, s.target_armor, s.target_shield_class, s.target_state.shield_current if s.target_state != null else s.target_shield)
+			var prim_res := _apply_primary_damage(s, raw_prim, "direct")
+			s.damage_applied = float(prim_res.get("raw_damage", raw_prim))
+			s.shield_damage_applied = float(prim_res.get("shield_absorbed", 0.0))
+			s.damage_to_hull = float(prim_res.get("hull_damage", 0.0))
+			_log("damage", "Damage calculated: %.2f (armor class %s, shield class %s %.2f/%.2f) -> target hull %.2f / %.2f" % [
+				s.damage_applied, s.target_armor, s.target_shield_class if s.target_shield_class != "" else "none",
+				s.target_shield, s.target_shield_max, s.target_health, s.target_health_max
 			])
 		if s.damage_radius > 0.0:
 			_apply_multi_target_splash(s, s.hit_target_id)
@@ -343,26 +387,134 @@ func _finish(s: Shot, kind: String) -> void:
 		"hit_normal": s.hit_normal,
 		"ammo_cost": s.ammo_cost,
 		"ammo_spent": s.ammo_spent,
+		"energy_cost": s.energy_cost,
+		"energy_spent": s.energy_spent,
+		"shooter_ammo_remaining": s.shooter_ammo_remaining,
+		"shooter_energy_remaining": s.shooter_energy_remaining,
 		"splash_hits": s.splash_hits,
 		"target_health": s.target_health,
 		"ordnance": s.ordnance_name,
 	})
 
 
+func _shield_ratio_for(s: Shot, sclass: String) -> float:
+	var sc := sclass.strip_edges().to_upper().substr(0, 1) if sclass != "" else ""
+	if sc == "":
+		return 1.0
+	var base := 1.0
+	match sc:
+		"S": base = 0.75
+		"D": base = 0.5
+		"N", "A": base = 1.0
+	return maxf(0.0, base * s.damage_shield_mult)
+
+
+func _damage_for_actor_from_shot(s: Shot, armor: String, sclass: String, shield_cur: float) -> float:
+	if s.damage_table.is_empty():
+		return s.damage_value
+	var key := armor if armor != "" else "N"
+	var sc := sclass.strip_edges().to_upper().substr(0, 1) if sclass != "" else ""
+	if sc != "" and shield_cur > 0.0 and s.damage_table.has(sc):
+		key = sc
+	return float(s.damage_table.get(key, s.damage_table.get("N", s.damage_value)))
+
+
+## Apply damage to the primary target (using persistent CombatActorState when
+## bound, or shot-local fallback for single-shot run_once tests).
+func _apply_primary_damage(s: Shot, raw_damage: float, dmg_kind: String) -> Dictionary:
+	if s.target_state != null:
+		var ratio := _shield_ratio_for(s, str(s.target_state.shield_class))
+		var res: Dictionary = s.target_state.apply_damage(raw_damage, ratio, dmg_kind)
+		s.target_shield = float(s.target_state.shield_current)
+		s.target_shield_max = float(s.target_state.shield_max)
+		s.target_shield_class = str(s.target_state.shield_class)
+		s.target_health = float(s.target_state.hull_current)
+		s.target_health_max = float(s.target_state.hull_max)
+		if float(res.get("shield_absorbed", 0.0)) > 0.0:
+			_log("damage", "Shield class %s absorbed %.2f (ratio %.2f), spill to hull %.2f, shield %.2f / %.2f (APPROXIMATED)" % [
+				s.target_shield_class, float(res.shield_absorbed), ratio, float(res.hull_damage), s.target_shield, s.target_shield_max
+			])
+		return res
+	var to_hull := _apply_shield(s, raw_damage)
+	s.target_health = maxf(0.0, s.target_health - to_hull)
+	return {
+		"raw_damage": raw_damage,
+		"shield_absorbed": s.shield_damage_applied,
+		"shield_remaining": s.target_shield,
+		"shield_max": s.target_shield_max,
+		"shield_class": s.target_shield_class,
+		"hull_damage": to_hull,
+		"hull_remaining": s.target_health,
+		"hull_max": s.target_health_max,
+	}
+
+
+## Apply direct or splash damage to an extra target using ITS OWN armor and
+## shield state (never leaking primary target shield parameters).
+func _apply_damage_to_extra_target(s: Shot, et: Dictionary, falloff: float, dmg_kind: String) -> Dictionary:
+	var actor_any = et.get("actor_state", null)
+	if actor_any != null and actor_any is RefCounted and actor_any.has_method("apply_damage"):
+		var actor = actor_any
+		var base_dmg := _damage_for_actor_from_shot(s, str(actor.armor_class), str(actor.shield_class), float(actor.shield_current))
+		var raw := base_dmg * falloff
+		var ratio := _shield_ratio_for(s, str(actor.shield_class))
+		var res: Dictionary = actor.apply_damage(raw, ratio, dmg_kind)
+		et["health"] = float(actor.hull_current)
+		et["max_health"] = float(actor.hull_max)
+		et["shield"] = float(actor.shield_current)
+		et["max_shield"] = float(actor.shield_max)
+		et["shield_class"] = str(actor.shield_class)
+		et["destroyed"] = bool(actor.destroyed)
+		return res
+	var armor := str(et.get("armor", "N"))
+	var sh_max := maxf(0.0, float(et.get("max_shield", 0.0)))
+	var sh_cur := maxf(0.0, float(et.get("shield", sh_max)))
+	var sh_cls := str(et.get("shield_class", ""))
+	var hp_max := maxf(1.0, float(et.get("max_health", s.target_health_max)))
+	var hp_cur := maxf(0.0, float(et.get("health", hp_max)))
+	var raw_d := _damage_for_actor_from_shot(s, armor, sh_cls, sh_cur) * falloff
+	var absorbed := 0.0
+	var to_hull := raw_d
+	if sh_cur > 0.0 and sh_max > 0.0 and raw_d > 0.0:
+		var r := maxf(0.0001, _shield_ratio_for(s, sh_cls))
+		var sh_hit := raw_d * r
+		absorbed = minf(sh_cur, sh_hit)
+		sh_cur = maxf(0.0, sh_cur - absorbed)
+		var spill := maxf(0.0, sh_hit - absorbed)
+		to_hull = raw_d * (spill / sh_hit)
+	hp_cur = maxf(0.0, hp_cur - to_hull)
+	et["shield"] = sh_cur
+	et["max_shield"] = sh_max
+	et["shield_class"] = sh_cls
+	et["health"] = hp_cur
+	et["max_health"] = hp_max
+	return {
+		"raw_damage": raw_d,
+		"shield_absorbed": absorbed,
+		"shield_remaining": sh_cur,
+		"shield_max": sh_max,
+		"shield_class": sh_cls,
+		"hull_damage": to_hull,
+		"hull_remaining": hp_cur,
+		"hull_max": hp_max,
+	}
+
+
 ## Consume shield before hull. Shield ratio follows the documented BZCC
 ## mapping (N/A=1, S=0.75, D=0.5) multiplied by ordnance DamageShield; this is
 ## an APPROXIMATED preview model, not native engine damage.
 func _apply_shield(s: Shot, raw_damage: float) -> float:
-	if s.target_shield_max <= 0.0 or s.target_shield_class == "":
+	if s.target_shield <= 0.0 or s.target_shield_max <= 0.0:
 		return raw_damage
-	var shield_hit := raw_damage * s.shield_damage_ratio
+	var ratio := maxf(0.0001, s.shield_damage_ratio)
+	var shield_hit := raw_damage * ratio
 	var absorbed := minf(s.target_shield, shield_hit)
 	s.target_shield = maxf(0.0, s.target_shield - absorbed)
 	s.shield_damage_applied = absorbed
 	var spill := maxf(0.0, shield_hit - absorbed)
 	var hull_damage := raw_damage * spill / maxf(0.0001, shield_hit)
 	_log("damage", "Shield class %s absorbed %.2f (ratio %.2f), spill to hull %.2f, shield %.2f / %.2f (APPROXIMATED)" % [
-		s.target_shield_class, absorbed, s.shield_damage_ratio, hull_damage, s.target_shield, s.target_shield_max
+		s.target_shield_class if s.target_shield_class != "" else "none", absorbed, ratio, hull_damage, s.target_shield, s.target_shield_max
 	])
 	return hull_damage
 
@@ -395,14 +547,25 @@ func _apply_multi_target_splash(s: Shot, skip_target_id: String) -> void:
 		var d := s.position.distance_to(s.target_position)
 		if d <= s.damage_radius:
 			var falloff := clampf(1.0 - (d / s.damage_radius), 0.0, 1.0)
-			var splash := s.damage_value * falloff
+			var base_p := _damage_for_actor_from_shot(s, s.target_armor, s.target_shield_class, s.target_state.shield_current if s.target_state != null else s.target_shield)
+			var splash := base_p * falloff
 			if splash > 0.001:
+				var pres := _apply_primary_damage(s, splash, "splash")
 				if skip_target_id == "":
 					s.damage_applied = splash
-				s.target_health = maxf(0.0, s.target_health - splash)
-				s.splash_hits.append({"id": "primary", "distance": d, "damage": splash, "health": s.target_health})
-				_log("damage", "Splash damage on primary (linear falloff, APPROXIMATED): %.2f at %.2f m -> hull %.2f" % [
-					splash, d, s.target_health
+					s.shield_damage_applied = float(pres.get("shield_absorbed", 0.0))
+					s.damage_to_hull = float(pres.get("hull_damage", 0.0))
+				s.splash_hits.append({
+					"id": "primary",
+					"distance": d,
+					"damage": splash,
+					"shield_damage": float(pres.get("shield_absorbed", 0.0)),
+					"shield_remaining": float(pres.get("shield_remaining", s.target_shield)),
+					"damage_to_hull": float(pres.get("hull_damage", 0.0)),
+					"health": s.target_health,
+				})
+				_log("damage", "Splash damage on primary (linear falloff, APPROXIMATED): %.2f at %.2f m -> shield %.2f, hull %.2f" % [
+					splash, d, s.target_shield, s.target_health
 				])
 	for et in s.extra_targets:
 		if not (et is Dictionary):
@@ -414,14 +577,22 @@ func _apply_multi_target_splash(s: Shot, skip_target_id: String) -> void:
 		var d2 := s.position.distance_to(epos)
 		if d2 <= s.damage_radius:
 			var fall2 := clampf(1.0 - (d2 / s.damage_radius), 0.0, 1.0)
-			var sp2 := s.damage_value * fall2
-			if sp2 > 0.001:
-				var hp_cur := float(et.get("health", s.target_health_max))
-				et["health"] = maxf(0.0, hp_cur - sp2)
-				s.splash_hits.append({"id": tid, "distance": d2, "damage": sp2, "health": float(et["health"])})
-				_log("damage", "Splash damage on %s (linear falloff, APPROXIMATED): %.2f at %.2f m -> hull %.2f" % [
-					str(et.get("name", tid)), sp2, d2, float(et["health"])
-				])
+			if fall2 > 0.0001:
+				var eres := _apply_damage_to_extra_target(s, et, fall2, "splash")
+				var sp2 := float(eres.get("raw_damage", 0.0))
+				if sp2 > 0.001:
+					s.splash_hits.append({
+						"id": tid,
+						"distance": d2,
+						"damage": sp2,
+						"shield_damage": float(eres.get("shield_absorbed", 0.0)),
+						"shield_remaining": float(eres.get("shield_remaining", 0.0)),
+						"damage_to_hull": float(eres.get("hull_damage", 0.0)),
+						"health": float(eres.get("hull_remaining", et.get("health", 0.0))),
+					})
+					_log("damage", "Splash damage on %s (linear falloff, APPROXIMATED): %.2f at %.2f m -> shield %.2f, hull %.2f" % [
+						str(et.get("name", tid)), sp2, d2, float(eres.get("shield_remaining", 0.0)), float(eres.get("hull_remaining", 0.0))
+					])
 
 
 func _ray_ramp(origin: Vector3, delta: Vector3, center: Vector3, size: Vector3, radius: float):

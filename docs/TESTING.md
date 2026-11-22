@@ -13,10 +13,14 @@ Equivalent:
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . res://tests/ui_smoke.tscn
 ```
 
-## `tests/test_runner.gd` — last run: 803 checks, 0 failures (`TESTED_HEADLESS`)
+## `tests/test_runner.gd` — last run: 990 checks, 0 failures (`TESTED_HEADLESS`)
 
 | Category | Coverage |
 |---|---|
+| Native startup diagnosis & log correlation (`NB-01..08`, `T-60`) | `/logconsole` opt-in (absent by default), stock `@rootdir\maps` mount, `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` vs bare `@rootdir` config check, `CONFIG_PATH_NOT_LOADED_NO_FILESYS` vs `EXTERNAL_MISSING_FONT` classification, session-correlated crash log selection (`P1-EVIDENCE-01`), stock `ds_16.bmf` presence |
+| Native completeness & monitor persistence (`RC-01..07`, `NM-03..08`, `P1-NATIVE-06`, `T-61`) | strict stock-only vs VSR closure, synthetic ordnance-only probe rejected when `require_complete_closure=true`, automatic `observation_expected_path` resolution in `poll_monitor`, foreign-session rejection, checked `process_monitors.json` persistence (`MONITOR_PERSIST_FAILED`/`RECOVERY_PENDING`), event-driven Lua without time-based `SHOT_OBSERVED` |
+| Persistent Combat State (`CS-01..12`, `T-62`) | `CombatActorState`/`CombatScenario` shooter-owned ammo/energy independent of target `maxAmmo`, multi-shot depletion & `INSUFFICIENT_AMMO`/`INSUFFICIENT_ENERGY` block, persistent target shield & hull across shots, independent secondary target shield/hull + splash propagation, reset & deterministic replay, live ODF edit + undo |
+| Particle Fidelity & `.msha` (`PF-01..04`, `T-63`) | `parse_texture_blend` ADD/MUL/SUB/MIX, `EffectBurst` UV scroll animation (`textureSpeed`/`textureRate`), per-emitter performance budgets, real 44-byte BZCC Workshop `.msha` DOCB v1 header inspection |
 | Reset safety (`RST-04..05,09,11,13..14`) | manifest failure blocks false reset success (`RESET_FAILED_RECOVERABLE`), durable recovery point create/restore, occurrence-aware physical duplicate reset, full factory header restore removing custom properties |
 | Damage/shield/ammo + hit normals (`DS-01..05`, `T-41`) | `maxShield`/`shieldClass`/`maxAmmo` parsed, `damageValue(S/D/A)` and shieldRatio applied before hull spill, `ammoCost` consumed, outward hit normal emitted in `shot_finished`/`run_once`, no-shield path unchanged |
 | Animated trails + animation inspection (`TR-01..04`, `T-41`) | crossed-ribbon trail generated and rebuilt for `draw_twirl_trail`, deterministic curved path, real DOCB `.msh` animation metadata inspected, non-DOCB `.msha` rejected |
@@ -56,7 +60,7 @@ Equivalent:
 Fixtures are read from the installed game and Workshop; nothing copyrighted is copied into the
 repository.
 
-## `tests/ui_smoke.tscn` — last run: 225 checks, 0 failures (`TESTED_HEADLESS`)
+## `tests/ui_smoke.tscn` — last run: 252 checks, 0 failures (`TESTED_HEADLESS`)
 
 Boots the real main scene and verifies:
 
@@ -131,14 +135,14 @@ tools\run_bench.cmd
 ```
 
 Prints index scan, 500-file parse throughput, 100 cold inheritance merges, 500 deterministic
-shots and static memory. There is no pass/fail threshold; compare runs by hand. Last run (2026-11-21 Wave F `T-42`):
+shots and static memory. There is no pass/fail threshold; compare runs by hand. Last run (2026-11-22 Wave F `T-64`):
 
 ```
-index: 17028 ODFs, 37161 asset names in 1323.1 ms
-parse: 500 ODFs, 0.55 MB in 606.3 ms (0.9 MB/s)
-inheritance: 100 cold merges of ivtank_vsr in 110.1 ms (1.10 ms each, 131 rows)
-sim: 500 shots in 4250.0 ms (8.50 ms each, 500 hits)
-memory: 147.9 MB static
+index: 17028 ODFs, 37161 asset names in 1208.9 ms
+parse: 500 ODFs, 0.55 MB in 760.0 ms (0.7 MB/s)
+inheritance: 100 cold merges of ivtank_vsr in 126.9 ms (1.27 ms each, 131 rows)
+sim: 500 shots in 5790.6 ms (11.58 ms each, 500 hits)
+memory: 148.3 MB static
 ```
 
 ## Regression rule

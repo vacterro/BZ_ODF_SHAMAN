@@ -4,32 +4,28 @@ Ordered by impact. None of these is silently removed from scope.
 
 ## Native game integration
 
-- **Live BZCC launch is reproducible, but the engine exits before mission initialization.**
-  `NativeTestAdapter` generates structurally validated ASCII v1192 `luamission.dll` `.bzn` scenarios
-  with verified stock `test` terrain, exact `<stage>/assets` `AddDirRecurse` mount configs, controlled
-  `WriteToFile` Lua state-machine scripts, Steam launch capability routing (`STEAM_MANAGED`,
-  `STEAM_LAUNCH_OPTIONS`, `OPERATOR_MANUAL`, `DIRECT_EXECUTABLE`, `UNSUPPORTED`), and separated
-  schema-vs-trusted-session evidence attestation. T-20 observed a logged-in Steam client,
-  `steam_appid.txt` present in read-only `BZ2R`, and `steam.exe -applaunch 624970` successfully
-  spawning `battlezone2.exe` with the staged `/config` and `shaman_shot.bzn`. BZCC 2.0.185 then
-  showed a modal fatal dialog: `Unable to load console font 'ds16.brf' -- check MOD installation
-  and/or .cfg`; `ds16.brf` is absent from the read-only game installation and Steam injects
-  `/logconsole` through global launch options even when it is omitted from the command. No
-  `Config: 'AddDirRecurse'` or mission initialization line appeared and no session-bound
-  LuaMission observation artifact was produced. The launch and dialog are recorded in
-  `.saipen/evidence/native/T-20-native-probe-1136976.json` and
-  `.saipen/evidence/native/T-20-font-blocker.md`.
-  No live engine measurement or calibration is claimed; read-only `BZ2R` is never modified, and
-  native verified count remains `0`. The original `STEAM_USER_NOT_LOGGED_IN` / exit 53 state was
-  a session-specific condition and is no longer the current blocker.
+- **Live BZCC `/config` path restriction & Steam confirmation modal (`NATIVE_VERIFIED: 0`).**
+  Controlled T-60 diagnostics (`.saipen/evidence/native/T-60-native-startup-diagnosis.md`) proved that
+  stock BZCC 2.0.185 boots cleanly (`Battlezone 2026-11-22 11.26.43.3718.log`) and that stock
+  `ds_16.bmf` exists in `bz2r_res/interface/Fonts/DS/ds_16.bmf` (earlier T-20 notes misread it as
+  `ds16.brf` and wrongly attributed `/logconsole` to Steam). The actual cause of the staged startup
+  failure is that BZCC 2.0.185's `select_bzone_cfg` (`i76win.cpp` RVA `0xfbc34`) only loads bare
+  `/config <filename.cfg>` files inside `@rootdir` (`BZ2R\`), skipping `ConfigureFileSystem()` for
+  external absolute or `..\` paths and thereby leaving `bz2r_res` unmounted. Additionally,
+  `steam.exe -applaunch 624970 <args>` triggers Steam's interactive `"Launch Game with custom arguments"`
+  confirmation modal. Because `SafeStageManager` keeps `BZ2R` strictly read-only, SHAMAN surfaces
+  `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` diagnostics and exact operator handoff instructions instead of
+  mutating `BZ2R`. `NATIVE_VERIFIED` remains honestly `0`.
 - Reload requirements inside BZCC (scene/mission/full restart) are not measured.
 - No supported live modification inside the running game is claimed.
 
 ## Assets
 
 - **DOCB `.msh` models are decoded for static geometry, `.material` descriptors, DDS/TGA textures,
-  and `hp_*`/turret hierarchy.** `.msha` files, animations, skin weights, and BC5S-compressed DDS
-  normal maps are not decoded; undecoded models fall back to clearly labelled `PLACEHOLDER MESH` boxes.
+  and `hp_*`/turret hierarchy.** Real 44-byte DOCB v1 `.msha` header identity is parsed honestly
+  (`is_empty_stub`, `skeletal_skinning_supported = false`), while full `.msha` skeletal tracks,
+  skin weights, and BC5S-compressed DDS normal maps remain `NOT_IMPLEMENTED`; undecoded models fall
+  back to clearly labelled `PLACEHOLDER MESH` boxes.
 - `.pak` archives are not unpacked, so assets stored only inside `.pak` files are not loaded.
 - Audio Lab plays uncompressed PCM WAVs and draws waveforms; Weapons Lab mixes fire/explosion
   WAVs through a bounded 8-channel multichannel pool linked to the interactive Timeline panel;
@@ -41,7 +37,7 @@ Ordered by impact. None of these is silently removed from scope.
 
 - Rigid flat floor (`StaticBody3D` at `y = 0`) plus placeable sandbox Walls, Pillars, Boxes, and sloped 3D Terrain Ramps (`shape="ramp"`) with ray-vs-wedge and particle-bounce collision; no full heightmap terrain, water, or mesh-accurate building colliders.
 - Oriented 3D bounding-box (OBB) and sphere/ramp collision; ignores exact hull mesh triangles, collision layers, and `boxCollide`.
-- Shield absorption is an APPROXIMATED preview: `shieldClass` ratio and `DamageShield` multiplier are applied before hull spill, but no real shield mesh/texture animation, deflection angle, or regeneration is simulated. Damage-over-time, status effects, mines, deployables, and friendly fire remain `NOT_IMPLEMENTED`.
+- Persistent actor-level combat state (`CombatActorState` / `CombatScenario`, `T-62`) models shooter-owned ammo/energy, persistent shield/hull across sequential shots, independent secondary target shields and splash propagation, and deterministic replay as `APPROXIMATED` preview models; no real shield mesh/texture animation, deflection angle, regeneration, mines, deployables, or friendly fire are simulated.
 - Approximated beam/lightning (`BoltBeamNode` for `draw_bolt`/`draw_beam`/`ArcCannonClass`), homing missile turning (`omegaTurn`), seeded `shotVariance` spread, recoil kick, moving shooter velocity inheritance, configurable Moving Target patterns (`Strafe`/`Wiggle`/`Orbit`/`Approach`), and Shooter Aim modes (`Manual`/`Track`/`Lead`/`Fixed Forward`) are implemented as `APPROXIMATED` preview models, not native engine formulas.
 - Salvos/bursts use `salvoCount`/`salvoDelay`; `altName` alternate fire is previewable via FIRE ALT, but the `switchMask`/deploy transition itself, ammo cost, and morph timing are not modelled.
 - Multi-target splash falloff is linear (`APPROXIMATED`) across primary and secondary targets on vehicle/obstacle/ground impacts.

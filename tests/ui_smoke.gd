@@ -985,6 +985,28 @@ finishRadius=0.1
 		if main.model_text != null:
 			main.current_doc = t41_doc
 			main._update_model_tab()
+
+		# Wave C/D/E UI: NativeSessionService monitoring survives tab switch to Particle Lab + Combat Actor HUD!
+		_check(main.native_session_service != null, "NM-01 UI: MainWindow owns application-level NativeSessionService")
+		_check(main.weapon_lab.native_session_service == main.native_session_service, "NM-01 UI: WeaponLab shares MainWindow NativeSessionService")
+		_check(main.weapon_lab.native_monitor_label != null and main.weapon_lab.native_cancel_button != null and main.weapon_lab.native_resume_button != null, "NM-01 UI: Native monitor strip and Cancel/Resume controls exist")
+		_check(main.weapon_lab.shield_bar != null and main.weapon_lab.shield_label != null and main.weapon_lab.shooter_resource_label != null, "Wave D/E UI: 3D Combat Actor HUD exposes Target Shield bar and Shooter Ammo/Energy label")
+		var nsvc = main.native_session_service
+		nsvc.runner.process_launcher = func(_e: String, _a: Array) -> Dictionary: return {"ok": true, "pid": 9101, "exit_code": 0}
+		nsvc.runner.process_inspector = func() -> Array: return []
+		var pre_ui: Dictionary = main.weapon_lab.run_native_preflight_only({"steam_override": {"steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe", "steam_present": true, "steam_running": true, "steam_logged_in": true}, "check_closure": false})
+		var sid_ui := str(pre_ui.get("session_id", ""))
+		main.weapon_lab.run_native_stage()
+		main.weapon_lab.run_native_launch(true, {"preexisting_game_pids": [], "monitor_started_at_s": 0.0, "monitor_timeout_s": 30.0})
+		_check(nsvc.is_monitoring(sid_ui), "NM-01 UI: automatic non-blocking polling started after launch")
+		main.doc_tabs.current_tab = 1  # Switch to Particle Lab!
+		await get_tree().process_frame
+		_check(nsvc.is_monitoring(sid_ui), "NM-02 UI: switching to Particle Lab does NOT interrupt NativeSessionService monitoring")
+		main.weapon_lab.run_native_cancel_monitor()
+		_check(not nsvc.is_monitoring(sid_ui), "NM-09 UI: cancel monitor stops automatic polling cleanly")
+		main.weapon_lab.run_native_cleanup()
+		main.doc_tabs.current_tab = 0
+
 	# Restore the real scenario for any later assertions.
 	main.apply_active_loadout("3532748119", false)
 	_cleanup_test_root()

@@ -136,21 +136,27 @@ static func inspect_animation(path: String, index: ResourceIndex = null,
 	return out
 
 
-## Parse a DOCB .msha file's header identity. This only proves the asset is a
-## DOCB animation container; it does not decode tracks or skin weights.
+## Parse a DOCB .msha file's header identity. Supports both compact 44-byte
+## DOCB v1 empty-track stubs observed in BZCC Workshop mods and full >=52-byte
+## DOCB containers. Does not fabricate skeletal skinning or keyframe tracks.
 static func inspect_msha_file(path: String) -> Dictionary:
-	var out := {"ok": false, "path": path, "version": 0, "layout": 0, "body_len": 0, "errors": []}
+	var out := {
+		"ok": false, "path": path, "bytes": 0, "version": 0, "layout": 0,
+		"body_len": 0, "is_empty_stub": false, "skeletal_skinning_supported": false, "errors": [],
+	}
 	if path == "" or not FileAccess.file_exists(path):
 		out.errors.append("msha file not found")
 		return out
 	var bytes := FileAccess.get_file_as_bytes(path)
-	if bytes.size() < 52 or bytes.slice(0, 4).get_string_from_ascii() != MAGIC:
+	out.bytes = bytes.size()
+	if bytes.size() < 12 or bytes.slice(0, 4).get_string_from_ascii() != MAGIC:
 		out.errors.append("not a DOCB .msha file")
 		return out
 	out.ok = true
 	out.version = int(bytes.decode_u32(4))
 	out.layout = int(bytes.decode_u32(8))
-	out.body_len = int(bytes.decode_u32(48))
+	out.body_len = int(bytes.decode_u32(48)) if bytes.size() >= 52 else 0
+	out.is_empty_stub = bytes.size() <= 44 and out.body_len == 0
 	return out
 
 

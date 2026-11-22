@@ -1,9 +1,9 @@
 extends SceneTree
-## Reproducible real-BZCC native experiment probe (T-20 / P2-01).
-## Uses the real adapter and runner with no DI hooks. All writes stay under an
-## isolated WorkspaceStore root; the game root is only read, never modified.
-## Emits a durable JSON evidence artifact containing preflight, stage, launch,
-## bounded monitor polls, observation collection and the exact blocker/verdict.
+## Reproducible real-BZCC native experiment probe (P0-NATIVE-02, P1-EVIDENCE-01).
+## Uses a real ResourceIndex + WeaponProfile + strict complete resource closure
+## against a stock-only scenario by default (ivtank / ivscav / gminigun_c), or
+## an explicit VSR integration fixture when `--vsr` is supplied.
+## All writes stay under an isolated WorkspaceStore root; BZ2R is strictly read-only.
 
 const RunnerScript = preload("res://scripts/native/native_experiment_runner.gd")
 const AdapterScript = preload("res://scripts/native/native_test_adapter.gd")
@@ -14,15 +14,20 @@ const POLL_INTERVAL_MS := 500
 
 
 func _initialize() -> void:
-	var root := "user://t20_native_probe_" + str(Time.get_ticks_usec())
+	var args := OS.get_cmdline_user_args()
+	var use_vsr := args.has("--vsr")
+	var allow_launch := args.has("--launch")
+	var launch_started_unix := int(Time.get_unix_time_from_system())
+
+	var root := "user://native_probe_" + str(Time.get_ticks_usec())
 	OS.set_environment(WorkspaceScript.ENV_ROOT, root)
 	var evidence_dir := ProjectSettings.globalize_path("res://.saipen/evidence/native")
 	DirAccess.make_dir_recursive_absolute(evidence_dir)
-	var evidence_path := evidence_dir.path_join("T-20-native-probe-" + str(Time.get_ticks_usec()) + ".json")
+	var evidence_path := evidence_dir.path_join("native-probe-" + str(Time.get_ticks_usec()) + ".json")
 
 	var out := {
-		"schema": 1,
-		"ticket": "T-20",
+		"schema": 2,
+		"fixture": "vsr" if use_vsr else "stock_only",
 		"workspace_root": root,
 		"started_at": Time.get_datetime_string_from_system(),
 		"discovery": {},
@@ -31,6 +36,7 @@ func _initialize() -> void:
 		"launch": {},
 		"monitor": {},
 		"observation": {},
+		"diagnostics": {},
 		"cleanup": {},
 		"verdict": "BLOCKED",
 		"reason": "",
@@ -45,22 +51,63 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	var odf_bytes := "[OrdnanceClass]\ndamageValue(H)=100\nshotSpeed=120\nshotRadius=0.5\nlifeSpan=0.834\n".to_utf8_buffer()
-	var pre: Dictionary = runner.preflight(null, null, {
+	# P0-NATIVE-02: Build a real ResourceIndex + strict ModLoadout + WeaponProfile
+	# so preflight verifies complete resource closure (shooter, target, weapon, ordnance).
+	var index := ResourceIndex.new()
+	var res_root := str(disc.get("res_root", str(disc.get("game_root", AdapterScript.DEFAULT_GAME_ROOT)).path_join("bz2r_res")))
+	var ws_root := str(disc.get("workshop_root", ""))
+	index.roots = [{"path": res_root, "label": "base", "kind": "game", "priority": 10, "enabled": true}]
+	if ws_root != "":
+		index.roots.append({"path": ws_root, "label": "workshop", "kind": "workshop", "priority": 30, "enabled": true})
+	index.scan(use_vsr)
+	var active_pkgs: Array[String] = []
+	var shooter_name := "ivtank"
+	var target_name := "ivscav"
+	var weapon_override := ""
+	if use_vsr:
+		active_pkgs = ["3532748119"]
+		shooter_name = "ivtank_vsr"
+		target_name = "ivscav_vsr"
+		weapon_override = "gatstabvsr_c"
+	index.set_active_packages(active_pkgs, true)
+	var shooter_path := index.resolve_path(shooter_name)
+	var target_path := index.resolve_path(target_name)
+	var profile := WeaponProfile.new()
+	var prof_ok := shooter_path != "" and target_path != "" and profile.resolve(index, shooter_path, target_path, weapon_override)
+	if not prof_ok:
+		out.reason = "RESOURCE_CLOSURE_INCOMPLETE"
+		out.preflight = {
+			"ok": false,
+			"reason": "RESOURCE_CLOSURE_INCOMPLETE",
+			"shooter_path": shooter_path,
+			"target_path": target_path,
+			"errors": profile.errors,
+		}
+		_write(evidence_path, out)
+		quit(1)
+		return
+
+	var pre: Dictionary = runner.preflight(profile, index, {
 		"discovery": disc,
-		"stage_prefix": "t20_real",
-		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"stage_prefix": "shaman_vsr" if use_vsr else "shaman_stock",
+		"check_closure": true,
+		"require_complete_closure": true,
+		"active_packages": active_pkgs,
+		"mounted_workshop_packages": active_pkgs,
 	})
+	var pre_detail: Dictionary = pre.get("preflight", {})
 	out.preflight = {
 		"ok": bool(pre.get("ok", false)),
 		"state": str(pre.get("state", "")),
 		"reason": str(pre.get("reason", "")),
 		"session_id": str(pre.get("session_id", "")),
-		"launch_route": str(pre.get("launch_route", "")),
+		"launch_route": str(pre_detail.get("launch_route", "")),
 		"launch_ready": bool(pre.get("launch_ready", false)),
+		"closure_status": str((pre_detail.get("resource_closure", {}) as Dictionary).get("status", "")),
+		"config_diagnostics": (pre_detail.get("launch_command", {}) as Dictionary).get("config_diagnostics", {}),
 	}
 	if not bool(pre.get("ok", false)):
-		out.reason = "PREFLIGHT_FAILED"
+		out.reason = str(pre.get("reason", "RESOURCE_CLOSURE_INCOMPLETE"))
 		_write(evidence_path, out)
 		quit(1)
 		return
@@ -77,6 +124,16 @@ func _initialize() -> void:
 		out.reason = "STAGE_FAILED"
 		_write(evidence_path, out)
 		quit(1)
+		return
+
+	if not allow_launch:
+		out.verdict = "STAGED_DRY_RUN"
+		out.reason = "Complete resource closure staged; pass --launch to execute authorized BZCC launch"
+		var cl0: Dictionary = runner.cleanup_stage(sid)
+		out.cleanup = {"ok": bool(cl0.get("ok", false)), "state": str(cl0.get("state", ""))}
+		out.finished_at = Time.get_datetime_string_from_system()
+		_write(evidence_path, out)
+		quit(0)
 		return
 
 	var launch: Dictionary = runner.launch(sid, {
@@ -100,10 +157,7 @@ func _initialize() -> void:
 		waited += POLL_INTERVAL_MS / 1000.0
 		last_poll = runner.poll_monitor(sid)
 		var state := str(last_poll.get("state", ""))
-		if state in ["COMPARISON_COMPLETE", "NATIVE_VERIFIED", "TIMEOUT", "CANCELLED", "FAILED"]:
-			break
-		var obs_path := str((runner.get_session_record(sid).get("session", {}) as Dictionary).get("observation_expected_path", ""))
-		if obs_path != "" and FileAccess.file_exists(obs_path):
+		if state in ["COMPARISON_COMPLETE", "NATIVE_VERIFIED", "TIMEOUT", "CANCELLED", "FAILED", "RECOVERY_PENDING"]:
 			break
 	out.monitor = {
 		"waited_s": waited,
@@ -112,12 +166,23 @@ func _initialize() -> void:
 		"game_exe_verified": bool(last_poll.get("game_exe_verified", false)),
 		"mission_observed": bool(last_poll.get("mission_observed", false)),
 		"resource_probe_confirmed": bool(last_poll.get("resource_probe_confirmed", false)),
+		"observation_collected": bool(last_poll.get("observation_collected", false)),
 		"polls": int(last_poll.get("polls", 0)),
 		"reason": str(last_poll.get("reason", "")),
 	}
 
-	var obs_path := str((runner.get_session_record(sid).get("session", {}) as Dictionary).get("observation_expected_path", ""))
-	if obs_path != "" and FileAccess.file_exists(obs_path):
+	var rec_sess: Dictionary = (runner.get_session_record(sid).get("session", {}) as Dictionary)
+	var obs_path := str(rec_sess.get("observation_expected_path", ""))
+	if bool(last_poll.get("observation_collected", false)):
+		out.observation = {
+			"path": obs_path,
+			"ok": true,
+			"state": str(last_poll.get("state", "")),
+			"verified": bool(last_poll.get("verified", false)),
+		}
+		out.verdict = "NATIVE_VERIFIED" if bool(last_poll.get("verified", false)) else "COMPARISON_COMPLETE"
+		out.reason = "LuaMission observation artifact collected automatically by monitor"
+	elif obs_path != "" and FileAccess.file_exists(obs_path):
 		var col: Dictionary = runner.collect_observation(sid, obs_path)
 		out.observation = {
 			"path": obs_path,
@@ -134,10 +199,11 @@ func _initialize() -> void:
 			"exists": false,
 			"reason": "OBSERVATION_ARTIFACT_MISSING",
 		}
-		out.reason = "BZCC launched/detected but no session-bound LuaMission observation artifact appeared within %d s; not attested" % int(MAX_WAIT_S)
+		out.reason = "No session-bound LuaMission observation artifact appeared within %d s" % int(MAX_WAIT_S)
 
-	out.diagnostics = _collect_launch_diagnostics(str(out.get("stage", {}).get("stage_root", "")), str(pre.get("session_id", "")))
-	out.reason = out.diagnostics.get("blocker_summary", out.reason)
+	out.diagnostics = _collect_launch_diagnostics(rec_sess, launch_started_unix)
+	if str(out.diagnostics.get("blocker_summary", "")) != "":
+		out.reason = str(out.diagnostics.get("blocker_summary", out.reason))
 	var cl: Dictionary = runner.cleanup_stage(sid)
 	out.cleanup = {"ok": bool(cl.get("ok", false)), "state": str(cl.get("state", ""))}
 	out.finished_at = Time.get_datetime_string_from_system()
@@ -145,67 +211,27 @@ func _initialize() -> void:
 	quit(0)
 
 
-func _collect_launch_diagnostics(stage_root: String, session_id: String) -> Dictionary:
-	var out := {
-		"steam_launch_lines": [],
-		"bzcc_startup_log": "",
-		"bzcc_startup_tail": "",
-		"staged_observation_files": [],
-		"blocker_summary": "",
-	}
-	var steam_log := "C:/Program Files (x86)/Steam/logs/console_log.txt"
-	if not FileAccess.file_exists(steam_log):
-		steam_log = "V:/__STORE_V/_SOFT/Steam/logs/console_log.txt"
-	if FileAccess.file_exists(steam_log):
-		var lines := FileAccess.get_file_as_string(steam_log).split("\n")
-		for i in range(maxi(0, lines.size() - 400), lines.size()):
-			var line := str(lines[i]).strip_edges()
-			if line.contains(stage_root.replace("\\", "/")) or line.contains(stage_root.replace("/", "\\")):
-				out.steam_launch_lines.append(line)
+func _collect_launch_diagnostics(sess_dict: Dictionary, launch_started_unix: int) -> Dictionary:
+	var stage_root := str(sess_dict.get("stage_root", ""))
+	var session_id := str(sess_dict.get("session_id", ""))
 	var docs := WorkspaceStore.canonical(OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)).path_join("My Games/Battlezone Combat Commander")
-	var dir := DirAccess.open(docs)
-	if dir != null:
-		var newest := ""
-		var newest_mtime := 0
-		for name in dir.get_files():
-			if not str(name).begins_with("Battlezone-Crashed") or not str(name).ends_with(".log"):
-				continue
-			var p := docs.path_join(str(name))
-			var mt := FileAccess.get_modified_time(p)
-			if mt > newest_mtime:
-				newest_mtime = mt
-				newest = p
-		if newest != "":
-			out.bzcc_startup_log = newest
-			var txt := FileAccess.get_file_as_string(newest)
-			var tlines := txt.split("\n")
-			var tail: Array[String] = []
-			for i in range(maxi(0, tlines.size() - 14), tlines.size()):
-				tail.append(str(tlines[i]).strip_edges())
-			out.bzcc_startup_tail = "\n".join(tail)
-		if stage_root != "":
-			var tag := stage_root.get_file().substr(0, 24)
-			var profile := docs.path_join("SHAMAN_" + tag)
-			var pd := DirAccess.open(profile)
-			if pd != null:
-				_scan_obs_files(pd, profile, out.staged_observation_files)
-	if out.steam_launch_lines.is_empty():
-		out.blocker_summary = "Steam -applaunch did not record staged config/mission in client log; launch not proven"
-	elif out.bzcc_startup_tail.contains("Command line /config used") and not out.bzcc_startup_tail.contains("Config: 'AddDirRecurse'"):
-		out.blocker_summary = "BZCC accepted staged /config and mission command line but terminated before filesystem/mission initialization; no session-bound LuaMission observation artifact (session=%s)" % session_id
-	else:
-		out.blocker_summary = "No session-bound LuaMission observation artifact; inspect steam_launch_lines and bzcc_startup_tail"
-	return out
-
-
-func _scan_obs_files(dir: DirAccess, path: String, result: Array) -> void:
-	for name in dir.get_files():
-		if str(name).begins_with("shaman_obs_") and str(name).ends_with(".json"):
-			result.append(path.path_join(str(name)))
-	for sub in dir.get_directories():
-		var subdir := DirAccess.open(path.path_join(str(sub)))
-		if subdir != null:
-			_scan_obs_files(subdir, path.path_join(str(sub)), result)
+	var corr: Dictionary = AdapterScript.correlate_crash_logs(docs, {
+		"stage_root": stage_root,
+		"stage_id": str(sess_dict.get("stage_id", "")),
+		"session_id": session_id,
+		"config_path": str(sess_dict.get("config_path", "")),
+		"mission_bzn": str(sess_dict.get("mission_basename", AdapterScript.DEFAULT_MISSION_BASE)) + ".bzn",
+	}, launch_started_unix)
+	var cls: Dictionary = AdapterScript.classify_startup_failure(str(corr.get("selected_tail", "")))
+	return {
+		"log_correlation": corr,
+		"startup_classification": cls,
+		"blocker_summary": "%s (confidence=%s, session=%s)" % [
+			str(cls.get("code", "UNKNOWN_STARTUP_STATE")),
+			str(corr.get("confidence", "UNRELATED")),
+			session_id
+		],
+	}
 
 
 func _write(path: String, data: Dictionary) -> void:
@@ -215,5 +241,5 @@ func _write(path: String, data: Dictionary) -> void:
 		return
 	f.store_string(JSON.stringify(data, "  "))
 	f.close()
-	print("T20_EVIDENCE=" + path)
-	print("T20_VERDICT=" + str(data.get("verdict", "")) + " " + str(data.get("reason", "")))
+	print("NATIVE_PROBE_EVIDENCE=" + path)
+	print("NATIVE_PROBE_VERDICT=" + str(data.get("verdict", "")) + " " + str(data.get("reason", "")))

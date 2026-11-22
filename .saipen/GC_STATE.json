@@ -73,28 +73,34 @@
   "T-55",
   "T-56",
   "T-57",
-  "T-58"
+  "T-58",
+  "T-59",
+  "T-60",
+  "T-61",
+  "T-62",
+  "T-63",
+  "T-64"
  ],
- "last_interval_consumed": 40,
+ "last_interval_consumed": 60,
  "last_run": {
-  "counted_at_run": 56,
-  "run_id": "20261121T232822-6fe18104"
+  "counted_at_run": 61,
+  "run_id": "20261122T095002-093cf86c"
  },
  "maintenance": {
   "blockers": [
    {
     "code": "EVIDENCE_KEPT",
-    "detail": "765908 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
+    "detail": "774133 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
    }
   ],
   "bytes_reclaimed": 0,
-  "fingerprint": "6477e764e9cf647e095fffb2bd67cd99218d673e79ee64953ed5b600b401be6a",
-  "last_attempt_fingerprint": "6477e764e9cf647e095fffb2bd67cd99218d673e79ee64953ed5b600b401be6a",
-  "protected_bytes": 765908,
+  "fingerprint": "4aab2d5e016e492bc5c1a6f59a103c09c970dc0b1560424966fbd5f52b56dbf1",
+  "last_attempt_fingerprint": "4aab2d5e016e492bc5c1a6f59a103c09c970dc0b1560424966fbd5f52b56dbf1",
+  "protected_bytes": 774133,
   "reason": "no reclaimable candidate exists; nothing is safe to delete",
-  "run_id": "20261121T232822-6fe18104",
+  "run_id": "20261122T095002-093cf86c",
   "state": "GC_BLOCKED_NO_SAFE_CANDIDATES",
-  "updated": "2026-11-21T23:28:22Z"
+  "updated": "2026-11-22T09:50:02Z"
  },
  "runs": [
   {
@@ -159,6 +165,27 @@
    "finished": "2026-11-21T23:28:22Z",
    "run_id": "20261121T232822-6fe18104",
    "started": "2026-11-21T23:28:22Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 59,
+   "finished": "2026-11-22T09:26:31Z",
+   "run_id": "20261122T092630-5dfd50dc",
+   "started": "2026-11-22T09:26:30Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 60,
+   "finished": "2026-11-22T09:44:26Z",
+   "run_id": "20261122T094426-f076f9ed",
+   "started": "2026-11-22T09:44:26Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 61,
+   "finished": "2026-11-22T09:50:02Z",
+   "run_id": "20261122T095002-093cf86c",
+   "started": "2026-11-22T09:50:02Z"
   }
  ],
  "schema": 1
