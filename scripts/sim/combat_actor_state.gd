@@ -36,6 +36,8 @@ var half_extents: Vector3 = Vector3.ZERO
 var bbox_offset: Vector3 = Vector3.ZERO
 
 var destroyed: bool = false
+var disabled: bool = false
+var weapon_name: String = ""
 var active_effects: Array[Dictionary] = []
 
 
@@ -85,17 +87,27 @@ func reset_to_initial() -> void:
 	energy_current = energy_max
 	reload_remaining = 0.0
 	destroyed = false
+	disabled = false
 	active_effects.clear()
 
 
+## Fire permission state machine (P0-SIM-02):
+##   READY | RELOADING | INSUFFICIENT_AMMO | INSUFFICIENT_ENERGY | DESTROYED | DISABLED
+func fire_permission_state(ammo_cost: int, energy_cost: float = 0.0, enforce_reload: bool = true) -> Dictionary:
+	return can_fire(ammo_cost, energy_cost, enforce_reload)
+
+
 func can_fire(ammo_cost: int, energy_cost: float = 0.0, enforce_reload: bool = false) -> Dictionary:
+	if disabled:
+		return {"ok": false, "state": "DISABLED", "reason": "SHOOTER_DISABLED"}
 	if destroyed:
-		return {"ok": false, "reason": "SHOOTER_DESTROYED"}
+		return {"ok": false, "state": "DESTROYED", "reason": "SHOOTER_DESTROYED"}
 	if enforce_reload and reload_remaining > 0.0001:
-		return {"ok": false, "reason": "WEAPON_RELOADING", "reload_remaining": reload_remaining}
+		return {"ok": false, "state": "RELOADING", "reason": "WEAPON_RELOADING", "reload_remaining": reload_remaining}
 	if ammo_cost > 0 and not ammo_unlimited and ammo_current < ammo_cost:
 		return {
 			"ok": false,
+			"state": "INSUFFICIENT_AMMO",
 			"reason": "INSUFFICIENT_AMMO",
 			"ammo_current": ammo_current,
 			"ammo_cost": ammo_cost,
@@ -103,19 +115,23 @@ func can_fire(ammo_cost: int, energy_cost: float = 0.0, enforce_reload: bool = f
 	if energy_cost > 0.0 and not energy_unlimited and energy_current + 0.0001 < energy_cost:
 		return {
 			"ok": false,
+			"state": "INSUFFICIENT_ENERGY",
 			"reason": "INSUFFICIENT_ENERGY",
 			"energy_current": energy_current,
 			"energy_cost": energy_cost,
 		}
-	return {"ok": true, "reason": ""}
+	return {"ok": true, "state": "READY", "reason": ""}
 
 
-func consume_fire_resources(ammo_cost: int, energy_cost: float = 0.0, p_shot_delay: float = -1.0) -> Dictionary:
-	var chk := can_fire(ammo_cost, energy_cost, false)
+func consume_fire_resources(ammo_cost: int, energy_cost: float = 0.0, p_shot_delay: float = -1.0,
+		enforce_reload: bool = true, set_reload_timer: bool = true) -> Dictionary:
+	var chk := can_fire(ammo_cost, energy_cost, enforce_reload)
 	if not bool(chk.get("ok", false)):
 		return {
 			"ok": false,
+			"state": str(chk.get("state", "DISABLED")),
 			"reason": str(chk.get("reason", "CANNOT_FIRE")),
+			"reload_remaining": reload_remaining,
 			"ammo_spent": 0,
 			"energy_spent": 0.0,
 			"ammo_remaining": ammo_current,
@@ -137,15 +153,17 @@ func consume_fire_resources(ammo_cost: int, energy_cost: float = 0.0, p_shot_del
 			energy_current = maxf(0.0, energy_current - spent_energy)
 	if p_shot_delay >= 0.0:
 		shot_delay = p_shot_delay
-	if shot_delay > 0.0:
+	if set_reload_timer and shot_delay > 0.0:
 		reload_remaining = shot_delay
 	return {
 		"ok": true,
+		"state": "RELOADING" if reload_remaining > 0.0001 else "READY",
 		"reason": "",
 		"ammo_spent": spent_ammo,
 		"energy_spent": spent_energy,
 		"ammo_remaining": ammo_current,
 		"energy_remaining": energy_current,
+		"reload_remaining": reload_remaining,
 	}
 
 
@@ -199,8 +217,18 @@ func add_effect(effect_name: String, dps: float, duration_s: float, shield_ratio
 
 func tick(dt: float) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	if dt <= 0.0:
+		return out
+	var was_reloading := reload_remaining > 0.0001
 	if reload_remaining > 0.0:
 		reload_remaining = maxf(0.0, reload_remaining - dt)
+		if was_reloading and reload_remaining <= 0.0001:
+			reload_remaining = 0.0
+			out.append({
+				"event_type": "reload_ready",
+				"actor_id": actor_id,
+				"kind": "reload_ready",
+			})
 	if active_effects.is_empty():
 		return out
 	var keep: Array[Dictionary] = []
@@ -209,6 +237,8 @@ func tick(dt: float) -> Array[Dictionary]:
 		var dps := float(eff.get("dps", 0.0))
 		if step_dt > 0.0 and dps > 0.0 and not destroyed:
 			var res := apply_damage(dps * step_dt, float(eff.get("shield_ratio", 1.0)), "dot:" + str(eff.get("name", "effect")))
+			res["event_type"] = "dot"
+			res["effect_name"] = str(eff.get("name", "effect"))
 			out.append(res)
 		var rem := float(eff.get("remaining_s", 0.0)) - dt
 		if rem > 0.0001:
@@ -224,6 +254,7 @@ func snapshot() -> Dictionary:
 		"actor_id": actor_id,
 		"role": role,
 		"display_name": display_name,
+		"weapon_name": weapon_name,
 		"hull_max": hull_max,
 		"hull_current": hull_current,
 		"armor_class": armor_class,
@@ -242,12 +273,27 @@ func snapshot() -> Dictionary:
 		"velocity": [velocity.x, velocity.y, velocity.z],
 		"yaw_rad": yaw_rad,
 		"radius": radius,
+		"half_extents": [half_extents.x, half_extents.y, half_extents.z],
+		"bbox_offset": [bbox_offset.x, bbox_offset.y, bbox_offset.z],
 		"destroyed": destroyed,
+		"disabled": disabled,
 		"active_effects": active_effects.duplicate(true),
 	}
 
 
+static func _vec3_from_arr(v, fallback: Vector3) -> Vector3:
+	if v is Vector3:
+		return v
+	if v is Array and (v as Array).size() >= 3:
+		return Vector3(float(v[0]), float(v[1]), float(v[2]))
+	return fallback
+
+
 func restore_snapshot(d: Dictionary) -> void:
+	actor_id = str(d.get("actor_id", actor_id))
+	role = str(d.get("role", role))
+	display_name = str(d.get("display_name", display_name))
+	weapon_name = str(d.get("weapon_name", weapon_name))
 	hull_max = float(d.get("hull_max", hull_max))
 	hull_current = float(d.get("hull_current", hull_max))
 	armor_class = str(d.get("armor_class", armor_class))
@@ -262,7 +308,14 @@ func restore_snapshot(d: Dictionary) -> void:
 	energy_unlimited = bool(d.get("energy_unlimited", energy_max <= 0.0))
 	shot_delay = float(d.get("shot_delay", shot_delay))
 	reload_remaining = float(d.get("reload_remaining", 0.0))
+	position = _vec3_from_arr(d.get("position", null), position)
+	velocity = _vec3_from_arr(d.get("velocity", null), velocity)
+	yaw_rad = float(d.get("yaw_rad", yaw_rad))
+	radius = maxf(0.2, float(d.get("radius", radius)))
+	half_extents = _vec3_from_arr(d.get("half_extents", null), half_extents)
+	bbox_offset = _vec3_from_arr(d.get("bbox_offset", null), bbox_offset)
 	destroyed = bool(d.get("destroyed", false))
+	disabled = bool(d.get("disabled", false))
 	active_effects = []
 	for eff in d.get("active_effects", []):
 		if eff is Dictionary:

@@ -1,0 +1,97 @@
+{
+  "cleanup": {
+    "ok": true,
+    "state": "CLEANED_UP"
+  },
+  "diagnostics": {},
+  "discovery": {
+    "addon_root": "C:/Users/SAIAG_9fabb0d5/Documents/My Games/Battlezone Combat Commander/Addon",
+    "build_id": "3807009",
+    "build_id_error": "",
+    "build_id_valid": true,
+    "data_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Data",
+    "exe": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe",
+    "exe_bytes": 5316976,
+    "exe_md5": "e2fa7458cf2604315f48915acd288689",
+    "game_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R",
+    "limitations": [
+      "Live BZCC launch via Steam requires an active logged-in Steam client session for AppID 624970.",
+      "Application-level trusted receipts verify runner provenance in-process, not cryptographic tamper resistance.",
+      "ODF resource reload timing in BZCC requires a fresh mission start.",
+      "Workshop mount order in the editor is an editor policy until verified per-mod in BZCC."
+    ],
+    "luamission_dll_present": true,
+    "missions_dll_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/Missions",
+    "ok": true,
+    "res_root": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res",
+    "steam": {
+      "active_pid": 30756,
+      "active_user": 0,
+      "detail": "steam.exe present but not running in current Windows session (ActiveUser=0x0)",
+      "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+      "steam_logged_in": false,
+      "steam_present": true,
+      "steam_running": false,
+      "supported_routes": [
+        "STEAM_MANAGED",
+        "STEAM_LAUNCH_OPTIONS",
+        "OPERATOR_MANUAL",
+        "DIRECT_EXECUTABLE"
+      ]
+    },
+    "steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe",
+    "workshop_root": "V:/__STORE_V/_SOFT/Steam/steamapps/workshop/content/624970"
+  },
+  "finished_at": "2026-11-22T12:34:52",
+  "fixture": "stock_only",
+  "launch": {},
+  "monitor": {},
+  "observation": {},
+  "preflight": {
+    "closure_status": "RESOURCE_CLOSURE_PARTIAL",
+    "config_compatible": true,
+    "config_diagnostics": {
+      "code": "CONFIG_STOCK_ADDON_ROUTE",
+      "config_arg": "",
+      "in_game_root": false,
+      "ok": true,
+      "recommended_rootdir_filename": "",
+      "requires_rootdir_placement": false,
+      "stock_addon_route": true,
+      "stock_bzone_cfg": {
+        "exists": true,
+        "first_mount": "@mydocsdir\\addon",
+        "mounts": [
+          "@mydocsdir\\addon",
+          "@rootdir\\bz2r_res",
+          "@rootdir\\maps"
+        ],
+        "mounts_addon_first": true,
+        "ok": true,
+        "path": "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bzone.cfg",
+        "reason": ""
+      },
+      "warning": ""
+    },
+    "execution_environment_ready": false,
+    "launch_eligible": false,
+    "launch_mode": "STOCK_ADDON",
+    "launch_ready": false,
+    "launch_route": "OPERATOR_MANUAL",
+    "ok": true,
+    "reason": "STEAM_USER_NOT_LOGGED_IN",
+    "session_id": "shaman_sess_1136922_1",
+    "stage_eligible": true,
+    "state": "BLOCKED"
+  },
+  "reason": "Complete resource closure staged; pass --launch to execute authorized BZCC launch",
+  "schema": 2,
+  "stage": {
+    "ok": true,
+    "stage_root": "C:/Users/SAIAG_9fabb0d5/Documents/My Games/Battlezone Combat Commander/addon/SHAMAN_shaman_stock_1136052_3055103045",
+    "state": "STAGED"
+  },
+  "started_at": "2026-11-22T12:34:51",
+  "verdict": "STAGED_DRY_RUN",
+  "workspace_root": "user://native_probe_799466"
+}

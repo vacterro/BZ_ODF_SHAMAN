@@ -991,10 +991,19 @@ finishRadius=0.1
 		_check(main.weapon_lab.native_session_service == main.native_session_service, "NM-01 UI: WeaponLab shares MainWindow NativeSessionService")
 		_check(main.weapon_lab.native_monitor_label != null and main.weapon_lab.native_cancel_button != null and main.weapon_lab.native_resume_button != null, "NM-01 UI: Native monitor strip and Cancel/Resume controls exist")
 		_check(main.weapon_lab.shield_bar != null and main.weapon_lab.shield_label != null and main.weapon_lab.shooter_resource_label != null, "Wave D/E UI: 3D Combat Actor HUD exposes Target Shield bar and Shooter Ammo/Energy label")
+		_check(main.weapon_lab.actor_inspector_tree != null and main.weapon_lab.capture_replay_button != null and main.weapon_lab.run_replay_button != null and main.weapon_lab.add_dot_button != null, "Wave F UI: Combat-State Timeline & Live Actor Inspector controls exist")
+		_check(main.weapon_lab.native_launch_mode_option != null, "Wave B UI: Native launch mode selector (STOCK_ADDON / CUSTOM_CONFIG) exists")
 		var nsvc = main.native_session_service
 		nsvc.runner.process_launcher = func(_e: String, _a: Array) -> Dictionary: return {"ok": true, "pid": 9101, "exit_code": 0}
 		nsvc.runner.process_inspector = func() -> Array: return []
-		var pre_ui: Dictionary = main.weapon_lab.run_native_preflight_only({"steam_override": {"steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe", "steam_present": true, "steam_running": true, "steam_logged_in": true}, "check_closure": false})
+		var fake_docs_ui := ProjectSettings.globalize_path(test_root.path_join("ui_mock_docs"))
+		DirAccess.make_dir_recursive_absolute(fake_docs_ui.path_join("My Games/Battlezone Combat Commander/addon"))
+		var pre_ui: Dictionary = main.weapon_lab.run_native_preflight_only({
+			"steam_override": {"steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe", "steam_present": true, "steam_running": true, "steam_logged_in": true},
+			"check_closure": false,
+			"launch_mode": "STOCK_ADDON",
+			"docs_dir_override": fake_docs_ui,
+		})
 		var sid_ui := str(pre_ui.get("session_id", ""))
 		main.weapon_lab.run_native_stage()
 		main.weapon_lab.run_native_launch(true, {"preexisting_game_pids": [], "monitor_started_at_s": 0.0, "monitor_timeout_s": 30.0})
@@ -1002,10 +1011,44 @@ finishRadius=0.1
 		main.doc_tabs.current_tab = 1  # Switch to Particle Lab!
 		await get_tree().process_frame
 		_check(nsvc.is_monitoring(sid_ui), "NM-02 UI: switching to Particle Lab does NOT interrupt NativeSessionService monitoring")
+		# NC-01/NC-02 UI: Cleanup while active is rejected and keeps monitoring running!
+		var cl_rej_ui: Dictionary = main.weapon_lab.run_native_cleanup()
+		_check(not bool(cl_rej_ui.get("ok", true)) and str(cl_rej_ui.get("reason", "")) == "ACTIVE_EXPERIMENT_CANNOT_CLEANUP", "NC-01 UI: active cleanup rejected with ACTIVE_EXPERIMENT_CANNOT_CLEANUP")
+		_check(nsvc.is_monitoring(sid_ui), "NC-02 UI: rejected cleanup leaves automatic monitoring active")
 		main.weapon_lab.run_native_cancel_monitor()
 		_check(not nsvc.is_monitoring(sid_ui), "NM-09 UI: cancel monitor stops automatic polling cleanly")
-		main.weapon_lab.run_native_cleanup()
+		var cl_ok_ui: Dictionary = main.weapon_lab.run_native_cleanup()
+		_check(bool(cl_ok_ui.get("ok", false)), "NC-04 UI: cleanup after cancel succeeds cleanly")
 		main.doc_tabs.current_tab = 0
+
+		# CB-01..CB-06 & Wave F UI: CombatScenario clock, reload enforcement, pause/step, DoT, Actor Inspector & Sandboxed Replay!
+		main.weapon_lab.restart_test()
+		var sh_ui = main.weapon_lab.combat_scenario.shooter
+		var prim_ui = main.weapon_lab.combat_scenario.primary_target()
+		main.weapon_lab.fire_once()
+		var rld0_ui: float = float(sh_ui.reload_remaining)
+		_check(rld0_ui > 0.0, "CB-01/CB-02 UI: fire_once sets shooter reload_remaining > 0 (%.2fs)" % rld0_ui)
+		var rej_rld_ui: Dictionary = main.weapon_lab._fire_one(false, "SINGLE", true)
+		_check(not bool(rej_rld_ui.get("ok", true)) and str(rej_rld_ui.get("state", "")) == "RELOADING", "CB-06 UI: immediate second fire rejected while reloading")
+		# Pause -> wait frame -> reload frozen; Single step -> advances exact 1/60s!
+		main.weapon_lab._on_pause_toggled(true)
+		var rld_paused: float = float(sh_ui.reload_remaining)
+		await get_tree().process_frame
+		_check(is_equal_approx(float(sh_ui.reload_remaining), rld_paused), "CB-03 UI: pause freezes reload cooldown")
+		main.weapon_lab.apply_test_dot("primary", "UI Burn", 60.0, 2.0)
+		var hull_before_step: float = float(prim_ui.hull_current)
+		var shield_before_step: float = float(prim_ui.shield_current)
+		main.weapon_lab.step_simulation_once(1.0 / 60.0)
+		_check(float(sh_ui.reload_remaining) < rld_paused, "CB-04 UI: single-step advances shooter reload via CombatScenario.advance()")
+		_check(float(prim_ui.hull_current) < hull_before_step or float(prim_ui.shield_current) < shield_before_step, "CB-04/CB-05 UI: single-step advances DoT damage on primary target")
+		main.weapon_lab.refresh_actor_inspector(true)
+		_check(main.weapon_lab.actor_inspector_tree.get_root() != null and main.weapon_lab.actor_inspector_tree.get_root().get_child_count() >= 2, "Wave F UI: Actor Inspector populates shooter + target rows live")
+		var snap_ui: Dictionary = main.weapon_lab.capture_replay_snapshot("ui_test_snap")
+		_check(str(snap_ui.get("snapshot_id", "")) != "", "Wave F UI: capture_replay_snapshot stores immutable snapshot")
+		var rep_ui: Dictionary = main.weapon_lab.replay_selected_snapshot()
+		_check(bool(rep_ui.get("ok", false)) and bool(rep_ui.get("sandboxed", false)), "Wave F / RP-08 UI: sandboxed replay runs cleanly without destroying active scenario")
+		main.weapon_lab._on_pause_toggled(false)
+		main.weapon_lab.restart_test()
 
 	# Restore the real scenario for any later assertions.
 	main.apply_active_loadout("3532748119", false)

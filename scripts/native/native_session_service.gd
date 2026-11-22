@@ -49,7 +49,7 @@ func recover_pending_sessions() -> Dictionary:
 			if bool(mres.get("active", false)):
 				if not _monitoring_sessions.has(sid):
 					_monitoring_sessions.append(sid)
-		if not _monitoring_sessions.is_empty() and poll_timer != null and poll_timer.is_stopped():
+		if not _monitoring_sessions.is_empty() and poll_timer != null and poll_timer.is_inside_tree() and poll_timer.is_stopped():
 			poll_timer.start()
 		if active_session_id != "":
 			_emit_if_changed(active_session_id, true)
@@ -96,15 +96,23 @@ func start_monitoring(session_id: String = "") -> bool:
 	active_session_id = sid
 	if not _monitoring_sessions.has(sid):
 		_monitoring_sessions.append(sid)
-	if poll_timer != null and poll_timer.is_stopped():
-		poll_timer.start()
+	if poll_timer != null:
+		if poll_timer.is_inside_tree():
+			if poll_timer.is_stopped():
+				poll_timer.start()
+		else:
+			poll_timer.autostart = true
 	_emit_if_changed(sid, true)
 	return true
 
 
 func is_monitoring(session_id: String = "") -> bool:
 	var sid := session_id if session_id != "" else active_session_id
-	return sid != "" and _monitoring_sessions.has(sid) and poll_timer != null and not poll_timer.is_stopped()
+	if sid == "" or not _monitoring_sessions.has(sid):
+		return false
+	if poll_timer != null and poll_timer.is_inside_tree():
+		return not poll_timer.is_stopped()
+	return poll_timer != null and poll_timer.autostart
 
 
 func poll_once(session_id: String = "", now_s: float = -1.0, observation_path: String = "") -> Dictionary:
@@ -172,9 +180,12 @@ func cleanup_stage(session_id: String = "") -> Dictionary:
 	if sid == "":
 		return {"ok": false, "reason": "NO_ACTIVE_SESSION"}
 	var res: Dictionary = runner.cleanup_stage(sid)
-	_monitoring_sessions.erase(sid)
-	if _monitoring_sessions.is_empty() and poll_timer != null:
-		poll_timer.stop()
+	# P1-NATIVE-03: Never stop automatic monitoring when cleanup was rejected
+	# (e.g. ACTIVE_EXPERIMENT_CANNOT_CLEANUP) or failed!
+	if bool(res.get("ok", false)) and not bool(res.get("cleanup_rejected", false)):
+		_monitoring_sessions.erase(sid)
+		if _monitoring_sessions.is_empty() and poll_timer != null:
+			poll_timer.stop()
 	_emit_if_changed(sid, true)
 	return res
 

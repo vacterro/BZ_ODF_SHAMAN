@@ -630,8 +630,25 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 	var disc: Dictionary = options.get("discovery", {}) if options.get("discovery", {}) is Dictionary else {}
 	if disc.is_empty():
 		disc = NativeAdapterScript.discover(str(options.get("game_root", NativeAdapterScript.DEFAULT_GAME_ROOT)))
+	var launch_mode := str(options.get("launch_mode", "CUSTOM_CONFIG")).strip_edges().to_upper()
+	if launch_mode != "STOCK_ADDON":
+		launch_mode = "CUSTOM_CONFIG"
 	var stage_root := str(options.get("stage_root", "")).strip_edges()
-	if stage_root == "":
+	var stock_addon_plan: Dictionary = {}
+	if launch_mode == "STOCK_ADDON":
+		var addon_prefix := str(options.get("stage_prefix", "shaman_addon"))
+		var addon_stage_id := "%s_%d_%d" % [addon_prefix, Time.get_ticks_usec(), randi()]
+		var docs_override := str(options.get("docs_dir_override", "")).strip_edges()
+		stock_addon_plan = NativeAdapterScript.build_stock_addon_stage_plan(addon_stage_id, "", str(options.get("mission_base", NativeAdapterScript.DEFAULT_MISSION_BASE)), docs_override)
+		if stage_root == "":
+			stage_root = str(stock_addon_plan.get("stage_absolute_path", ""))
+			var addon_base := str(stock_addon_plan.get("addon_base", ""))
+			if addon_base != "":
+				var extra_prot := NativeAdapterScript._extra_protected_from_discovery(disc, true)
+				SafeStageScript.register_owned_base(addon_base, extra_prot)
+		else:
+			stage_root = WorkspaceStore.canonical(stage_root)
+	elif stage_root == "":
 		stage_root = SafeStageScript.allocate_stage_dir(str(options.get("stage_prefix", "shaman_run")))
 	else:
 		stage_root = WorkspaceStore.canonical(stage_root)
@@ -650,6 +667,7 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 	scenario["target"] = target_name
 	scenario["weapon"] = weapon_name
 	scenario["ordnance"] = ord_name
+	scenario["launch_mode"] = launch_mode
 	if not scenario.has("godot_prediction"):
 		scenario["godot_prediction"] = {
 			"damage": pred_dmg,
@@ -661,6 +679,22 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 	var mission_base := str(options.get("mission_base", NativeAdapterScript.DEFAULT_MISSION_BASE))
 	var terrain_name := str(options.get("terrain_name", NativeAdapterScript.DEFAULT_TERRAIN_NAME))
 	var sess = NativeAdapterScript.create_session(stage_root, scenario, disc, mission_base, terrain_name)
+	var cfg_override := str(options.get("config_path_override", "")).strip_edges()
+	if cfg_override != "":
+		sess.config_path = WorkspaceStore.canonical(cfg_override)
+		sess.mount_plan["bzcc_config_path"] = sess.config_path
+		sess.mount_plan["bzcc_config_win"] = sess.config_path.replace("/", "\\")
+	if launch_mode == "STOCK_ADDON":
+		var addon_plan := NativeAdapterScript.build_stock_addon_stage_plan(sess.stage_id, sess.session_id, mission_base, str(options.get("docs_dir_override", "")))
+		sess.config_path = ""
+		sess.observation_filename = str(addon_plan.get("observation_filename", sess.observation_filename))
+		sess.observation_expected_path = str(addon_plan.get("observation_expected_path", sess.observation_expected_path))
+		sess.mount_plan["launch_mode"] = "STOCK_ADDON"
+		sess.mount_plan["bzcc_writable_profile_dir"] = str(addon_plan.get("bzcc_writable_profile_dir", ""))
+		sess.mount_plan["bzcc_logs_dir"] = str(addon_plan.get("bzcc_logs_dir", ""))
+		sess.mount_plan["startup_log_path"] = str(addon_plan.get("startup_log_path", ""))
+		sess.mount_plan["observation_filename"] = sess.observation_filename
+		sess.mount_plan["observation_expected_path"] = sess.observation_expected_path
 
 	var extra_odfs: Dictionary = {}
 	if options.has("staged_odfs") and options.staged_odfs is Dictionary:
@@ -671,6 +705,10 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 		extra_odfs["assets/ODF/" + profile.ordnance_path.get_file()] = profile.ordnance_doc.to_bytes()
 
 	var files: Dictionary = NativeAdapterScript.build_experiment_files_for_session(sess, profile, extra_odfs)
+	if launch_mode == "STOCK_ADDON":
+		# Never pollute global @mydocsdir\addon with bzshell_init.cfg or external shaman_native.cfg.
+		files.erase("shaman_native.cfg")
+		files.erase("assets/Config/bzshell_init.cfg")
 	var require_closure := bool(options.get("require_complete_closure", false))
 	var closure_spec: Dictionary = {}
 	if index != null or bool(options.get("check_closure", false)) or require_closure:
@@ -689,24 +727,47 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 		}
 
 	var steam_override: Dictionary = options.get("steam_override", {}) if options.get("steam_override", {}) is Dictionary else {}
+	var pre_launch_opts := {
+		"launch_mode": launch_mode,
+		"config_path_override": cfg_override,
+		"include_logconsole": bool(options.get("include_logconsole", false)),
+	}
 	var pre: Dictionary = NativeAdapterScript.preflight_experiment(
-		stage_root, files, sess.scenario, disc, steam_override, sess, index if not closure_spec.is_empty() else null, closure_spec
+		stage_root, files, sess.scenario, disc, steam_override, sess, index if not closure_spec.is_empty() else null, closure_spec, pre_launch_opts
 	)
 	if require_closure and index == null:
 		pre["ok"] = false
 		pre["structurally_valid"] = false
+		pre["resource_closure_valid"] = false
+		pre["stage_eligible"] = false
 		pre["launch_ready"] = false
+		pre["launch_eligible"] = false
 		pre["status"] = "FAILED"
 		pre["reason"] = REASON_RESOURCE_CLOSURE_INCOMPLETE
+		if pre.get("gates", null) is Dictionary:
+			(pre["gates"] as Dictionary)["STRUCTURALLY_VALID"] = false
+			(pre["gates"] as Dictionary)["RESOURCE_CLOSURE_VALID"] = false
+			(pre["gates"] as Dictionary)["STAGE_ELIGIBLE"] = false
+			(pre["gates"] as Dictionary)["LAUNCH_ELIGIBLE"] = false
 		var pre_issues: Array = pre.get("issues", [])
 		pre_issues.append("Complete resource closure required but no ResourceIndex was supplied (synthetic probe cannot claim full native closure)")
 		pre["issues"] = pre_issues
 	elif not closure_spec.is_empty() and not bool((pre.get("resource_closure", {}) as Dictionary).get("ok", true)):
 		pre["closure_incomplete"] = true
 		pre["closure_code"] = REASON_RESOURCE_CLOSURE_INCOMPLETE
-	var preflight_passed := bool(pre.get("structurally_valid", false))
-	var state := "PREFLIGHT_OK" if bool(pre.get("launch_ready", false)) else ("BLOCKED" if preflight_passed else "FAILED")
-	sess.add_checkpoint(state, "Preflight finished: route=%s reason=%s" % [str(pre.get("launch_route", "")), str(pre.get("reason", ""))])
+		pre["resource_closure_valid"] = false
+		pre["stage_eligible"] = false
+		pre["launch_ready"] = false
+		pre["launch_eligible"] = false
+	var structurally_valid := bool(pre.get("structurally_valid", false))
+	var resource_closure_valid := bool(pre.get("resource_closure_valid", true))
+	var preflight_passed := structurally_valid and resource_closure_valid
+	var stage_eligible_pre := bool(pre.get("stage_eligible", preflight_passed))
+	var config_compatible := bool(pre.get("config_compatible", false))
+	var exec_env_ready := bool(pre.get("execution_environment_ready", false))
+	var launch_ready_pre := bool(pre.get("launch_ready", false))
+	var state := "PREFLIGHT_OK" if launch_ready_pre else ("BLOCKED" if stage_eligible_pre else "FAILED")
+	sess.add_checkpoint(state, "Preflight finished: route=%s mode=%s reason=%s" % [str(pre.get("launch_route", "")), launch_mode, str(pre.get("reason", ""))])
 
 	var source_revisions := {}
 	if profile != null:
@@ -733,6 +794,8 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 	var pkg_ok := bool(pkg_res.get("ok", false)) and bool(pkg_verify.get("ok", false)) and str(pkg_verify.get("status", "")) == "PREFLIGHT_SNAPSHOT_VALID" and str(pkg_verify.get("session_id", "")) == sid
 
 	var now := Time.get_datetime_string_from_system()
+	var stage_eligible := stage_eligible_pre and pkg_ok
+	var launch_eligible := stage_eligible and launch_ready_pre and config_compatible and exec_env_ready
 	var record := {
 		"schema": LEDGER_SCHEMA,
 		"session_id": sid,
@@ -741,7 +804,14 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 		"state": state,
 		"evidence_state": "STRUCTURALLY_VALID" if preflight_passed else "FAILED",
 		"preflight_passed": preflight_passed and pkg_ok,
-		"launch_eligible": preflight_passed and pkg_ok,
+		"structurally_valid": structurally_valid,
+		"resource_closure_valid": resource_closure_valid,
+		"stage_eligible": stage_eligible,
+		"config_compatible": config_compatible,
+		"execution_environment_ready": exec_env_ready,
+		"launch_ready": launch_ready_pre and pkg_ok,
+		"launch_eligible": launch_eligible,
+		"launch_mode": launch_mode,
 		"restart_resumable": false,
 		"preflight_package_md5": str(pkg_res.get("package_md5", "")),
 		"preflight_file_hashes": (pkg_res.get("file_hashes", {}) as Dictionary).duplicate(true),
@@ -763,12 +833,19 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 		record["state"] = "FAILED"
 		record["evidence_state"] = "FAILED"
 		record["preflight_passed"] = false
+		record["stage_eligible"] = false
+		record["launch_ready"] = false
 		record["launch_eligible"] = false
 		record["restart_resumable"] = false
 		record["reason"] = "PREFLIGHT_PERSIST_FAILED"
 		return {
 			"ok": false,
 			"preflight_passed": false,
+			"structurally_valid": structurally_valid,
+			"resource_closure_valid": resource_closure_valid,
+			"stage_eligible": false,
+			"config_compatible": config_compatible,
+			"execution_environment_ready": exec_env_ready,
 			"launch_eligible": false,
 			"launch_ready": false,
 			"restart_resumable": false,
@@ -789,12 +866,19 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 		record["state"] = "FAILED"
 		record["evidence_state"] = "FAILED"
 		record["preflight_passed"] = false
+		record["stage_eligible"] = false
+		record["launch_ready"] = false
 		record["launch_eligible"] = false
 		record["restart_resumable"] = false
 		record["reason"] = "PREFLIGHT_PERSIST_FAILED"
 		return {
 			"ok": false,
 			"preflight_passed": false,
+			"structurally_valid": structurally_valid,
+			"resource_closure_valid": resource_closure_valid,
+			"stage_eligible": false,
+			"config_compatible": config_compatible,
+			"execution_environment_ready": exec_env_ready,
 			"launch_eligible": false,
 			"launch_ready": false,
 			"restart_resumable": false,
@@ -812,8 +896,14 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 	return {
 		"ok": preflight_passed,
 		"preflight_passed": preflight_passed,
-		"launch_eligible": preflight_passed,
-		"launch_ready": bool(pre.get("launch_ready", false)),
+		"structurally_valid": structurally_valid,
+		"resource_closure_valid": resource_closure_valid,
+		"stage_eligible": stage_eligible,
+		"config_compatible": config_compatible,
+		"execution_environment_ready": exec_env_ready,
+		"launch_eligible": launch_eligible,
+		"launch_ready": launch_ready_pre,
+		"launch_mode": launch_mode,
 		"restart_resumable": true,
 		"preflight_package_md5": str(pkg_res.get("package_md5", "")),
 		"session_id": sid,
@@ -918,14 +1008,17 @@ func stage(session_id: String, files_override: Dictionary = {}, stage_options: D
 		}
 
 	var pre_passed := bool(record.get("preflight_passed", false))
-	var rec_eligible := bool(record.get("launch_eligible", false))
-	if not pre_passed or not rec_eligible:
+	var rec_stage_eligible := bool(record.get("stage_eligible", pre_passed))
+	var rec_launch_eligible := bool(record.get("launch_eligible", false))
+	var is_diag := str(record.get("reason", "")) == "DIAGNOSTIC_ONLY" or str(record.get("state", "")) == "STAGED_DIAGNOSTIC"
+	if not pre_passed or not rec_stage_eligible or is_diag:
 		var fail_reason := str(record.get("reason", "PREFLIGHT_FAILED"))
 		if fail_reason == "":
 			fail_reason = "PREFLIGHT_FAILED"
 		return {
 			"ok": false,
 			"state": "REJECTED",
+			"stage_eligible": false,
 			"launch_eligible": false,
 			"reason": fail_reason,
 			"error": "Preflight failed (%s); staging rejected" % fail_reason,
@@ -1014,8 +1107,13 @@ func stage(session_id: String, files_override: Dictionary = {}, stage_options: D
 
 	record["state"] = "STAGED"
 	record["evidence_state"] = "STAGED"
-	record["launch_eligible"] = true
-	record["reason"] = ""
+	record["stage_eligible"] = true
+	# P0-NATIVE-01: Preserve preflight launch eligibility — staging a valid
+	# scenario with external /config or logged-off Steam MUST NOT promote
+	# launch_eligible to true!
+	record["launch_eligible"] = rec_launch_eligible
+	if rec_launch_eligible:
+		record["reason"] = ""
 	record["updated_at"] = Time.get_datetime_string_from_system()
 	record["session"] = sess.to_dict()
 	record["staged"] = {
@@ -1025,13 +1123,15 @@ func stage(session_id: String, files_override: Dictionary = {}, stage_options: D
 		"stage_manifest": str(stg.get("stage_manifest", "")),
 		"file_count": (stg.get("staged", []) as Array).size(),
 		"staged_file_hashes": staged_hashes,
-		"launch_eligible": true,
+		"stage_eligible": true,
+		"launch_eligible": rec_launch_eligible,
 	}
 	record["evidence"] = (stg.get("evidence", {}) as Dictionary).duplicate(true)
 	var staged_commit := _commit_transition(session_id, record, "STAGED", "Staged via SafeStageManager")
 	if not bool(staged_commit.get("ok", false)):
 		staged_commit["session_id"] = session_id
 		staged_commit["evidence_state"] = STATE_RECOVERY_PENDING
+		staged_commit["stage_eligible"] = false
 		staged_commit["launch_eligible"] = false
 		return staged_commit
 	return {
@@ -1039,7 +1139,9 @@ func stage(session_id: String, files_override: Dictionary = {}, stage_options: D
 		"session_id": session_id,
 		"state": "STAGED",
 		"evidence_state": "STAGED",
-		"launch_eligible": true,
+		"stage_eligible": true,
+		"launch_eligible": rec_launch_eligible,
+		"reason": str(record.get("reason", "")),
 		"staged_file_hashes": staged_hashes,
 		"staged": stg,
 		"session": sess,
@@ -1166,7 +1268,7 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 	if sess == null:
 		return {"ok": false, "state": "REJECTED", "reason": "INVALID_SESSION", "error": "cannot deserialize session"}
 
-	# P1-NATIVE-04: Fail-closed when preflight_passed or launch_eligible is missing or false.
+	# P1-NATIVE-04: Fail-closed when preflight_passed or launch_eligible is missing.
 	if not record.has("preflight_passed") or not record.has("launch_eligible"):
 		return {
 			"ok": false,
@@ -1175,7 +1277,9 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 			"launch_rejected": true,
 			"error": "LAUNCH_REJECTED: persisted session missing preflight state (fail-closed)",
 		}
-	if not bool(record.get("preflight_passed", false)) or not bool(record.get("launch_eligible", false)):
+	var is_diag := str(record.get("reason", "")) == "DIAGNOSTIC_ONLY" or str(record.get("state", "")) == "STAGED_DIAGNOSTIC"
+	var stage_eligible := bool(record.get("stage_eligible", record.get("preflight_passed", false)))
+	if not bool(record.get("preflight_passed", false)) or not stage_eligible or is_diag:
 		var rej_reason := str(record.get("reason", "LAUNCH_REJECTED"))
 		if rej_reason == "" or rej_reason == "DIAGNOSTIC_ONLY":
 			rej_reason = "LAUNCH_REJECTED"
@@ -1184,13 +1288,13 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 			"state": "REJECTED",
 			"reason": rej_reason,
 			"launch_rejected": true,
-			"error": "LAUNCH_REJECTED: preflight not passed or session not launch-eligible (" + rej_reason + ")",
+			"error": "LAUNCH_REJECTED: preflight not passed or diagnostic-only session (" + rej_reason + ")",
 		}
 
 	if str(sess.stage_manifest_path) == "" or not FileAccess.file_exists(str(sess.stage_manifest_path)):
 		return {"ok": false, "state": "REJECTED", "reason": "NOT_STAGED", "launch_rejected": true, "error": "stage the experiment before launching"}
 
-	# P0-02 / N-05 / N-D10: Re-verify staged files immediately before launch.
+	# P0-02 / N-05 / N-D10 / NL-04: Re-verify staged files immediately before launch.
 	var stg_check := _verify_staged_integrity_before_launch(sess)
 	if not bool(stg_check.get("ok", false)):
 		var mod_reason := str(stg_check.get("reason", "STAGE_MODIFIED_AFTER_PREFLIGHT"))
@@ -1198,6 +1302,13 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 		record["state"] = "FAILED"
 		record["launch_eligible"] = false
 		record["reason"] = mod_reason
+		if monitors.has(session_id):
+			var mon_f = monitors[session_id]
+			mon_f.state = ProcessMonitorScript.STATE_FAILED
+			mon_f.reason = mod_reason
+			mon_f.active = false
+			record["monitor"] = mon_f.to_dict()
+			_save_monitors()
 		record["session"] = sess.to_dict()
 		record["updated_at"] = Time.get_datetime_string_from_system()
 		_persist_session(session_id, record)
@@ -1205,6 +1316,7 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 
 	var disc: Dictionary = record.get("discovery", {})
 	var pre: Dictionary = record.get("preflight", {})
+	var launch_mode := str(record.get("launch_mode", pre.get("launch_mode", "CUSTOM_CONFIG")))
 	var route := str(options.get("route_override", pre.get("launch_route", sess.launch_route)))
 	if bool(options.get("manual_handoff", false)):
 		route = "OPERATOR_MANUAL"
@@ -1219,27 +1331,35 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 
 	var mission_bzn := str(sess.mission_basename) + ".bzn"
 	var include_logconsole := bool(options.get("include_logconsole", false))
-	var cmd: Dictionary = NativeAdapterScript.build_launch_command(route, disc, str(sess.config_path), mission_bzn, include_logconsole)
+	var cmd: Dictionary = NativeAdapterScript.build_launch_command(route, disc, str(sess.config_path), mission_bzn, include_logconsole, launch_mode)
 	var now := Time.get_datetime_string_from_system()
 
 	if route == "OPERATOR_MANUAL" or route == "STEAM_LAUNCH_OPTIONS":
 		var cfg_diag: Dictionary = cmd.get("config_diagnostics", {}) if cmd.get("config_diagnostics", {}) is Dictionary else {}
 		var cfg_arg := str(cfg_diag.get("config_arg", str(sess.config_path).replace("/", "\\")))
+		var rootdir_handoff: Dictionary = pre.get("rootdir_handoff", {}) if pre.get("rootdir_handoff", {}) is Dictionary else {}
+		if rootdir_handoff.is_empty() and launch_mode != "STOCK_ADDON" and not bool(cfg_diag.get("ok", false)):
+			rootdir_handoff = NativeAdapterScript.prepare_rootdir_config_handoff(str(sess.config_path), str(disc.get("game_root", NativeAdapterScript.DEFAULT_GAME_ROOT)))
 		var flags_prefix := "/nointro /win /logconsole" if include_logconsole else "/nointro /win"
+		var launch_opts_line := str(cmd.get("launch_options_text", "%s /config \"%s\" \"%s\"" % [flags_prefix, cfg_arg, mission_bzn]))
 		var instr_lines := PackedStringArray([
 			"BZ_ODF_SHAMAN Native Experiment Operator Handoff",
 			"session_id=" + str(sess.session_id),
 			"launch_nonce=" + str(sess.launch_nonce),
 			"stage_root=" + str(sess.stage_root),
+			"launch_mode=" + launch_mode,
 			"route=" + route,
 			"steam_app_id=" + NativeAdapterScript.STEAM_APP_ID,
 			"config_path=" + str(sess.config_path).replace("/", "\\"),
 			"config_arg=" + cfg_arg,
 			"config_compatibility=" + str(cfg_diag.get("code", "")),
+			"rootdir_destination=" + str(rootdir_handoff.get("destination_path", "")),
+			"rootdir_config_sha256=" + str(rootdir_handoff.get("sha256", "")),
+			"rootdir_collision=" + str(bool(rootdir_handoff.get("collision_detected", false))),
 			"mission_bzn=" + mission_bzn,
-			"launch_options=%s /config \"%s\" \"%s\"" % [flags_prefix, cfg_arg, mission_bzn],
+			"launch_options=" + launch_opts_line,
 			"observation_expected_path=" + str(sess.observation_expected_path),
-			"instructions=" + str(cmd.get("instructions", cmd.get("launch_options_text", ""))),
+			"instructions=" + str(cmd.get("instructions", launch_opts_line)),
 		])
 		var instr_path := str(sess.stage_root).path_join("operator_instructions.txt")
 		var instr_res: Dictionary = {"ok": false, "error": "injected operator_instructions.txt write failure"} if fault_fail_operator_instructions_write else WorkspaceStore.atomic_write_abs(instr_path, "\n".join(instr_lines).to_utf8_buffer())
@@ -1253,9 +1373,11 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 		record["updated_at"] = now
 		record["launch"] = {
 			"mode": route,
+			"launch_mode": launch_mode,
 			"executed": false,
 			"requested_at": now,
 			"command": cmd,
+			"rootdir_handoff": rootdir_handoff,
 			"instructions_path": instr_path,
 			"observation_expected_path": str(sess.observation_expected_path),
 		}
@@ -1270,11 +1392,35 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 			"state": "AWAITING_OPERATOR",
 			"evidence_state": "LAUNCH_REQUESTED",
 			"route": route,
+			"launch_mode": launch_mode,
 			"reason": str(record.reason),
 			"command": cmd,
+			"rootdir_handoff": rootdir_handoff,
 			"instructions_path": instr_path,
 			"observation_expected_path": str(sess.observation_expected_path),
 			"session_id": session_id,
+		}
+
+	# P0-NATIVE-01: Actual game launch MUST NOT proceed when launch_eligible or
+	# config_compatible is false (e.g. unresolved CONFIG_REQUIRES_ROOTDIR_PLACEMENT).
+	var live_cfg_diag: Dictionary = cmd.get("config_diagnostics", {}) if cmd.get("config_diagnostics", {}) is Dictionary else {}
+	var cfg_compat := bool(record.get("config_compatible", bool(live_cfg_diag.get("ok", false)))) and bool(live_cfg_diag.get("ok", false))
+	if not bool(record.get("launch_eligible", false)) or not cfg_compat:
+		var blk_reason := str(live_cfg_diag.get("code", "")) if not cfg_compat else str(record.get("reason", "LAUNCH_REJECTED"))
+		if blk_reason == "" or blk_reason == "CONFIG_IN_ROOTDIR":
+			blk_reason = str(record.get("reason", "LAUNCH_REJECTED"))
+		if blk_reason == "":
+			blk_reason = "LAUNCH_REJECTED"
+		return {
+			"ok": false,
+			"state": "REJECTED",
+			"route": route,
+			"launch_mode": launch_mode,
+			"reason": blk_reason,
+			"launch_rejected": true,
+			"executed": false,
+			"command": cmd,
+			"error": "LAUNCH_REJECTED: session is not launch-eligible (%s); use manual_handoff or a compatible config/STOCK_ADDON route" % blk_reason,
 		}
 
 	if route == "STEAM_MANAGED":
@@ -1831,6 +1977,8 @@ func cancel_monitor(session_id: String) -> Dictionary:
 	var monitor = monitors[session_id]
 	monitor.cancel()
 	var record: Dictionary = sessions.get(session_id, {})
+	if not record.is_empty():
+		record["monitor"] = monitor.to_dict()
 	var commit := _commit_transition(session_id, record, "CANCELLED", "Monitor cancelled by operator")
 	if not bool(commit.get("ok", false)):
 		commit["session_id"] = session_id
@@ -1843,7 +1991,29 @@ func cancel_monitor(session_id: String) -> Dictionary:
 	return out
 
 
+func _is_session_active_for_cleanup(session_id: String, record: Dictionary) -> bool:
+	var rec_state := str(record.get("state", ""))
+	if rec_state in ["COMPARISON_COMPLETE", "NATIVE_VERIFIED", "CANCELLED", "TIMEOUT", "FAILED", "RECOVERY_PENDING", "CLEANED_UP", "PARTIAL_CLEANUP"]:
+		return false
+	if monitors.has(session_id):
+		var mon = monitors[session_id]
+		if mon != null and bool(mon.active) and not mon.is_terminal():
+			return true
+	var mon_dict: Dictionary = record.get("monitor", {}) if record.get("monitor", {}) is Dictionary else {}
+	if not mon_dict.is_empty():
+		var m_active := bool(mon_dict.get("active", false))
+		var m_state := str(mon_dict.get("state", ""))
+		if m_active and not (m_state in ProcessMonitorScript.TERMINAL_STATES):
+			return true
+	if rec_state in ["STEAM_PROCESS_STARTED", "GAME_PROCESS_DETECTED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED"]:
+		return true
+	return false
+
+
 ## Step 5: Safe MD5-verified cleanup of the staged directory via SafeStageManager.
+## P1-NATIVE-03: Rejects cleanup while an experiment monitor is active
+## (`ACTIVE_EXPERIMENT_CANNOT_CLEANUP`) and retains evidence artifacts in a
+## durable directory separate from disposable stage files.
 func cleanup_stage(session_id: String) -> Dictionary:
 	if not sessions.has(session_id):
 		return {"ok": false, "reason": "UNKNOWN_SESSION", "error": "session not found in ledger: " + session_id}
@@ -1851,12 +2021,47 @@ func cleanup_stage(session_id: String) -> Dictionary:
 	var sess = NativeSessionScript.from_dict(record.get("session", {}))
 	if sess == null:
 		return {"ok": false, "reason": "INVALID_SESSION", "error": "cannot deserialize session"}
+	if _is_session_active_for_cleanup(session_id, record):
+		var cur_state := str(record.get("state", "ACTIVE"))
+		return {
+			"ok": false,
+			"state": cur_state,
+			"reason": "ACTIVE_EXPERIMENT_CANNOT_CLEANUP",
+			"cleanup_rejected": true,
+			"active_monitor": true,
+			"session_id": session_id,
+			"error": "ACTIVE_EXPERIMENT_CANNOT_CLEANUP: cancel or finish active native experiment before cleaning stage",
+		}
+	# NC-07: Retain durable evidence artifact outside disposable stage root before cleanup.
+	var retained_evidence_path := ""
+	var ev_src := str(sess.evidence_path)
+	if ev_src != "" and FileAccess.file_exists(ev_src):
+		var ev_dir := ledger_dir().path_join("evidence")
+		DirAccess.make_dir_recursive_absolute(ev_dir)
+		var ev_dst := ev_dir.path_join(session_id.replace("/", "_").replace("\\", "_") + "_native_evidence.json")
+		var ev_bytes := FileAccess.get_file_as_bytes(ev_src)
+		if not ev_bytes.is_empty():
+			var ew := WorkspaceStore.atomic_write_abs(ev_dst, ev_bytes)
+			if bool(ew.get("ok", false)):
+				retained_evidence_path = ev_dst
+				record["retained_evidence_path"] = ev_dst
+	elif not (record.get("evidence", {}) as Dictionary).is_empty():
+		var ev_dir2 := ledger_dir().path_join("evidence")
+		DirAccess.make_dir_recursive_absolute(ev_dir2)
+		var ev_dst2 := ev_dir2.path_join(session_id.replace("/", "_").replace("\\", "_") + "_native_evidence.json")
+		var ew2 := WorkspaceStore.atomic_write_abs(ev_dst2, JSON.stringify(record.get("evidence", {}), "  ").to_utf8_buffer())
+		if bool(ew2.get("ok", false)):
+			retained_evidence_path = ev_dst2
+			record["retained_evidence_path"] = ev_dst2
+
 	var disc: Dictionary = record.get("discovery", {})
-	var extra_prot: Array[String] = []
-	for k in ["game_root", "data_root", "res_root", "missions_dll_root", "workshop_root", "addon_root"]:
-		var p := str(disc.get(k, ""))
-		if p != "":
-			extra_prot.append(p)
+	var is_stock_addon := str(record.get("launch_mode", "")) == "STOCK_ADDON"
+	var stage_leaf := WorkspaceStore.canonical(str(sess.stage_root)).get_file()
+	var extra_prot: Array[String] = NativeAdapterScript._extra_protected_from_discovery(disc, is_stock_addon and stage_leaf.begins_with("SHAMAN_"))
+	if is_stock_addon and str(sess.stage_root) != "":
+		var addon_parent := WorkspaceStore.canonical(str(sess.stage_root)).get_base_dir()
+		if addon_parent != "" and addon_parent.to_lower().ends_with("/addon"):
+			SafeStageScript.register_owned_base(addon_parent, extra_prot)
 	var cl: Dictionary = SafeStageScript.cleanup(str(sess.stage_root), extra_prot)
 	var new_state := "CLEANED_UP" if (bool(cl.get("ok", false)) and not bool(cl.get("partial", false))) else ("PARTIAL_CLEANUP" if bool(cl.get("partial", false)) else "FAILED")
 	sess.add_checkpoint(new_state, "Stage cleanup: status=%s removed=%d" % [str(cl.get("status", "")), int(cl.get("removed", 0))])
@@ -1874,5 +2079,6 @@ func cleanup_stage(session_id: String) -> Dictionary:
 		"ok": bool(cl.get("ok", false)),
 		"state": new_state,
 		"cleanup": cl,
+		"retained_evidence_path": retained_evidence_path,
 		"session_id": session_id,
 	}

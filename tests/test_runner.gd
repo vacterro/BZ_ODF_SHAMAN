@@ -90,6 +90,10 @@ func _initialize() -> void:
 	_test_t61_wave_c_native_completeness()
 	_test_t62_wave_d_persistent_combat_state()
 	_test_t63_wave_e_particle_fidelity_and_msha()
+	_test_t65_native_launch_gates_and_stock_addon()
+	_test_t66_combat_clock_reload_dot()
+	_test_t67_replay_snapshots_and_baseline()
+	_test_t68_native_cleanup_safety()
 	# Static document cache holds strong references by design; release it before
 	# the engine's own shutdown so a passing run exits with no ObjectDB leak.
 	OdfDocument.clear_all_cache()
@@ -1096,10 +1100,11 @@ func _test_steam_launch_routes() -> void:
 	var s1 := NativeAdapterScript.classify_launch_result("DIRECT_EXECUTABLE", 53, false, false, false, false)
 	_eq(str(s1.get("reason", "")), "STEAM_HANDOFF_REQUIRED", "S1: direct-exe exit 53 classified as STEAM_HANDOFF_REQUIRED")
 	_check(bool(s1.get("handoff", false)) and not bool(s1.get("verified", true)), "S1: handoff flag true and not verified")
-	# S2: Steam-managed launch retains intended args.
+	# S2: Steam-managed launch with compatible @rootdir config retains intended args.
 	var logged_in_steam := {"steam_exe": str(disc.get("steam_exe", "V:/__STORE_V/_SOFT/Steam/steam.exe")), "steam_present": true, "steam_running": true, "steam_logged_in": true}
-	var pre_s2 := NativeAdapterScript.preflight_experiment(stage, files, scn, disc, logged_in_steam)
-	_check(bool(pre_s2.get("launch_ready", false)) and str(pre_s2.get("launch_route", "")) == "STEAM_MANAGED", "S2: logged-in Steam selects STEAM_MANAGED launch_ready=true")
+	var compat_cfg_s2 := str(disc.get("game_root", "")).path_join("shaman_native.cfg")
+	var pre_s2 := NativeAdapterScript.preflight_experiment(stage, files, scn, disc, logged_in_steam, null, null, {}, {"config_path_override": compat_cfg_s2})
+	_check(bool(pre_s2.get("launch_ready", false)) and str(pre_s2.get("launch_route", "")) == "STEAM_MANAGED", "S2: logged-in Steam with compatible @rootdir config selects STEAM_MANAGED launch_ready=true")
 	var lcmd: Dictionary = pre_s2.get("launch_command", {})
 	var sargs: Array = lcmd.get("args", [])
 	_check(sargs.has("-applaunch") and sargs.has("624970") and sargs.has("/config") and sargs.has("shaman_shot.bzn"), "S2: STEAM_MANAGED preserves -applaunch 624970 /config shaman_shot.bzn")
@@ -1660,6 +1665,7 @@ func _test_native_experiment_runner_t26() -> void:
 		"discovery": disc,
 		"stage_prefix": "t26_steam",
 		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"config_path_override": str(disc.get("game_root", "")).path_join("shaman_t26_test.cfg"),
 		"steam_override": {"steam_present": true, "steam_logged_in": true, "steam_exe": str(disc.get("steam_exe", ""))},
 	})
 	_check(bool(pre3.get("launch_ready", false)), "T-26: STEAM_MANAGED preflight reports launch_ready=true")
@@ -2440,6 +2446,7 @@ func _test_t29_ux_and_bzcc_particles() -> void:
 		"discovery": disc31, "stage_prefix": "t31_ok",
 		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": doc31.to_bytes()},
 		"source_odf_paths": [src_odf31],
+		"config_path_override": str(disc31.get("game_root", "")).path_join("shaman_t31_test.cfg"),
 		"steam_override": {"steam_present": true, "steam_logged_in": true, "steam_exe": str(disc31.get("steam_exe", ""))},
 	})
 	var sid_ok := str(pre_ok.get("session_id", ""))
@@ -2615,7 +2622,8 @@ func _test_wave_c_native_durability_and_evidence() -> void:
 
 	# N-D03 / N-D04 / N-D05 / N-D07: Valid preflight -> corrupt byte hash / corrupt base64 / wrong session / clean exact stage.
 	var r3 = NativeRunnerScript.new()
-	var p3: Dictionary = r3.preflight(null, null, {"discovery": disc, "stage_prefix": "nd03_07", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+	var compat_cfg_nd := str(disc.get("game_root", "")).path_join("shaman_nd_test.cfg")
+	var p3: Dictionary = r3.preflight(null, null, {"discovery": disc, "stage_prefix": "nd03_07", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_nd, "steam_override": steam_on})
 	_check(bool(p3.get("ok", false)) and bool(p3.get("restart_resumable", false)), "N-D07 setup: durable preflight succeeded with restart_resumable=true")
 	var sid3 := str(p3.get("session_id", ""))
 	var pkg_path3: String = NativeRunnerScript._preflight_pkg_file(sid3)
@@ -2735,7 +2743,7 @@ func _test_wave_c_native_durability_and_evidence() -> void:
 	# Explicitly no game running:
 	re.game_process_detector = func() -> Dictionary:
 		return {"detected": false, "game_pid": 0}
-	var pe: Dictionary = re.preflight(null, null, {"discovery": disc, "stage_prefix": "ne01_08", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+	var pe: Dictionary = re.preflight(null, null, {"discovery": disc, "stage_prefix": "ne01_08", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_nd, "steam_override": steam_on})
 	var side := str(pe.get("session_id", ""))
 	var ste: Dictionary = re.stage(side)
 	var sesse = ste.get("session", null)
@@ -2940,6 +2948,8 @@ func _test_t36_fx_and_sandbox() -> void:
 
 	OdfDocument.clear_all_cache()
 	_remove_tree(tmp_dir)
+
+
 
 
 func _test_t34_mod_loadout_profiles() -> void:
@@ -3260,10 +3270,11 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 	var steam_on := {"steam_present": true, "steam_logged_in": true, "steam_exe": str(disc.get("steam_exe", ""))}
 	var expected_exe := str(disc.get("exe", "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/battlezone2.exe"))
 	var expected_md5 := str(disc.get("exe_md5", ""))
+	var compat_cfg_t40 := str(disc.get("game_root", "")).path_join("shaman_t40_test.cfg")
 
 	# ND-11: stage() ledger persist failure -> STATE_PERSIST_FAILED / RECOVERY_PENDING (never false STAGED)
 	var r11 = NativeRunnerScript.new()
-	var p11: Dictionary = r11.preflight(null, null, {"discovery": disc, "stage_prefix": "nd11", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+	var p11: Dictionary = r11.preflight(null, null, {"discovery": disc, "stage_prefix": "nd11", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_t40, "steam_override": steam_on})
 	var sid11 := str(p11.get("session_id", ""))
 	r11.fault_fail_ledger_write = true
 	var st11: Dictionary = r11.stage(sid11)
@@ -3285,7 +3296,7 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 		return {"ok": true, "pid": 4100, "exit_code": 0}
 	r12.game_process_detector = func() -> Dictionary:
 		return {"detected": false, "game_pid": 0}
-	var p12: Dictionary = r12.preflight(null, null, {"discovery": disc, "stage_prefix": "nd12", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+	var p12: Dictionary = r12.preflight(null, null, {"discovery": disc, "stage_prefix": "nd12", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_t40, "steam_override": steam_on})
 	var sid12 := str(p12.get("session_id", ""))
 	var st12: Dictionary = r12.stage(sid12)
 	var sess12 = st12.get("session", null)
@@ -3343,7 +3354,7 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 		var obs_flags := {"mission_observed": false, "mission_loaded_at": "", "resource_probe_confirmed": false}
 		rm.mission_observer = func(_s) -> Dictionary: return obs_flags.duplicate(true)
 
-		var pm: Dictionary = rm.preflight(null, null, {"discovery": disc, "stage_prefix": "sm01_04", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var pm: Dictionary = rm.preflight(null, null, {"discovery": disc, "stage_prefix": "sm01_04", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_t40, "steam_override": steam_on})
 		var sidm := str(pm.get("session_id", ""))
 		var stm: Dictionary = rm.stage(sidm)
 		var sessm = stm.get("session", null)
@@ -3429,7 +3440,7 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 		rt.process_launcher = func(_e: String, _a: Array) -> Dictionary:
 			return {"ok": true, "pid": 7100, "exit_code": 0}
 		rt.set("process_inspector", func() -> Array: return [])
-		var pt: Dictionary = rt.preflight(null, null, {"discovery": disc, "stage_prefix": "sm02_06", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var pt: Dictionary = rt.preflight(null, null, {"discovery": disc, "stage_prefix": "sm02_06", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_t40, "steam_override": steam_on})
 		var sidt := str(pt.get("session_id", ""))
 		var stt: Dictionary = rt.stage(sidt)
 		var sesst = stt.get("session", null)
@@ -3447,7 +3458,7 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 		rc.process_launcher = func(_e: String, _a: Array) -> Dictionary:
 			return {"ok": true, "pid": 7200, "exit_code": 0}
 		rc.set("process_inspector", func() -> Array: return [])
-		var pc: Dictionary = rc.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_cancel", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var pc: Dictionary = rc.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_cancel", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_t40, "steam_override": steam_on})
 		var sidc := str(pc.get("session_id", ""))
 		var stc: Dictionary = rc.stage(sidc)
 		var sessc = stc.get("session", null)
@@ -3467,7 +3478,7 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 		rp.process_launcher = func(_e: String, _a: Array) -> Dictionary:
 			live_procs.append({"pid": 9999, "name": "battlezone2.exe", "exe_path": expected_exe, "exe_md5": expected_md5})
 			return {"ok": true, "pid": 7300, "exit_code": 0}
-		var pp: Dictionary = rp.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_pre_spawn", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var pp: Dictionary = rp.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_pre_spawn", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_t40, "steam_override": steam_on})
 		var sidp := str(pp.get("session_id", ""))
 		var stp: Dictionary = rp.stage(sidp)
 		var sessp = stp.get("session", null)
@@ -3475,6 +3486,7 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 		var poll_pre: Dictionary = rp.call("poll_monitor", sidp, 1.0)
 		_eq(str(poll_pre.get("state", "")), "GAME_PROCESS_DETECTED", "SM-01: game PID created by Steam spawn is not mistaken for preexisting")
 		_eq(int(poll_pre.get("game_pid", 0)), 9999, "SM-01: post-spawn game PID 9999 detected")
+		rp.cancel_monitor(sidp)
 		rp.cleanup_stage(sidp)
 		_remove_tree(str(sessp.stage_root))
 
@@ -3484,13 +3496,14 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 		rw.process_launcher = func(_e: String, _a: Array) -> Dictionary:
 			return {"ok": true, "pid": 7400, "exit_code": 0}
 		rw.set("process_inspector", func() -> Array: return [])
-		var pw: Dictionary = rw.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_wall_clock", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "steam_override": steam_on})
+		var pw: Dictionary = rw.preflight(null, null, {"discovery": disc, "stage_prefix": "sm_wall_clock", "staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes}, "config_path_override": compat_cfg_t40, "steam_override": steam_on})
 		var sidw := str(pw.get("session_id", ""))
 		var stw: Dictionary = rw.stage(sidw)
 		var sessw = stw.get("session", null)
 		rw.launch(sidw, {"execute_process": true, "monitor_timeout_s": 30.0})
 		var poll_wall: Dictionary = rw.call("poll_monitor", sidw)
 		_eq(str(poll_wall.get("state", "")), "STEAM_PROCESS_STARTED", "SM-06: wall-clock monitor does not time out on first poll")
+		rw.cancel_monitor(sidw)
 		rw.cleanup_stage(sidw)
 		_remove_tree(str(sessw.stage_root))
 
@@ -3628,6 +3641,8 @@ startColor=\"80 200 255 255\"
 	_remove_tree(tmp_dir)
 
 
+
+
 func _test_t60_wave_b_native_startup_diagnosis() -> void:
 	_start("T-60 Wave B Native Startup Diagnosis, Config Compat & Crash Log Correlation (NB-01..NB-08, P1-EVIDENCE-01)")
 	var old_root := WorkspaceStore.root_override
@@ -3724,9 +3739,11 @@ func _test_t61_wave_c_native_completeness() -> void:
 	var stock_target := real_idx.resolve_path("ivscav")
 	var stock_prof := WeaponProfile.new()
 	_check(stock_prof.resolve(real_idx, stock_shooter, stock_target), "RC-05 setup: stock-only ivtank -> ivscav profile resolved")
+	var compat_cfg_t61 := str(disc.get("game_root", "")).path_join("shaman_t61_test.cfg")
 	var pre_stock: Dictionary = runner.preflight(stock_prof, real_idx, {
 		"discovery": disc,
 		"steam_override": steam_ok,
+		"config_path_override": compat_cfg_t61,
 		"check_closure": true,
 		"require_complete_closure": true,
 		"active_packages": [],
@@ -3808,7 +3825,7 @@ func _test_t61_wave_c_native_completeness() -> void:
 	runner.cleanup_stage(sid_ok)
 
 	# NM-05: Inject process_monitors.json write failure -> MONITOR_PERSIST_FAILED / RECOVERY_PENDING.
-	var pre_pf: Dictionary = runner.preflight(stock_prof, real_idx, {"discovery": disc, "steam_override": steam_ok, "check_closure": true, "active_packages": []})
+	var pre_pf: Dictionary = runner.preflight(stock_prof, real_idx, {"discovery": disc, "steam_override": steam_ok, "config_path_override": compat_cfg_t61, "check_closure": true, "active_packages": []})
 	var sid_pf := str(pre_pf.get("session_id", ""))
 	runner.stage(sid_pf)
 	fake_state["game_up"] = false
@@ -3920,6 +3937,8 @@ func _test_t62_wave_d_persistent_combat_state() -> void:
 	_remove_tree(tmp_dir)
 
 
+
+
 func _test_t63_wave_e_particle_fidelity_and_msha() -> void:
 	_start("T-63 Wave E Particle Fidelity (Blend Modes, UV Anim, Budgets) & Real .msha Inspection")
 	var tmp_dir := ProjectSettings.globalize_path("user://t63_fx_" + str(Time.get_ticks_usec()))
@@ -3960,6 +3979,408 @@ func _test_t63_wave_e_particle_fidelity_and_msha() -> void:
 
 	OdfDocument.clear_all_cache()
 	_remove_tree(tmp_dir)
+
+
+func _test_t65_native_launch_gates_and_stock_addon() -> void:
+	_start("T-65 Wave B Native Launch Eligibility Gates & Safe Stock Addon Route (P0-NATIVE-01, P0-NATIVE-02; NL-01..NL-06)")
+	NativeAdapterScript.clear_trusted_sessions()
+	var old_root := WorkspaceStore.root_override
+	var ws := "user://t65_native_gates_" + str(Time.get_ticks_usec())
+	WorkspaceStore.root_override = ws
+	var abs_ws := ProjectSettings.globalize_path(ws)
+
+	var disc := NativeAdapterScript.discover()
+	var game_root := str(disc.get("game_root", NativeAdapterScript.DEFAULT_GAME_ROOT))
+	var exe_md5_before := str(disc.get("exe_md5", ""))
+	var bzone_cfg_before := FileAccess.get_file_as_bytes(game_root.path_join("bzone.cfg"))
+	var steam_ok := {"steam_exe": str(disc.get("steam_exe", "V:/__STORE_V/_SOFT/Steam/steam.exe")), "steam_present": true, "steam_running": true, "steam_logged_in": true}
+	var steam_off := {"steam_exe": str(disc.get("steam_exe", "")), "steam_present": true, "steam_running": false, "steam_logged_in": false, "detail": "ActiveUser=0x0"}
+	var odf_bytes := "[OrdnanceClass]\ndamageValue(H)=100\nshotSpeed=120\n".to_utf8_buffer()
+
+	# NL-01 (Scenario A): External /config + authenticated Steam -> STRUCTURALLY_VALID=true, STAGE_ELIGIBLE=true,
+	# CONFIG_COMPATIBLE=false, LAUNCH_ELIGIBLE=false, CONFIG_REQUIRES_ROOTDIR_PLACEMENT; actual launch REJECTED!
+	var r_a = NativeRunnerScript.new()
+	var spawn_count_a := {"n": 0}
+	r_a.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+		spawn_count_a["n"] += 1
+		return {"ok": true, "pid": 9001, "exit_code": 0}
+	var pre_a: Dictionary = r_a.preflight(null, null, {
+		"discovery": disc,
+		"stage_prefix": "nl01_ext",
+		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"steam_override": steam_ok,
+		"launch_mode": "CUSTOM_CONFIG",
+	})
+	_check(bool(pre_a.get("structurally_valid", false)), "NL-01: external /config scenario is STRUCTURALLY_VALID=true")
+	_check(bool(pre_a.get("stage_eligible", false)), "NL-01: external /config scenario is STAGE_ELIGIBLE=true")
+	_check(not bool(pre_a.get("config_compatible", true)), "NL-01: external /config reports CONFIG_COMPATIBLE=false")
+	_check(not bool(pre_a.get("launch_eligible", true)) and not bool(pre_a.get("launch_ready", true)), "NL-01: external /config + authenticated Steam -> LAUNCH_ELIGIBLE=false")
+	_eq(str(pre_a.get("reason", "")), "CONFIG_REQUIRES_ROOTDIR_PLACEMENT", "NL-01: reason is CONFIG_REQUIRES_ROOTDIR_PLACEMENT")
+	var sid_a := str(pre_a.get("session_id", ""))
+	var stg_a: Dictionary = r_a.stage(sid_a)
+	_check(bool(stg_a.get("ok", false)) and bool(stg_a.get("stage_eligible", false)) and not bool(stg_a.get("launch_eligible", true)), "NL-01: stage() succeeds for valid external config while keeping launch_eligible=false")
+	var lch_a: Dictionary = r_a.launch(sid_a, {"execute_process": true})
+	_check(not bool(lch_a.get("ok", true)) and bool(lch_a.get("launch_rejected", false)), "NL-01: actual launch REJECTED while CONFIG_REQUIRES_ROOTDIR_PLACEMENT unresolved")
+	_eq(str(lch_a.get("reason", "")), "CONFIG_REQUIRES_ROOTDIR_PLACEMENT", "NL-01: launch rejection reason is CONFIG_REQUIRES_ROOTDIR_PLACEMENT")
+	_eq(int(spawn_count_a["n"]), 0, "NL-01: zero game/Steam processes spawned on incompatible external /config")
+	# Manual handoff IS allowed on Scenario A and records SHA256 + destination + collision status!
+	var mh_a: Dictionary = r_a.launch(sid_a, {"manual_handoff": true})
+	_check(bool(mh_a.get("ok", false)) and str(mh_a.get("state", "")) == "AWAITING_OPERATOR", "NL-01: explicit manual_handoff allowed for structurally valid stage")
+	var rh_a: Dictionary = mh_a.get("rootdir_handoff", {})
+	_check(str(rh_a.get("sha256", "")).length() == 64 and bool(rh_a.get("requires_operator_approval", false)) and not bool(rh_a.get("auto_write_permitted", true)), "NL-01/P0-NATIVE-02: controlled fallback provides SHA256 and requires operator approval without auto-writing BZ2R")
+	r_a.cleanup_stage(sid_a)
+	_remove_tree(str((stg_a.get("session") as RefCounted).stage_root))
+
+	# NL-02 (Scenario C): Structurally valid scenario + Steam unavailable -> STAGE_ELIGIBLE=true, AWAITING_OPERATOR, zero launch.
+	var r_c = NativeRunnerScript.new()
+	var spawn_count_c := {"n": 0}
+	r_c.process_launcher = func(_e: String, _a: Array) -> Dictionary:
+		spawn_count_c["n"] += 1
+		return {"ok": true, "pid": 9002, "exit_code": 0}
+	var pre_c: Dictionary = r_c.preflight(null, null, {
+		"discovery": disc,
+		"stage_prefix": "nl02_nosteam",
+		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"steam_override": steam_off,
+	})
+	_check(bool(pre_c.get("stage_eligible", false)) and not bool(pre_c.get("launch_eligible", true)), "NL-02: Steam unavailable -> STAGE_ELIGIBLE=true, LAUNCH_ELIGIBLE=false")
+	var sid_c := str(pre_c.get("session_id", ""))
+	var stg_c: Dictionary = r_c.stage(sid_c)
+	_check(bool(stg_c.get("ok", false)), "NL-02: stage() succeeds when Steam unavailable")
+	var lch_c: Dictionary = r_c.launch(sid_c, {"execute_process": true})
+	_eq(str(lch_c.get("state", "")), "AWAITING_OPERATOR", "NL-02: Steam unavailable transitions to AWAITING_OPERATOR")
+	_eq(int(spawn_count_c["n"]), 0, "NL-02: no actual process spawned when Steam unavailable")
+	r_c.cleanup_stage(sid_c)
+	_remove_tree(str((stg_c.get("session") as RefCounted).stage_root))
+
+	# NL-03 (Scenario B) + NL-04 (Stage tamper after preflight): Compatible @rootdir config + Steam ready -> LAUNCH_ELIGIBLE=true.
+	var r_b = NativeRunnerScript.new()
+	r_b.process_launcher = func(_e: String, _a: Array) -> Dictionary: return {"ok": true, "pid": 9003, "exit_code": 0}
+	r_b.process_inspector = func() -> Array: return []
+	var pre_b: Dictionary = r_b.preflight(null, null, {
+		"discovery": disc,
+		"stage_prefix": "nl03_compat",
+		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"config_path_override": game_root.path_join("shaman_nl03.cfg"),
+		"steam_override": steam_ok,
+	})
+	_check(bool(pre_b.get("launch_eligible", false)) and bool(pre_b.get("config_compatible", false)) and bool(pre_b.get("execution_environment_ready", false)), "NL-03: compatible config + valid stage + Steam ready -> LAUNCH_ELIGIBLE=true")
+	var sid_b := str(pre_b.get("session_id", ""))
+	var stg_b: Dictionary = r_b.stage(sid_b)
+	_check(bool(stg_b.get("ok", false)) and bool(stg_b.get("launch_eligible", false)), "NL-03: stage() preserves launch_eligible=true for compatible config")
+	var sess_b = stg_b.get("session")
+	# NL-04: Mutate staged file after staging -> launch MUST be rejected!
+	_write(str(sess_b.stage_root).path_join("assets/ODF/atstabvsr_c.odf"), "TAMPERED_AFTER_PREFLIGHT")
+	var lch_tamper: Dictionary = r_b.launch(sid_b, {"execute_process": true})
+	_check(not bool(lch_tamper.get("ok", true)) and str(lch_tamper.get("reason", "")) == "STAGE_MODIFIED_AFTER_PREFLIGHT", "NL-04: stage modification after preflight rejects launch")
+	r_b.cleanup_stage(sid_b)
+	_remove_tree(str(sess_b.stage_root))
+
+	# NL-05: Stock Addon route (@mydocsdir\addon) inspects stock bzone.cfg, stages into owned SHAMAN_* folder
+	# without external /config or bzshell_init.cfg pollution, achieves LAUNCH_ELIGIBLE=true, cleans up only owned files!
+	var stock_cfg_chk := NativeAdapterScript.inspect_stock_bzone_cfg(game_root)
+	_check(bool(stock_cfg_chk.get("ok", false)) and bool(stock_cfg_chk.get("mounts_addon_first", false)), "NL-05: stock bzone.cfg mounts @mydocsdir\\addon first")
+	var fake_docs := abs_ws.path_join("mock_docs")
+	var fake_addon := fake_docs.path_join("My Games/Battlezone Combat Commander/addon")
+	DirAccess.make_dir_recursive_absolute(fake_addon)
+	var foreign_mod_file := fake_addon.path_join("user_existing_mod.odf")
+	_write(foreign_mod_file, "[GameObjectClass]\nunitName=\"DoNotTouch\"\n")
+	var r_addon = NativeRunnerScript.new()
+	var captured_addon_args := {"args": []}
+	r_addon.process_launcher = func(_e: String, args: Array) -> Dictionary:
+		captured_addon_args["args"] = args.duplicate()
+		return {"ok": true, "pid": 9005, "exit_code": 0}
+	r_addon.process_inspector = func() -> Array: return []
+	var disc_addon := disc.duplicate(true)
+	disc_addon["addon_root"] = fake_addon
+	var pre_addon: Dictionary = r_addon.preflight(null, null, {
+		"discovery": disc_addon,
+		"stage_prefix": "nl05_addon",
+		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"steam_override": steam_ok,
+		"launch_mode": "STOCK_ADDON",
+		"docs_dir_override": fake_docs,
+	})
+	_check(bool(pre_addon.get("launch_eligible", false)) and bool(pre_addon.get("config_compatible", false)), "NL-05: STOCK_ADDON route achieves CONFIG_COMPATIBLE=true and LAUNCH_ELIGIBLE=true without touching BZ2R")
+	var sid_ad := str(pre_addon.get("session_id", ""))
+	var stg_ad: Dictionary = r_addon.stage(sid_ad)
+	_check(bool(stg_ad.get("ok", false)), "NL-05: STOCK_ADDON staged cleanly into owned SHAMAN_* folder under addon/")
+	var sess_ad = stg_ad.get("session")
+	_check(not FileAccess.file_exists(str(sess_ad.stage_root).path_join("assets/Config/bzshell_init.cfg")), "NL-05: STOCK_ADDON does not drop bzshell_init.cfg into global addon")
+	var lch_ad: Dictionary = r_addon.launch(sid_ad, {"execute_process": true})
+	var ad_args: Array = captured_addon_args["args"]
+	_check(bool(lch_ad.get("ok", false)) and not ad_args.has("/config") and ad_args.has("shaman_shot.bzn"), "NL-05: STOCK_ADDON launches without /config and passes mission bzn")
+	r_addon.cancel_monitor(sid_ad)
+	var cl_ad: Dictionary = r_addon.cleanup_stage(sid_ad)
+	_check(bool(cl_ad.get("ok", false)) and FileAccess.file_exists(foreign_mod_file), "NL-05: STOCK_ADDON cleanup removes only SHAMAN-owned files and preserves existing addon files")
+
+	# NL-06: Zero unapproved writes to BZ2R or Workshop.
+	var disc_after := NativeAdapterScript.discover()
+	_eq(str(disc_after.get("exe_md5", "")), exe_md5_before, "NL-06: BZ2R executable MD5 unchanged")
+	_check(FileAccess.get_file_as_bytes(game_root.path_join("bzone.cfg")) == bzone_cfg_before, "NL-06: BZ2R stock bzone.cfg bytes untouched")
+	_check(not FileAccess.file_exists(game_root.path_join("shaman_nl03.cfg")), "NL-06: no config file silently written into BZ2R")
+
+	NativeAdapterScript.clear_trusted_sessions()
+	WorkspaceStore.root_override = old_root
+	_remove_tree(abs_ws)
+
+
+func _test_t66_combat_clock_reload_dot() -> void:
+	_start("T-66 Wave C1 Combat Clock, Reload Enforcement, Pause/Step & DoT (P0-SIM-01, P0-SIM-02; CB-01..CB-08)")
+	var tmp_dir := ProjectSettings.globalize_path("user://t66_clock_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+	var sh := tmp_dir.path_join("sh.odf")
+	var wp := tmp_dir.path_join("wp.odf")
+	var ord := tmp_dir.path_join("or.odf")
+	var tg := tmp_dir.path_join("tg.odf")
+	_write(sh, "[GameObjectClass]\nweaponName1=\"wp\"\nmaxAmmo=30\nmaxEnergy=100\nmaxHealth=1000\narmorClass=\"H\"\n")
+	_write(wp, "[WeaponClass]\nordName=\"or\"\nshotDelay=1.0\nsalvoCount=3\nsalvoDelay=0.1\nenergyCost=10\n")
+	_write(ord, "[OrdnanceClass]\nshotSpeed=200\nlifeSpan=1.0\nshotRadius=0.5\nammoCost=5\ndamageValue(H)=50\n")
+	_write(tg, "[GameObjectClass]\nmaxHealth=500\narmorClass=\"H\"\nshieldClass=\"N\"\nmaxShield=40\n")
+	var idx := ResourceIndex.new()
+	idx.roots = [{"path": tmp_dir, "label": "t66", "kind": "game", "priority": 10, "enabled": true}]
+	idx.scan(false)
+	var prof := WeaponProfile.new()
+	_check(prof.resolve(idx, sh, tg), "CB setup: weapon chain with 1.0s shotDelay resolved")
+
+	var CombatScenarioScript = preload("res://scripts/sim/combat_scenario.gd")
+	var scn = CombatScenarioScript.new(1001)
+	var tpos := Vector3(0, 2, -40)
+	scn.create_new_scenario(prof, tpos)
+
+	# CB-02 & CB-06 & CB-07: 1.0s reload acceptance schedule:
+	# t=0.0 accepted; t=0.2 rejected; t=0.9 rejected; t=1.0+ accepted; ammo/energy deducted ONCE per accepted shot!
+	var f0: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true, [], "SINGLE")
+	_check(bool(f0.get("ok", false)) and int(f0.get("ammo_spent", 0)) == 5 and scn.shooter.ammo_current == 25, "CB-02/CB-07: t=0.0 fire accepted, ammo 30->25 (single deduct)")
+	_check(is_equal_approx(scn.shooter.energy_current, 90.0), "CB-07: t=0.0 energy 100->90 (single deduct)")
+	_check(is_equal_approx(scn.shooter.reload_remaining, 1.0), "CB-02: reload_remaining initialized to 1.0s")
+
+	# Advance 0.2s via CombatScenario.advance() -> projectile already hits at 0.1875s, yet sim_time & reload continue advancing!
+	scn.advance(0.2)
+	_check(is_equal_approx(scn.sim.sim_time, 0.2) and is_equal_approx(scn.shooter.reload_remaining, 0.8), "CB-02: at t=0.2s reload_remaining decreased to 0.8s even after projectile finished")
+	var f_02: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true, [], "SINGLE")
+	_check(not bool(f_02.get("ok", true)) and str(f_02.get("state", "")) == "RELOADING" and str(f_02.get("reason", "")) == "WEAPON_RELOADING", "CB-06: t=0.2s fire rejected with RELOADING / WEAPON_RELOADING")
+	_eq(scn.shooter.ammo_current, 25, "CB-07: rejected shot at t=0.2s deducted zero ammo")
+
+	# Advance another 0.7s -> t=0.9s (reload_remaining = 0.1s) -> STILL rejected!
+	scn.advance(0.7)
+	var f_09: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true, [], "SINGLE")
+	_check(not bool(f_09.get("ok", true)) and str(f_09.get("state", "")) == "RELOADING", "CB-06: t=0.9s fire still rejected while reloading")
+
+	# CB-04: Single-step 1/60s advances reload by exact 1/60s!
+	var rld_before_step: float = scn.shooter.reload_remaining
+	scn.advance(1.0 / 60.0)
+	_check(absf((rld_before_step - scn.shooter.reload_remaining) - (1.0 / 60.0)) < 0.0005, "CB-04: single-step advances reload_remaining by exact 1/60s")
+
+	# Advance past 1.0s -> reload finishes, RELOAD_READY event emitted, fire accepted!
+	scn.advance(0.15)
+	_check(scn.shooter.reload_remaining <= 0.0001, "CB-02: at t>=1.0s reload_remaining reached 0.0")
+	var saw_reload_ready := false
+	for ev in scn.combat_events:
+		if str(ev.get("kind", "")) == "RELOAD_READY":
+			saw_reload_ready = true
+			break
+	_check(saw_reload_ready, "CB-02: CombatScenario emitted RELOAD_READY event on single clock")
+	var f_10: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true, [], "SINGLE")
+	_check(bool(f_10.get("ok", false)) and scn.shooter.ammo_current == 20, "CB-02/CB-07: t=1.0+ fire accepted and ammo 25->20")
+
+	# CB-06: DISABLED and DESTROYED states block fire via consume_fire_resources as well!
+	scn.advance(1.1)
+	scn.shooter.disabled = true
+	var f_dis: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true)
+	_check(not bool(f_dis.get("ok", true)) and str(f_dis.get("state", "")) == "DISABLED", "CB-06: DISABLED shooter rejected cleanly")
+	scn.shooter.disabled = false
+	scn.shooter.destroyed = true
+	var f_des: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true)
+	_check(not bool(f_des.get("ok", true)) and str(f_des.get("state", "")) == "DESTROYED", "CB-06: DESTROYED shooter rejected cleanly")
+	scn.shooter.destroyed = false
+
+	# CB-05: DoT effect persists across steps and damages target over time.
+	var hull_pre_dot: float = scn.primary_target().hull_current
+	_check(scn.apply_status_effect("primary", "Burn", 20.0, 2.0), "CB-05: DoT applied to primary target")
+	_check(scn.has_active_timers(), "CB-05: has_active_timers() true while DoT active")
+	scn.advance(0.5)
+	_check(absf(scn.primary_target().hull_current - (hull_pre_dot - 10.0)) < 0.05, "CB-05: 0.5s of 20 dps DoT dealt 10.0 damage")
+	scn.advance(1.5)
+	_check(absf(scn.primary_target().hull_current - (hull_pre_dot - 40.0)) < 0.05 and scn.primary_target().active_effects.is_empty(), "CB-05: full 2.0s DoT dealt 40.0 damage and expired cleanly")
+
+	# CB-08: Burst/Salvo semantics — first shot enforces reload; salvo followup permitted within salvo!
+	scn.reset("ALL")
+	var b1: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true, [], "BURST")
+	_check(bool(b1.get("ok", false)), "CB-08: burst shot 1 accepted")
+	var b_block: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true, [], "BURST")
+	_check(not bool(b_block.get("ok", true)) and str(b_block.get("state", "")) == "RELOADING", "CB-08: second BURST blocked by reload")
+	var b2: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos, [], Vector3.ZERO, true, [], "SALVO_FOLLOWUP")
+	_check(bool(b2.get("ok", false)) and scn.shooter.ammo_current == 20, "CB-08: SALVO_FOLLOWUP shot 2 within salvo allowed and deducts ammo once")
+
+	OdfDocument.clear_all_cache()
+	_remove_tree(tmp_dir)
+
+
+func _test_t67_replay_snapshots_and_baseline() -> void:
+	_start("T-67 Wave C2 Spatial Replay Snapshots, ODF Revision Isolation & Baseline Preservation (P1-SIM-03, P1-SIM-04; RP-01..RP-08)")
+	var tmp_dir := ProjectSettings.globalize_path("user://t67_replay_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+	var sh := tmp_dir.path_join("sh.odf")
+	var wp := tmp_dir.path_join("wp.odf")
+	var ord := tmp_dir.path_join("or.odf")
+	var tg := tmp_dir.path_join("tg.odf")
+	_write(sh, "[GameObjectClass]\nweaponName1=\"wp\"\nmaxAmmo=30\nmaxEnergy=60\nmaxHealth=1000\narmorClass=\"H\"\n")
+	_write(wp, "[WeaponClass]\nordName=\"or\"\nshotDelay=0.8\nenergyCost=10\n")
+	_write(ord, "[OrdnanceClass]\nshotSpeed=120\nlifeSpan=2.0\nshotRadius=0.5\nammoCost=10\ndamageValue(H)=60\n")
+	_write(tg, "[GameObjectClass]\nmaxHealth=500\narmorClass=\"H\"\nshieldClass=\"N\"\nmaxShield=100\n")
+	var idx := ResourceIndex.new()
+	idx.roots = [{"path": tmp_dir, "label": "t67", "kind": "game", "priority": 10, "enabled": true}]
+	idx.scan(false)
+	var prof := WeaponProfile.new()
+	_check(prof.resolve(idx, sh, tg), "RP setup: combat chain resolved")
+
+	var CombatScenarioScript = preload("res://scripts/sim/combat_scenario.gd")
+	var scn = CombatScenarioScript.new(2026)
+	var init_pos := Vector3(0, 2, -40)
+	prof.target_half_extents = Vector3(1.5, 1.2, 2.4)
+	prof.target_bbox_offset = Vector3(0, 0.5, 0)
+	prof.target_yaw_rad = 0.25
+	scn.create_new_scenario(prof, init_pos)
+	scn.primary_target().velocity = Vector3(3.0, 0.0, 0.0)
+	scn.capture_replay_baseline(prof)
+
+	# RP-01, RP-02, RP-03: Mutate spatial transform + hitbox -> reset("ALL") MUST restore all of them!
+	scn.primary_target().position = Vector3(25, 4, -80)
+	scn.primary_target().velocity = Vector3(-9.0, 0.0, 4.0)
+	scn.primary_target().yaw_rad = 1.7
+	scn.primary_target().radius = 9.5
+	scn.primary_target().half_extents = Vector3(8, 8, 8)
+	scn.primary_target().bbox_offset = Vector3(2, 3, 4)
+	scn.reset("ALL")
+	_check(scn.primary_target().position.is_equal_approx(init_pos), "RP-01: reset('ALL') restores original target position")
+	_check(scn.primary_target().velocity.is_equal_approx(Vector3(3.0, 0.0, 0.0)) and is_equal_approx(scn.primary_target().yaw_rad, 0.25), "RP-02: reset('ALL') restores original velocity and yaw_rad")
+	_check(is_equal_approx(scn.primary_target().radius, prof.target_radius) and scn.primary_target().half_extents.is_equal_approx(Vector3(1.5, 1.2, 2.4)) and scn.primary_target().bbox_offset.is_equal_approx(Vector3(0, 0.5, 0)), "RP-03: reset('ALL') restores collision geometry (radius, half_extents, bbox_offset)")
+
+	# RP-04: Moving-target scenario: Target at X=0 -> Shot 1 (hits!) -> Move target to X=20 -> Shot 2 fired straight ahead (misses!) -> Replay reproduces exact sequence!
+	var r_hit: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), Vector3(0, 2, -40), 5.0, [], Vector3.ZERO, false)
+	_eq(str(r_hit.get("kind", "")), "vehicle", "RP-04: Shot 1 at X=0 hits target")
+	scn.record_actor_transform("primary", Vector3(20, 2, -40), Vector3(10, 0, 0), 0.5)
+	var r_miss: Dictionary = scn.fire_and_resolve(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), Vector3(20, 2, -40), 5.0, [], Vector3.ZERO, false)
+	_check(str(r_miss.get("kind", "")) != "vehicle", "RP-04: Shot 2 aimed down -Z misses target moved to X=20")
+	var saved_snap: Dictionary = scn.save_replay_snapshot("moving_run_orig_odf")
+
+	# RP-05: Edit ODF damageValue(H) 60 -> 150 AFTER capturing snapshot!
+	# Replaying old snapshot MUST still use captured 60 (shield 100->40, hull 500), while a new live run uses 150!
+	var odoc := prof.ordnance_doc
+	var dent = odoc.find_entry("OrdnanceClass", "damageValue(H)")
+	odoc.set_entry_value(dent, "150")
+	prof.refresh()
+	var sandbox_rep: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(saved_snap)
+	_eq(int(sandbox_rep.get("shots_replayed", 0)), 2, "RP-04/05: sandboxed replay replayed both moving-target shots")
+	var s_res0: Dictionary = (sandbox_rep.get("results", []) as Array)[0]
+	var s_res1: Dictionary = (sandbox_rep.get("results", []) as Array)[1]
+	_eq(str(s_res0.get("kind", "")), "vehicle", "RP-04: replayed Shot 1 hit target at X=0")
+	_check(str(s_res1.get("kind", "")) != "vehicle", "RP-04: replayed Shot 2 missed target moved to X=20")
+	var rep_prim: Dictionary = (sandbox_rep.get("targets", {}) as Dictionary).get("primary", {})
+	_check(is_equal_approx(float(rep_prim.get("shield", -1.0)), 40.0) and is_equal_approx(float(rep_prim.get("hull", -1.0)), 500.0), "RP-05: replaying captured snapshot after ODF edit still uses captured damage=60 (shield 40, hull 500)")
+
+	# RP-08: Sandboxed replay MUST NOT overwrite active user scenario!
+	var active_ammo_before: int = scn.shooter.ammo_current
+	var active_pos_before: Vector3 = scn.primary_target().position
+	var sb2: Dictionary = scn.replay_deterministic(prof, [], true)
+	_check(bool(sb2.get("sandboxed", false)) and scn.shooter.ammo_current == active_ammo_before and scn.primary_target().position.is_equal_approx(active_pos_before), "RP-08: sandboxed replay leaves active user scenario untouched")
+
+	# RP-06 & RP-07: Initial ammo 30 -> Fire -> 20 -> apply DoT + keep reload -> edit weapon / configure_from_profile(..., true) -> Fire -> 10 -> Reset -> ammo restored to 30 (NOT 20)!
+	odoc.undo()
+	scn.reset("ALL")
+	_eq(scn.shooter.ammo_current, 30, "RP-06 setup: initial ammo=30")
+	var f1: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), init_pos, [], Vector3.ZERO, true)
+	_check(bool(f1.get("ok", false)) and scn.shooter.ammo_current == 20, "RP-06: after Shot 1 ammo=20")
+	scn.apply_status_effect("primary", "PlasmaBurn", 15.0, 3.0)
+	var reload_before_reconfig: float = scn.shooter.reload_remaining
+	_check(reload_before_reconfig > 0.5, "RP-07 setup: shooter has active reload_remaining")
+	var wdoc := prof.weapon_doc
+	var w_del = wdoc.find_entry("WeaponClass", "shotDelay")
+	wdoc.set_entry_value(w_del, "1.2")
+	# Routine parameter update (both configure_from_profile(..., true) and change_weapon) MUST preserve baseline, reload, and effects!
+	scn.configure_from_profile(prof, init_pos, true)
+	_check(is_equal_approx(scn.shooter.reload_remaining, reload_before_reconfig) and scn.primary_target().active_effects.size() == 1, "RP-07: reconfiguration preserves active reload cooldown and target status effects")
+	scn.advance(1.5)
+	var f2: Dictionary = scn.fire_shot(prof, Vector3(0, 2, 0), Vector3(0, 0, -1), init_pos, [], Vector3.ZERO, true)
+	_check(bool(f2.get("ok", false)) and scn.shooter.ammo_current == 10, "RP-06: after Shot 2 ammo=10")
+	scn.reset("ALL")
+	_eq(scn.shooter.ammo_current, 30, "RP-06: Reset to initial restores ammo to original 30 (NOT depleted 20)")
+
+	OdfDocument.clear_all_cache()
+	_remove_tree(tmp_dir)
+
+
+func _test_t68_native_cleanup_safety() -> void:
+	_start("T-68 Wave D Active-Experiment Cleanup Guard, Monitor Preservation & Evidence Retention (P1-NATIVE-03; NC-01..NC-07)")
+	NativeAdapterScript.clear_trusted_sessions()
+	var old_root := WorkspaceStore.root_override
+	var ws := "user://t68_cleanup_safe_" + str(Time.get_ticks_usec())
+	WorkspaceStore.root_override = ws
+	var abs_ws := ProjectSettings.globalize_path(ws)
+
+	var disc := NativeAdapterScript.discover()
+	var game_root := str(disc.get("game_root", NativeAdapterScript.DEFAULT_GAME_ROOT))
+	var steam_ok := {"steam_exe": str(disc.get("steam_exe", "V:/__STORE_V/_SOFT/Steam/steam.exe")), "steam_present": true, "steam_running": true, "steam_logged_in": true}
+	var odf_bytes := "[OrdnanceClass]\ndamageValue(H)=100\nshotSpeed=120\n".to_utf8_buffer()
+
+	var ServiceScript = preload("res://scripts/native/native_session_service.gd")
+	var svc = ServiceScript.new()
+	root.add_child(svc)
+	svc.ensure_initialized()
+	svc.runner.process_launcher = func(_e: String, _a: Array) -> Dictionary: return {"ok": true, "pid": 8101, "exit_code": 0}
+	svc.runner.process_inspector = func() -> Array: return []
+
+	var pre: Dictionary = svc.runner.preflight(null, null, {
+		"discovery": disc,
+		"stage_prefix": "nc01_07",
+		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"config_path_override": game_root.path_join("shaman_nc_test.cfg"),
+		"steam_override": steam_ok,
+	})
+	var sid := str(pre.get("session_id", ""))
+	svc.active_session_id = sid
+	var stg: Dictionary = svc.stage(sid)
+	var sess = stg.get("session")
+	var stage_root := str(sess.stage_root)
+	# Drop an unknown file AND modify one staged file? First test NC-01 & NC-02 while active!
+	var lch: Dictionary = svc.launch(sid, {"execute_process": true, "monitor_started_at_s": 0.0, "monitor_timeout_s": 30.0})
+	_check(bool(lch.get("ok", false)) and svc.is_monitoring(sid), "NC-01 setup: monitoring active after launch")
+
+	# NC-01 & NC-02: Pressing CLEANUP while monitor is active MUST be rejected AND leave monitor & timer running!
+	var cl_blocked: Dictionary = svc.cleanup_stage(sid)
+	_check(not bool(cl_blocked.get("ok", true)) and bool(cl_blocked.get("cleanup_rejected", false)), "NC-01: cleanup_stage rejected while monitor is active")
+	_eq(str(cl_blocked.get("reason", "")), "ACTIVE_EXPERIMENT_CANNOT_CLEANUP", "NC-01: rejection reason is ACTIVE_EXPERIMENT_CANNOT_CLEANUP")
+	_check(svc.is_monitoring(sid) and svc.poll_timer != null and (not svc.poll_timer.is_stopped() or svc.poll_timer.autostart), "NC-02: rejected cleanup leaves NativeSessionService monitoring and timer active")
+	_check(FileAccess.file_exists(stage_root.path_join("assets/ODF/atstabvsr_c.odf")), "NC-01: staged files untouched after rejected cleanup")
+
+	# NC-03: Cancel experiment -> persists CANCELLED across restart!
+	var c_res: Dictionary = svc.cancel_monitoring(sid)
+	_eq(str(c_res.get("state", "")), "CANCELLED", "NC-03: cancel_monitoring transitions to CANCELLED")
+	_check(not svc.is_monitoring(sid), "NC-03: monitoring stopped cleanly after cancel")
+	var r_rec = NativeRunnerScript.new()
+	r_rec.recover_sessions()
+	_eq(str(r_rec.get_session_record(sid).get("state", "")), "CANCELLED", "NC-03: CANCELLED state persisted durably across restart")
+
+	# NC-04, NC-05, NC-06, NC-07: Place unknown file + modify a staged ODF -> cleanup succeeds partially,
+	# preserving unknown file & modified staged file while retaining evidence artifact outside stage root!
+	var unknown_file := stage_root.path_join("operator_notes.txt")
+	_write(unknown_file, "Keep my notes!")
+	var mod_odf := stage_root.path_join("assets/ODF/atstabvsr_c.odf")
+	_write(mod_odf, "[OrdnanceClass]\ndamageValue(H)=777\n")
+	var cl_ok: Dictionary = r_rec.cleanup_stage(sid)
+	_check(bool(cl_ok.get("ok", false)) or str(cl_ok.get("state", "")) in ["CLEANED_UP", "PARTIAL_CLEANUP"], "NC-04: cleanup after terminal CANCELLED state proceeds")
+	_check(FileAccess.file_exists(unknown_file), "NC-05: unknown file preserved during cleanup")
+	_check(FileAccess.file_exists(mod_odf), "NC-06: modified staged file preserved during cleanup")
+	var retained_ev := str(cl_ok.get("retained_evidence_path", ""))
+	_check(retained_ev != "" and FileAccess.file_exists(retained_ev), "NC-07: evidence artifact retained outside disposable stage root after cleanup")
+
+	root.remove_child(svc)
+	svc.free()
+	NativeAdapterScript.clear_trusted_sessions()
+	WorkspaceStore.root_override = old_root
+	_remove_tree(stage_root)
+	_remove_tree(abs_ws)
 
 
 # ---------------------------------------------------------------- helpers

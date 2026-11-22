@@ -4,18 +4,18 @@ Ordered by impact. None of these is silently removed from scope.
 
 ## Native game integration
 
-- **Live BZCC `/config` path restriction & Steam confirmation modal (`NATIVE_VERIFIED: 0`).**
+- **Live BZCC `/config` path restriction, safe `STOCK_ADDON` route & Steam authentication (`NATIVE_VERIFIED: 0`).**
   Controlled T-60 diagnostics (`.saipen/evidence/native/T-60-native-startup-diagnosis.md`) proved that
   stock BZCC 2.0.185 boots cleanly (`Battlezone 2026-11-22 11.26.43.3718.log`) and that stock
-  `ds_16.bmf` exists in `bz2r_res/interface/Fonts/DS/ds_16.bmf` (earlier T-20 notes misread it as
-  `ds16.brf` and wrongly attributed `/logconsole` to Steam). The actual cause of the staged startup
-  failure is that BZCC 2.0.185's `select_bzone_cfg` (`i76win.cpp` RVA `0xfbc34`) only loads bare
-  `/config <filename.cfg>` files inside `@rootdir` (`BZ2R\`), skipping `ConfigureFileSystem()` for
-  external absolute or `..\` paths and thereby leaving `bz2r_res` unmounted. Additionally,
-  `steam.exe -applaunch 624970 <args>` triggers Steam's interactive `"Launch Game with custom arguments"`
-  confirmation modal. Because `SafeStageManager` keeps `BZ2R` strictly read-only, SHAMAN surfaces
-  `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` diagnostics and exact operator handoff instructions instead of
-  mutating `BZ2R`. `NATIVE_VERIFIED` remains honestly `0`.
+  `ds_16.bmf` exists in `bz2r_res/interface/Fonts/DS/ds_16.bmf`. BZCC 2.0.185's `select_bzone_cfg`
+  (`i76win.cpp` RVA `0xfbc34`) only loads bare `/config <filename.cfg>` files inside `@rootdir` (`BZ2R\`),
+  skipping `ConfigureFileSystem()` for external paths. SHAMAN now enforces independent launch eligibility
+  gates (`NL-01..NL-06`) so unresolved `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` blocks process launch while
+  still permitting staging and explicit operator handoff (with SHA256 + collision check), and also
+  provides the safe `STOCK_ADDON` route mounting uniquely named owned `SHAMAN_*` folders via stock
+  `bzone.cfg`'s `@mydocsdir\addon` without modifying `BZ2R`. Live Steam execution in the current Windows
+  session remains `BLOCKED_EXTERNAL` (`STEAM_USER_NOT_LOGGED_IN`, `ActiveUser=0x0`), so `NATIVE_VERIFIED`
+  remains honestly `0`.
 - Reload requirements inside BZCC (scene/mission/full restart) are not measured.
 - No supported live modification inside the running game is claimed.
 
@@ -37,7 +37,7 @@ Ordered by impact. None of these is silently removed from scope.
 
 - Rigid flat floor (`StaticBody3D` at `y = 0`) plus placeable sandbox Walls, Pillars, Boxes, and sloped 3D Terrain Ramps (`shape="ramp"`) with ray-vs-wedge and particle-bounce collision; no full heightmap terrain, water, or mesh-accurate building colliders.
 - Oriented 3D bounding-box (OBB) and sphere/ramp collision; ignores exact hull mesh triangles, collision layers, and `boxCollide`.
-- Persistent actor-level combat state (`CombatActorState` / `CombatScenario`, `T-62`) models shooter-owned ammo/energy, persistent shield/hull across sequential shots, independent secondary target shields and splash propagation, and deterministic replay as `APPROXIMATED` preview models; no real shield mesh/texture animation, deflection angle, regeneration, mines, deployables, or friendly fire are simulated.
+- Persistent actor-level combat state (`CombatActorState` / `CombatScenario`, `T-62`, `T-66`, `T-67`) unifies projectile stepping, shooter-owned ammo/energy, reload cooldown enforcement (`READY`/`RELOADING`/`INSUFFICIENT_AMMO`/`INSUFFICIENT_ENERGY`/`DESTROYED`/`DISABLED`), persistent shield/hull across sequential shots, DoT status effects, independent secondary target shields and splash propagation, and immutable spatial/ODF-isolated sandboxed `CombatReplaySnapshot` replays as `APPROXIMATED` preview models; no real shield mesh/texture animation, deflection angle, regeneration, mines, deployables, or friendly fire are simulated.
 - Approximated beam/lightning (`BoltBeamNode` for `draw_bolt`/`draw_beam`/`ArcCannonClass`), homing missile turning (`omegaTurn`), seeded `shotVariance` spread, recoil kick, moving shooter velocity inheritance, configurable Moving Target patterns (`Strafe`/`Wiggle`/`Orbit`/`Approach`), and Shooter Aim modes (`Manual`/`Track`/`Lead`/`Fixed Forward`) are implemented as `APPROXIMATED` preview models, not native engine formulas.
 - Salvos/bursts use `salvoCount`/`salvoDelay`; `altName` alternate fire is previewable via FIRE ALT, but the `switchMask`/deploy transition itself, ammo cost, and morph timing are not modelled.
 - Multi-target splash falloff is linear (`APPROXIMATED`) across primary and secondary targets on vehicle/obstacle/ground impacts.
@@ -49,8 +49,8 @@ Ordered by impact. None of these is silently removed from scope.
   for lookup.
 - Raw-editor “Apply” replaces the document (and clears its undo stack); it is explicit.
 - Undo history is in-memory only, not persisted.
-- Batch editing across several properties, diff-before-commit review, side-by-side ODF
-  comparison, presets and before/after replay are not implemented.
+- Batch editing across several properties, diff-before-commit review, and side-by-side ODF
+  comparison are not implemented (immutable `CombatReplaySnapshot` capture & sandboxed replay are implemented in Weapons Lab).
 - The parameter sweep varies exactly one property over a numeric range; it does not combine
   values. CSV export is implemented (`save_sweep_csv`) and covered by the UI smoke test.
 - No project manifest/module import/export packaging beyond single-ODF staging.

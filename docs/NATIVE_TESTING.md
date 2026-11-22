@@ -106,7 +106,10 @@ What already existed and still applies:
 | Persistent `ModLoadout` explicit conflict winner shared identically by `ResourceIndex` and `NativeResourceClosureBuilder` | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `T-34` |
 | Checked durable session transitions (`STATE_PERSIST_FAILED` / `RECOVERY_PENDING`) | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `ND-11..ND-15` (`T-40`) |
 | Bounded asynchronous `NativeProcessMonitor` with PID/exe verification, mission/probe state machine, restart recovery, timeout/cancel | `IMPLEMENTED` / `TESTED_HEADLESS` | Validated by `SM-01..SM-07` (`T-40`) |
-| Live Steam BZCC execution & engine health-delta calibration | `NOT_VERIFIED` (`NATIVE_VERIFIED: 0`) | T-20 reproduced staged `STEAM_MANAGED` launch; engine exits before mission init; no Lua observation artifact; original `BZ2R` untouched |
+| Independent launch eligibility gates (`STRUCTURALLY_VALID`, `RESOURCE_CLOSURE_VALID`, `STAGE_ELIGIBLE`, `CONFIG_COMPATIBLE`, `EXECUTION_ENVIRONMENT_READY`, `LAUNCH_ELIGIBLE`) & `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` mandatory launch block | `VERIFIED` (`TESTED_HEADLESS`) | Validated by `NL-01..NL-06` (`T-65`); incompatible external `/config` can stage for manual handoff (with SHA256/collision check) but is unconditionally rejected from process launch |
+| Safe Stock Addon launch route (`STOCK_ADDON` via stock `bzone.cfg` `@mydocsdir\addon\SHAMAN_*`) | `VERIFIED` (dry-run staging) / `BLOCKED_EXTERNAL` (live Steam) | Verified read-only that stock `bzone.cfg` mounts `@mydocsdir\addon` first (`CONFIG_STOCK_ADDON_ROUTE`), stages without `/config` or `bzshell_init.cfg` pollution, cleans up only owned files (`NL-05`, `.saipen/evidence/native/native-probe-799678.json`) |
+| Active-experiment cleanup guard (`ACTIVE_EXPERIMENT_CANNOT_CLEANUP`) & separate evidence retention | `VERIFIED` (`TESTED_HEADLESS` + `TESTED_GUI`) | Validated by `NC-01..NC-07` (`T-68`); rejected cleanup preserves `NativeSessionService` timer/monitor; evidence copied outside stage root before cleanup |
+| Live Steam BZCC execution & engine health-delta calibration | `BLOCKED_EXTERNAL` (`NATIVE_VERIFIED: 0`) | Live Steam client session is unauthenticated (`ActiveUser=0x0`, `STEAM_USER_NOT_LOGGED_IN`) in this Windows session; original `BZ2R` untouched |
 
 ## Remaining adapter work (for an operator-authorized `@rootdir` run)
 

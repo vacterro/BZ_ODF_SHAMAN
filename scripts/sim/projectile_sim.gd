@@ -211,8 +211,16 @@ func update_live_target(target_pos: Vector3, target_yaw_rad: float = 0.0) -> voi
 
 
 func advance(dt: float) -> void:
+	if dt <= 0.0:
+		return
+	if shots.is_empty():
+		sim_time += dt
+		return
 	var remaining := dt
-	while remaining > 0.0 and not shots.is_empty():
+	while remaining > 0.0:
+		if shots.is_empty():
+			sim_time += remaining
+			break
 		var step: float = minf(SUBSTEP, remaining)
 		remaining -= step
 		sim_time += step

@@ -305,9 +305,12 @@ static func discover(game_root: String = DEFAULT_GAME_ROOT, probe_steam: bool = 
 	return out
 
 
-static func _extra_protected_from_discovery(discovery: Dictionary) -> Array[String]:
+static func _extra_protected_from_discovery(discovery: Dictionary, allow_mydocs_addon_stage: bool = false) -> Array[String]:
 	var out: Array[String] = []
-	for k in ["game_root", "data_root", "res_root", "missions_dll_root", "workshop_root", "addon_root"]:
+	var keys := ["game_root", "data_root", "res_root", "missions_dll_root", "workshop_root"]
+	if not allow_mydocs_addon_stage:
+		keys.append("addon_root")
+	for k in keys:
 		var p := str(discovery.get(k, ""))
 		if p != "":
 			out.append(p)
@@ -946,6 +949,116 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 	return "\n".join(lines) + "\n"
 
 
+## Compute lowercase hex SHA256 digest of raw bytes (used for operator handoff
+## provenance when preparing a controlled @rootdir config placement).
+static func sha256_bytes(bytes: PackedByteArray) -> String:
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	ctx.update(bytes)
+	return ctx.finish().hex_encode().to_lower()
+
+
+## Read-only inspection of stock `bzone.cfg` verifying whether BZCC mounts
+## `@mydocsdir\addon` first in `ConfigureStream("base")`. Never mutates BZ2R.
+static func inspect_stock_bzone_cfg(game_root: String = DEFAULT_GAME_ROOT) -> Dictionary:
+	var cfg_path := WorkspaceStore.canonical(game_root).path_join("bzone.cfg")
+	if not FileAccess.file_exists(cfg_path):
+		return {
+			"ok": false,
+			"exists": false,
+			"path": cfg_path,
+			"mounts_addon_first": false,
+			"first_mount": "",
+			"reason": "STOCK_BZONE_CFG_MISSING",
+		}
+	var txt := FileAccess.get_file_as_string(cfg_path)
+	var mounts: Array[String] = []
+	for raw_line in txt.replace("\r\n", "\n").split("\n"):
+		var line := raw_line.strip_edges()
+		if line.begins_with("//"):
+			continue
+		if line.begins_with("AddDirRecurse("):
+			var q1 := line.find("\"")
+			var q2 := line.find("\"", q1 + 1)
+			if q1 >= 0 and q2 > q1:
+				mounts.append(line.substr(q1 + 1, q2 - q1 - 1))
+	var first_m := mounts[0] if not mounts.is_empty() else ""
+	var addon_first := first_m.to_lower().replace("/", "\\") == "@mydocsdir\\addon"
+	return {
+		"ok": addon_first,
+		"exists": true,
+		"path": cfg_path,
+		"mounts_addon_first": addon_first,
+		"first_mount": first_m,
+		"mounts": mounts,
+		"reason": "" if addon_first else "STOCK_ADDON_MOUNT_NOT_FIRST",
+	}
+
+
+## Build a safe stock-addon staging plan under My Documents
+## (`Documents/My Games/Battlezone Combat Commander/addon/SHAMAN_<stage_id>`).
+## Zero writes to BZ2R or Workshop; stock `bzone.cfg` mounts `@mydocsdir\addon` first.
+static func build_stock_addon_stage_plan(stage_id: String, session_id: String = "",
+		mission_base: String = DEFAULT_MISSION_BASE, docs_override: String = "") -> Dictionary:
+	var docs := WorkspaceStore.canonical(docs_override if docs_override != "" else OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS))
+	var bz_docs := docs.path_join("My Games/Battlezone Combat Commander") if docs != "" else ""
+	var addon_base := bz_docs.path_join("addon") if bz_docs != "" else ""
+	var safe_id := stage_id.strip_edges().replace("/", "_").replace("\\", "_").replace(" ", "_").replace("..", "_")
+	if safe_id == "":
+		safe_id = "stage_" + str(Time.get_ticks_usec())
+	if not safe_id.begins_with("SHAMAN_"):
+		safe_id = "SHAMAN_" + safe_id
+	var stage_root := addon_base.path_join(safe_id) if addon_base != "" else ""
+	var sid := session_id if session_id != "" else safe_id
+	var safe_sid := sid.replace("/", "_").replace("\\", "_").replace(" ", "_")
+	var logs_dir := bz_docs.path_join("Logs") if bz_docs != "" else ""
+	var obs_filename := "shaman_obs_%s.json" % safe_sid
+	return {
+		"launch_mode": "STOCK_ADDON",
+		"addon_base": addon_base,
+		"stage_id": safe_id,
+		"stage_absolute_path": stage_root,
+		"assets_mount_path": stage_root.path_join("assets") if stage_root != "" else "",
+		"assets_mount_win": _to_win_path(stage_root.path_join("assets")) if stage_root != "" else "",
+		"bzcc_writable_profile_dir": bz_docs,
+		"bzcc_logs_dir": logs_dir,
+		"startup_log_path": bz_docs.path_join("battlezone.log") if bz_docs != "" else "",
+		"observation_filename": obs_filename,
+		"observation_expected_path": logs_dir.path_join(obs_filename) if logs_dir != "" else "",
+		"mission_bzn": mission_base + ".bzn",
+		"mission_lua": mission_base + ".lua",
+	}
+
+
+## Prepare a controlled operator fallback descriptor for placing a generated
+## `.cfg` inside `@rootdir` (BZ2R). Strictly read-only: computes SHA256, checks
+## for destination filename collision, and requires explicit operator approval.
+static func prepare_rootdir_config_handoff(cfg_path: String, game_root: String = DEFAULT_GAME_ROOT,
+		cfg_bytes: PackedByteArray = PackedByteArray()) -> Dictionary:
+	var c_cfg := WorkspaceStore.canonical(cfg_path)
+	var c_root := WorkspaceStore.canonical(game_root)
+	var bare_name := c_cfg.get_file()
+	if bare_name == "":
+		bare_name = "shaman_native.cfg"
+	var dest_path := c_root.path_join(bare_name)
+	var raw := cfg_bytes
+	if raw.is_empty() and c_cfg != "" and FileAccess.file_exists(c_cfg):
+		raw = FileAccess.get_file_as_bytes(c_cfg)
+	var sha256 := sha256_bytes(raw) if not raw.is_empty() else ""
+	var collision := FileAccess.file_exists(dest_path)
+	return {
+		"source_path": _to_win_path(c_cfg),
+		"destination_path": _to_win_path(dest_path),
+		"recommended_filename": bare_name,
+		"sha256": sha256,
+		"byte_length": raw.size(),
+		"collision_detected": collision,
+		"requires_operator_approval": true,
+		"auto_write_permitted": false,
+		"warning": ("Destination file '%s' already exists in BZ2R; back up existing file before copying or choose a unique filename." % bare_name) if collision else "",
+	}
+
+
 ## Diagnose whether a `/config` path can be opened by BZCC 2.0.185's
 ## select_bzone_cfg (i76win.cpp RVA 0xfbc34), which only loads bare filenames
 ## inside @rootdir and skips ConfigureFileSystem() for arbitrary absolute or
@@ -1117,17 +1230,41 @@ static func correlate_crash_logs(docs_dir: String, session_info: Dictionary,
 ## Build exact launch command descriptor for a given launch capability route.
 ## `/logconsole` is opt-in (default false) so SHAMAN never injects extra flags
 ## behind the operator's back (P0-NATIVE-01).
+## Supports `launch_mode = "STOCK_ADDON"` (stock bzone.cfg mounts `@mydocsdir\addon`
+## first without external `/config`) as well as `"CUSTOM_CONFIG"`.
 static func build_launch_command(route: String, discovery: Dictionary, cfg_path: String,
 		mission_bzn: String = DEFAULT_MISSION_BASE + ".bzn",
-		include_logconsole: bool = false) -> Dictionary:
+		include_logconsole: bool = false,
+		launch_mode: String = "CUSTOM_CONFIG") -> Dictionary:
 	var game_root := str(discovery.get("game_root", DEFAULT_GAME_ROOT))
-	var cfg_diag := diagnose_config_path_compatibility(cfg_path, game_root)
-	var cfg_arg := str(cfg_diag.get("config_arg", _to_win_path(cfg_path)))
+	var is_stock_addon := launch_mode.strip_edges().to_upper() == "STOCK_ADDON"
+	var cfg_diag: Dictionary
 	var game_args: Array[String] = ["/nointro", "/win"]
 	if include_logconsole:
 		game_args.append("/logconsole")
-	game_args.append_array(["/config", cfg_arg, mission_bzn])
 	var flags_prefix := "/nointro /win /logconsole" if include_logconsole else "/nointro /win"
+	var launch_opts_text := ""
+	if is_stock_addon:
+		var stock_chk := inspect_stock_bzone_cfg(game_root)
+		var addon_ok := bool(stock_chk.get("ok", false))
+		cfg_diag = {
+			"ok": addon_ok,
+			"in_game_root": false,
+			"stock_addon_route": true,
+			"config_arg": "",
+			"recommended_rootdir_filename": "",
+			"requires_rootdir_placement": false,
+			"code": "CONFIG_STOCK_ADDON_ROUTE" if addon_ok else str(stock_chk.get("reason", "STOCK_ADDON_MOUNT_NOT_FIRST")),
+			"warning": "" if addon_ok else "Stock bzone.cfg does not mount @mydocsdir\\addon first; stock addon route unavailable.",
+			"stock_bzone_cfg": stock_chk,
+		}
+		game_args.append(mission_bzn)
+		launch_opts_text = "%s \"%s\"" % [flags_prefix, mission_bzn]
+	else:
+		cfg_diag = diagnose_config_path_compatibility(cfg_path, game_root)
+		var cfg_arg := str(cfg_diag.get("config_arg", _to_win_path(cfg_path)))
+		game_args.append_array(["/config", cfg_arg, mission_bzn])
+		launch_opts_text = "%s /config \"%s\" \"%s\"" % [flags_prefix, cfg_arg, mission_bzn]
 	match route:
 		"STEAM_MANAGED":
 			var steam_exe := str(discovery.get("steam_exe", ""))
@@ -1135,6 +1272,7 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 			sargs.append_array(game_args)
 			return {
 				"route": "STEAM_MANAGED",
+				"launch_mode": "STOCK_ADDON" if is_stock_addon else "CUSTOM_CONFIG",
 				"executable": steam_exe,
 				"args": sargs,
 				"game_args": game_args,
@@ -1147,12 +1285,13 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 		"STEAM_LAUNCH_OPTIONS":
 			return {
 				"route": "STEAM_LAUNCH_OPTIONS",
+				"launch_mode": "STOCK_ADDON" if is_stock_addon else "CUSTOM_CONFIG",
 				"executable": str(discovery.get("steam_exe", "")),
 				"args": game_args,
 				"game_args": game_args,
 				"include_logconsole": include_logconsole,
 				"config_diagnostics": cfg_diag,
-				"launch_options_text": "%s /config \"%s\" \"%s\"" % [flags_prefix, cfg_arg, mission_bzn],
+				"launch_options_text": launch_opts_text,
 				"steam_app_id": STEAM_APP_ID,
 				"game_version": str(discovery.get("build_id", "UNKNOWN")),
 				"supported": str(discovery.get("steam_exe", "")) != "",
@@ -1160,15 +1299,17 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 		"OPERATOR_MANUAL":
 			return {
 				"route": "OPERATOR_MANUAL",
+				"launch_mode": "STOCK_ADDON" if is_stock_addon else "CUSTOM_CONFIG",
 				"executable": str(discovery.get("steam_exe", "")),
 				"args": game_args,
 				"game_args": game_args,
 				"include_logconsole": include_logconsole,
 				"config_diagnostics": cfg_diag,
+				"launch_options_text": launch_opts_text,
 				"steam_app_id": STEAM_APP_ID,
 				"game_version": str(discovery.get("build_id", "UNKNOWN")),
-				"instructions": "Log into Steam for AppID %s and launch BZCC with %s /config \"%s\" \"%s\"%s" % [
-					STEAM_APP_ID, flags_prefix, cfg_arg, mission_bzn,
+				"instructions": "Log into Steam for AppID %s and launch BZCC with %s%s" % [
+					STEAM_APP_ID, launch_opts_text,
 					(" (Note: " + str(cfg_diag.warning) + ")") if str(cfg_diag.warning) != "" else ""
 				],
 				"supported": true,
@@ -1176,6 +1317,7 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 		"DIRECT_EXECUTABLE":
 			return {
 				"route": "DIRECT_EXECUTABLE",
+				"launch_mode": "STOCK_ADDON" if is_stock_addon else "CUSTOM_CONFIG",
 				"executable": str(discovery.get("exe", "")),
 				"args": game_args,
 				"game_args": game_args,
@@ -1188,6 +1330,7 @@ static func build_launch_command(route: String, discovery: Dictionary, cfg_path:
 		_:
 			return {
 				"route": "UNSUPPORTED",
+				"launch_mode": "STOCK_ADDON" if is_stock_addon else "CUSTOM_CONFIG",
 				"executable": "",
 				"args": [],
 				"game_args": [],
@@ -1261,7 +1404,12 @@ static func classify_launch_result(route: String, exit_code: int, process_seen: 
 static func stage_scenario(stage_root: String, files: Dictionary, scenario: Dictionary,
 		discovery: Dictionary = {}, dry_run: bool = false,
 		session: RefCounted = null, options: Dictionary = {}) -> Dictionary:
-	var extra_protected := _extra_protected_from_discovery(discovery)
+	var is_stock_addon := str(options.get("launch_mode", "")).strip_edges().to_upper() == "STOCK_ADDON"
+	if not is_stock_addon and session != null and str(session.mount_plan.get("launch_mode", "")).to_upper() == "STOCK_ADDON":
+		is_stock_addon = true
+	var stage_leaf := WorkspaceStore.canonical(stage_root).get_file()
+	var allow_addon := is_stock_addon and stage_leaf.begins_with("SHAMAN_")
+	var extra_protected := _extra_protected_from_discovery(discovery, allow_addon)
 	var stage_opts := options.duplicate(true)
 	if session != null and str(stage_opts.get("stage_id", "")) == "":
 		stage_opts["stage_id"] = session.stage_id
@@ -1878,15 +2026,21 @@ static func is_native_verified(evidence: Dictionary) -> bool:
 
 ## Read-only preflight verifying executable, build ID, staging isolation,
 ## BZN + Lua + terrain closure, mount config mapping, session identity consistency,
-## resource closure (when index/spec provided), and Steam launch route.
+## resource closure (when index/spec provided), config path compatibility, and
+## Steam launch route. Computes independent execution gates (P0-NATIVE-01):
+##   STRUCTURALLY_VALID, RESOURCE_CLOSURE_VALID, STAGE_ELIGIBLE,
+##   CONFIG_COMPATIBLE, EXECUTION_ENVIRONMENT_READY, LAUNCH_ELIGIBLE.
 static func preflight_experiment(stage_root: String, files: Dictionary, scenario: Dictionary,
 		discovery: Dictionary = {}, steam_override: Dictionary = {},
 		session: RefCounted = null, index: ResourceIndex = null,
-		closure_spec: Dictionary = {}) -> Dictionary:
+		closure_spec: Dictionary = {}, launch_options: Dictionary = {}) -> Dictionary:
 	var disc := discovery if not discovery.is_empty() else discover()
 	var issues: Array[String] = []
 	var blockers: Array[String] = []
 	var primary_reason := ""
+	var launch_mode := str(launch_options.get("launch_mode", "CUSTOM_CONFIG")).strip_edges().to_upper()
+	if launch_mode != "STOCK_ADDON":
+		launch_mode = "CUSTOM_CONFIG"
 
 	if not bool(disc.get("ok", false)):
 		issues.append("BZCC executable not found at " + str(disc.get("exe", "")))
@@ -1900,7 +2054,9 @@ static func preflight_experiment(stage_root: String, files: Dictionary, scenario
 		if primary_reason == "":
 			primary_reason = "MISSING_SCENARIO_ID"
 
-	var extra_prot := _extra_protected_from_discovery(disc)
+	var stage_leaf := WorkspaceStore.canonical(stage_root).get_file()
+	var allow_addon_dest := (launch_mode == "STOCK_ADDON") and stage_leaf.begins_with("SHAMAN_")
+	var extra_prot := _extra_protected_from_discovery(disc, allow_addon_dest)
 	var dest_check := SafeStageScript.validate_stage_destination(stage_root, extra_prot)
 	if not bool(dest_check.get("ok", false)):
 		issues.append("stage destination rejected: " + str(dest_check.get("error", "")))
@@ -1919,14 +2075,32 @@ static func preflight_experiment(stage_root: String, files: Dictionary, scenario
 		if primary_reason == "":
 			primary_reason = str(pkg_check.get("reason", "INVALID_MISSION_PACKAGE"))
 
-	# P0-NATIVE-02: Validate shaman_native.cfg mounts exact staged assets directory.
-	var cfg_raw = files.get("shaman_native.cfg", "")
-	var cfg_text: String = (cfg_raw as PackedByteArray).get_string_from_utf8() if cfg_raw is PackedByteArray else str(cfg_raw)
-	var mount_check := validate_mount_config(cfg_text, stage_root)
-	if not bool(mount_check.get("ok", false)):
-		issues.append(str(mount_check.get("error", "mount path mismatch")))
-		if primary_reason == "":
-			primary_reason = str(mount_check.get("reason", "MOUNT_PATH_MISMATCH"))
+	# P0-NATIVE-02: Validate mount config (CUSTOM_CONFIG) or stock addon marker safety (STOCK_ADDON).
+	var mount_check: Dictionary = {}
+	if launch_mode == "STOCK_ADDON":
+		var has_marker := files.has("assets/ODF/shaman_mount_marker.odf")
+		var pollutes_shell := files.has("assets/Config/bzshell_init.cfg")
+		var stock_chk := inspect_stock_bzone_cfg(str(disc.get("game_root", DEFAULT_GAME_ROOT)))
+		mount_check = {
+			"ok": has_marker and not pollutes_shell and bool(stock_chk.get("ok", false)),
+			"mode": "STOCK_ADDON",
+			"has_marker": has_marker,
+			"pollutes_shell_init": pollutes_shell,
+			"stock_bzone_cfg": stock_chk,
+			"reason": "" if (has_marker and not pollutes_shell and bool(stock_chk.get("ok", false))) else ("STOCK_ADDON_SHELL_POLLUTION" if pollutes_shell else ("MISSING_MOUNT_MARKER" if not has_marker else str(stock_chk.get("reason", "STOCK_ADDON_MOUNT_NOT_FIRST")))),
+		}
+		if not bool(mount_check.get("ok", false)):
+			issues.append("stock addon mount validation failed: " + str(mount_check.get("reason", "")))
+			if primary_reason == "":
+				primary_reason = str(mount_check.get("reason", "STOCK_ADDON_INVALID"))
+	else:
+		var cfg_raw = files.get("shaman_native.cfg", "")
+		var cfg_text: String = (cfg_raw as PackedByteArray).get_string_from_utf8() if cfg_raw is PackedByteArray else str(cfg_raw)
+		mount_check = validate_mount_config(cfg_text, stage_root)
+		if not bool(mount_check.get("ok", false)):
+			issues.append(str(mount_check.get("error", "mount path mismatch")))
+			if primary_reason == "":
+				primary_reason = str(mount_check.get("reason", "MOUNT_PATH_MISMATCH"))
 
 	# P0-SESSION: Validate single NativeExperimentSession identity across generated Lua and mount plan.
 	var session_check: Dictionary = {}
@@ -1940,6 +2114,7 @@ static func preflight_experiment(stage_root: String, files: Dictionary, scenario
 
 	# P0-CLOSURE: Validate transitive ODF resource closure when requested.
 	var closure_report: Dictionary = {}
+	var resource_closure_valid := true
 	if index != null or not closure_spec.is_empty():
 		var cspec := closure_spec.duplicate(true)
 		if not cspec.has("staged_files"):
@@ -1948,6 +2123,7 @@ static func preflight_experiment(stage_root: String, files: Dictionary, scenario
 		if session != null:
 			session.closure_report = closure_report.duplicate(true)
 		if not bool(closure_report.get("ok", false)):
+			resource_closure_valid = false
 			var creason := str(closure_report.get("reason", closure_report.get("status", "RESOURCE_MISSING")))
 			issues.append("resource closure failed (%s)" % creason)
 			if primary_reason == "":
@@ -1972,27 +2148,64 @@ static func preflight_experiment(stage_root: String, files: Dictionary, scenario
 	else:
 		launch_route = "STEAM_MANAGED"
 
-	var cfg_path := WorkspaceStore.canonical(stage_root).path_join("shaman_native.cfg")
+	var cfg_override := str(launch_options.get("config_path_override", "")).strip_edges()
+	var cfg_path := WorkspaceStore.canonical(cfg_override) if cfg_override != "" else (
+		WorkspaceStore.canonical(str(session.config_path)) if (session != null and str(session.config_path) != "") else WorkspaceStore.canonical(stage_root).path_join("shaman_native.cfg")
+	)
 	var mission_bzn := str(pkg_check.get("bzn_file", DEFAULT_MISSION_BASE + ".bzn"))
-	var launch_cmd := build_launch_command(launch_route, disc, cfg_path, mission_bzn)
+	var include_logconsole := bool(launch_options.get("include_logconsole", false))
+	var launch_cmd := build_launch_command(launch_route, disc, cfg_path, mission_bzn, include_logconsole, launch_mode)
+	var cfg_diag: Dictionary = launch_cmd.get("config_diagnostics", {}) if launch_cmd.get("config_diagnostics", {}) is Dictionary else {}
+	var config_compatible := bool(cfg_diag.get("ok", false))
+	var rootdir_handoff: Dictionary = {}
+	if not config_compatible:
+		var cfg_raw_bytes := PackedByteArray()
+		if files.has("shaman_native.cfg"):
+			var cr = files["shaman_native.cfg"]
+			cfg_raw_bytes = cr if cr is PackedByteArray else str(cr).to_utf8_buffer()
+		rootdir_handoff = prepare_rootdir_config_handoff(cfg_path, str(disc.get("game_root", DEFAULT_GAME_ROOT)), cfg_raw_bytes)
+		var cfg_code := str(cfg_diag.get("code", "CONFIG_REQUIRES_ROOTDIR_PLACEMENT"))
+		blockers.append(str(cfg_diag.get("warning", "External /config path requires @rootdir placement (%s)" % cfg_code)))
+		if blocker_reason == "":
+			blocker_reason = cfg_code
+
 	if session != null:
 		session.launch_route = launch_route
 		session.launch_command = launch_cmd.duplicate(true)
 
 	var structurally_valid := issues.is_empty()
-	var launch_ready := structurally_valid and blockers.is_empty()
-	var status := "STRUCTURALLY_VALID" if launch_ready else ("BLOCKED" if structurally_valid else "FAILED")
+	var stage_eligible := structurally_valid and resource_closure_valid
+	var execution_environment_ready := (launch_route == "STEAM_MANAGED") and bool(launch_cmd.get("supported", false))
+	var launch_ready := stage_eligible and config_compatible and execution_environment_ready and blockers.is_empty()
+	var launch_eligible := launch_ready
+	var status := "STRUCTURALLY_VALID" if launch_ready else ("BLOCKED" if stage_eligible else "FAILED")
 	if primary_reason == "" and blocker_reason != "":
 		primary_reason = blocker_reason
 
 	return {
 		"ok": structurally_valid,
 		"structurally_valid": structurally_valid,
+		"resource_closure_valid": resource_closure_valid,
+		"stage_eligible": stage_eligible,
+		"config_compatible": config_compatible,
+		"execution_environment_ready": execution_environment_ready,
 		"launch_ready": launch_ready,
+		"launch_eligible": launch_eligible,
+		"gates": {
+			"STRUCTURALLY_VALID": structurally_valid,
+			"RESOURCE_CLOSURE_VALID": resource_closure_valid,
+			"STAGE_ELIGIBLE": stage_eligible,
+			"CONFIG_COMPATIBLE": config_compatible,
+			"EXECUTION_ENVIRONMENT_READY": execution_environment_ready,
+			"LAUNCH_ELIGIBLE": launch_eligible,
+		},
+		"launch_mode": launch_mode,
 		"status": status,
 		"reason": primary_reason,
 		"issues": issues,
 		"blockers": blockers,
+		"config_diagnostics": cfg_diag,
+		"rootdir_handoff": rootdir_handoff,
 		"mission_package": pkg_check,
 		"mount_validation": mount_check,
 		"session_consistency": session_check,

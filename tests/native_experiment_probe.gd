@@ -17,6 +17,7 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var use_vsr := args.has("--vsr")
 	var allow_launch := args.has("--launch")
+	var use_stock_addon := not args.has("--custom-config")
 	var launch_started_unix := int(Time.get_unix_time_from_system())
 
 	var root := "user://native_probe_" + str(Time.get_ticks_usec())
@@ -90,6 +91,7 @@ func _initialize() -> void:
 	var pre: Dictionary = runner.preflight(profile, index, {
 		"discovery": disc,
 		"stage_prefix": "shaman_vsr" if use_vsr else "shaman_stock",
+		"launch_mode": "STOCK_ADDON" if use_stock_addon else "CUSTOM_CONFIG",
 		"check_closure": true,
 		"require_complete_closure": true,
 		"active_packages": active_pkgs,
@@ -101,8 +103,13 @@ func _initialize() -> void:
 		"state": str(pre.get("state", "")),
 		"reason": str(pre.get("reason", "")),
 		"session_id": str(pre.get("session_id", "")),
+		"launch_mode": str(pre.get("launch_mode", "")),
 		"launch_route": str(pre_detail.get("launch_route", "")),
+		"stage_eligible": bool(pre.get("stage_eligible", false)),
+		"config_compatible": bool(pre.get("config_compatible", false)),
+		"execution_environment_ready": bool(pre.get("execution_environment_ready", false)),
 		"launch_ready": bool(pre.get("launch_ready", false)),
+		"launch_eligible": bool(pre.get("launch_eligible", false)),
 		"closure_status": str((pre_detail.get("resource_closure", {}) as Dictionary).get("status", "")),
 		"config_diagnostics": (pre_detail.get("launch_command", {}) as Dictionary).get("config_diagnostics", {}),
 	}

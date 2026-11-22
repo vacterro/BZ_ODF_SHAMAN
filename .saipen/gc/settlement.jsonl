@@ -74,3 +74,15 @@
 {"at": "2026-11-22T09:51:10Z", "event_id": "finish-d9212c2f1bfd4f87b6deeaf60e45071c", "key": "T-63:finish-d9212c2f1bfd4f87b6deeaf60e45071c", "schema": 1, "state": "done", "ticket": "T-63"}
 {"at": "2026-11-22T09:51:26Z", "event_id": "finish-ec36afe956a548d99a89b3be1a6211c2", "key": "T-64:finish-ec36afe956a548d99a89b3be1a6211c2", "schema": 1, "state": "pending", "ticket": "T-64"}
 {"at": "2026-11-22T09:51:27Z", "event_id": "finish-ec36afe956a548d99a89b3be1a6211c2", "key": "T-64:finish-ec36afe956a548d99a89b3be1a6211c2", "schema": 1, "state": "done", "ticket": "T-64"}
+{"at": "2026-11-22T10:45:07Z", "event_id": "finish-88e653a6cead4f54927b790c7d8858fc", "key": "T-65:finish-88e653a6cead4f54927b790c7d8858fc", "schema": 1, "state": "pending", "ticket": "T-65"}
+{"at": "2026-11-22T10:45:08Z", "event_id": "finish-88e653a6cead4f54927b790c7d8858fc", "key": "T-65:finish-88e653a6cead4f54927b790c7d8858fc", "schema": 1, "state": "done", "ticket": "T-65"}
+{"at": "2026-11-22T10:45:23Z", "event_id": "finish-8aa4dc1698684472b93539baf4cc6977", "key": "T-66:finish-8aa4dc1698684472b93539baf4cc6977", "schema": 1, "state": "pending", "ticket": "T-66"}
+{"at": "2026-11-22T10:45:23Z", "event_id": "finish-8aa4dc1698684472b93539baf4cc6977", "key": "T-66:finish-8aa4dc1698684472b93539baf4cc6977", "schema": 1, "state": "done", "ticket": "T-66"}
+{"at": "2026-11-22T10:45:36Z", "event_id": "finish-64252f45586c45d8b4eb673274e31046", "key": "T-67:finish-64252f45586c45d8b4eb673274e31046", "schema": 1, "state": "pending", "ticket": "T-67"}
+{"at": "2026-11-22T10:45:36Z", "event_id": "finish-64252f45586c45d8b4eb673274e31046", "key": "T-67:finish-64252f45586c45d8b4eb673274e31046", "schema": 1, "state": "done", "ticket": "T-67"}
+{"at": "2026-11-22T10:45:50Z", "event_id": "finish-20d8c7ee46b64eb3809134a1ba21fd0a", "key": "T-68:finish-20d8c7ee46b64eb3809134a1ba21fd0a", "schema": 1, "state": "pending", "ticket": "T-68"}
+{"at": "2026-11-22T10:45:50Z", "event_id": "finish-20d8c7ee46b64eb3809134a1ba21fd0a", "key": "T-68:finish-20d8c7ee46b64eb3809134a1ba21fd0a", "schema": 1, "state": "done", "ticket": "T-68"}
+{"at": "2026-11-22T10:46:03Z", "event_id": "finish-09bcfa7048b44a61bd98d070845318b4", "key": "T-69:finish-09bcfa7048b44a61bd98d070845318b4", "schema": 1, "state": "pending", "ticket": "T-69"}
+{"at": "2026-11-22T10:46:03Z", "event_id": "finish-09bcfa7048b44a61bd98d070845318b4", "key": "T-69:finish-09bcfa7048b44a61bd98d070845318b4", "schema": 1, "state": "done", "ticket": "T-69"}
+{"at": "2026-11-22T10:46:17Z", "event_id": "finish-54b3bb531b8d4a06bf7d3ed544ae2143", "key": "T-70:finish-54b3bb531b8d4a06bf7d3ed544ae2143", "schema": 1, "state": "pending", "ticket": "T-70"}
+{"at": "2026-11-22T10:46:17Z", "event_id": "finish-54b3bb531b8d4a06bf7d3ed544ae2143", "key": "T-70:finish-54b3bb531b8d4a06bf7d3ed544ae2143", "schema": 1, "state": "done", "ticket": "T-70"}

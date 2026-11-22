@@ -86,6 +86,11 @@ var target_health_documented: bool = false
 ## Keys are normalised "property|suffix" ids; no file is ever written.
 var overrides: Dictionary = {}
 
+## True when reconstructed from an immutable CombatReplaySnapshot so refresh()
+## preserves captured historical ODF values even after live ODF edits (P1-SIM-03).
+var is_frozen_snapshot: bool = false
+var captured_odf_revisions: Dictionary = {}
+
 
 func resolve(p_index: ResourceIndex, p_shooter_path: String, p_target_path: String,
 		p_weapon_override: String = "", p_resolve_alt: bool = true) -> bool:
@@ -293,6 +298,8 @@ func _read_target() -> void:
 
 
 func refresh() -> void:
+	if is_frozen_snapshot:
+		return
 	if shooter_doc != null:
 		shooter_geometry = _find_value(shooter_doc, ["geometryName"])
 		shooter_geometry_scale = _float_or(_find_value(shooter_doc, ["geometryScale"]), 1.0)
@@ -496,3 +503,150 @@ func _bool_or(v: String, fallback: bool) -> bool:
 		return fallback
 	var c := v.substr(0, 1).to_lower()
 	return not (c == "f" or c == "n" or c == "0")
+
+
+## Capture an immutable dictionary snapshot of all effective weapon/ordnance/actor
+## parameters and source ODF revisions for deterministic replay across ODF edits.
+func snapshot_params() -> Dictionary:
+	if not is_frozen_snapshot:
+		refresh()
+	var revs := captured_odf_revisions.duplicate(true)
+	if not is_frozen_snapshot:
+		revs = {}
+		for pair in [
+			["shooter", shooter_path, shooter_doc],
+			["weapon", weapon_path, weapon_doc],
+			["ordnance", ordnance_path, ordnance_doc],
+			["target", target_path, target_doc],
+		]:
+			var role := str(pair[0])
+			var p := str(pair[1])
+			var doc: OdfDocument = pair[2]
+			if doc != null:
+				revs[role] = {
+					"path": p,
+					"md5": WorkspaceStore._md5_bytes(doc.to_bytes()),
+					"dirty": doc.dirty,
+				}
+			elif p != "":
+				revs[role] = {"path": p, "md5": "", "dirty": false}
+	return {
+		"shooter_path": shooter_path,
+		"weapon_path": weapon_path,
+		"ordnance_path": ordnance_path,
+		"target_path": target_path,
+		"weapon_name": weapon_name,
+		"weapon_hardpoint": weapon_hardpoint,
+		"ordnance_name": ordnance_name,
+		"weapon_header": weapon_header,
+		"ordnance_header": ordnance_header,
+		"weapon_class_label": weapon_class_label,
+		"ordnance_class_label": ordnance_class_label,
+		"shot_speed": shot_speed,
+		"life_span": life_span,
+		"shot_radius": shot_radius,
+		"is_arcing": is_arcing,
+		"fire_sound": fire_sound,
+		"shot_sound": shot_sound,
+		"muzzle_render": muzzle_render,
+		"expl_sound": expl_sound,
+		"shot_delay": shot_delay,
+		"salvo_count": salvo_count,
+		"salvo_delay": salvo_delay,
+		"shot_variance": shot_variance,
+		"kick_veloc": kick_veloc,
+		"omega_turn": omega_turn,
+		"is_homing": is_homing,
+		"is_beam_weapon": is_beam_weapon,
+		"is_beam_render": is_beam_render,
+		"ammo_cost": ammo_cost,
+		"weapon_energy_cost": weapon_energy_cost,
+		"damage_shield": damage_shield,
+		"damage": damage.duplicate(true),
+		"damage_radius": damage_radius,
+		"xpl_ground": xpl_ground,
+		"xpl_vehicle": xpl_vehicle,
+		"xpl_expire": xpl_expire,
+		"render_name": render_name,
+		"shot_geometry": shot_geometry,
+		"shooter_ammo_max": shooter_ammo_max,
+		"shooter_energy_max": shooter_energy_max,
+		"shooter_health_max": shooter_health_max,
+		"shooter_armor": shooter_armor,
+		"target_health_max": target_health_max,
+		"target_shield_max": target_shield_max,
+		"target_shield_class": target_shield_class,
+		"target_ammo_max": target_ammo_max,
+		"target_armor": target_armor,
+		"target_radius": target_radius,
+		"target_half_extents": [target_half_extents.x, target_half_extents.y, target_half_extents.z],
+		"target_bbox_offset": [target_bbox_offset.x, target_bbox_offset.y, target_bbox_offset.z],
+		"target_yaw_rad": target_yaw_rad,
+		"target_name": target_name,
+		"odf_revisions": revs,
+	}
+
+
+static func from_snapshot(snap: Dictionary) -> WeaponProfile:
+	var p := new()
+	p.is_frozen_snapshot = true
+	p.shooter_path = str(snap.get("shooter_path", ""))
+	p.weapon_path = str(snap.get("weapon_path", ""))
+	p.ordnance_path = str(snap.get("ordnance_path", ""))
+	p.target_path = str(snap.get("target_path", ""))
+	p.weapon_name = str(snap.get("weapon_name", ""))
+	p.weapon_hardpoint = str(snap.get("weapon_hardpoint", ""))
+	p.ordnance_name = str(snap.get("ordnance_name", ""))
+	p.weapon_header = str(snap.get("weapon_header", ""))
+	p.ordnance_header = str(snap.get("ordnance_header", "OrdnanceClass"))
+	p.weapon_class_label = str(snap.get("weapon_class_label", ""))
+	p.ordnance_class_label = str(snap.get("ordnance_class_label", ""))
+	p.shot_speed = float(snap.get("shot_speed", 0.0))
+	p.life_span = float(snap.get("life_span", 1.0))
+	p.shot_radius = float(snap.get("shot_radius", 0.5))
+	p.is_arcing = bool(snap.get("is_arcing", false))
+	p.fire_sound = str(snap.get("fire_sound", ""))
+	p.shot_sound = str(snap.get("shot_sound", ""))
+	p.muzzle_render = str(snap.get("muzzle_render", ""))
+	p.expl_sound = str(snap.get("expl_sound", ""))
+	p.shot_delay = float(snap.get("shot_delay", 1.0))
+	p.salvo_count = int(snap.get("salvo_count", 1))
+	p.salvo_delay = float(snap.get("salvo_delay", 0.0))
+	p.shot_variance = float(snap.get("shot_variance", 0.0))
+	p.kick_veloc = float(snap.get("kick_veloc", 0.0))
+	p.omega_turn = float(snap.get("omega_turn", 0.0))
+	p.is_homing = bool(snap.get("is_homing", false))
+	p.is_beam_weapon = bool(snap.get("is_beam_weapon", false))
+	p.is_beam_render = bool(snap.get("is_beam_render", false))
+	p.ammo_cost = int(snap.get("ammo_cost", 0))
+	p.weapon_energy_cost = float(snap.get("weapon_energy_cost", 0.0))
+	p.damage_shield = float(snap.get("damage_shield", 1.0))
+	var dm = snap.get("damage", {})
+	p.damage = (dm as Dictionary).duplicate(true) if dm is Dictionary else {}
+	p.damage_radius = float(snap.get("damage_radius", 0.0))
+	p.xpl_ground = str(snap.get("xpl_ground", ""))
+	p.xpl_vehicle = str(snap.get("xpl_vehicle", ""))
+	p.xpl_expire = str(snap.get("xpl_expire", ""))
+	p.render_name = str(snap.get("render_name", ""))
+	p.shot_geometry = str(snap.get("shot_geometry", ""))
+	p.shooter_ammo_max = int(snap.get("shooter_ammo_max", 0))
+	p.shooter_energy_max = float(snap.get("shooter_energy_max", 0.0))
+	p.shooter_health_max = float(snap.get("shooter_health_max", 1000.0))
+	p.shooter_armor = str(snap.get("shooter_armor", "H"))
+	p.target_health_max = float(snap.get("target_health_max", 1000.0))
+	p.target_shield_max = float(snap.get("target_shield_max", 0.0))
+	p.target_shield_class = str(snap.get("target_shield_class", ""))
+	p.target_ammo_max = int(snap.get("target_ammo_max", 0))
+	p.target_armor = str(snap.get("target_armor", "N"))
+	p.target_radius = float(snap.get("target_radius", 2.0))
+	var he = snap.get("target_half_extents", [0.0, 0.0, 0.0])
+	if he is Array and (he as Array).size() >= 3:
+		p.target_half_extents = Vector3(float(he[0]), float(he[1]), float(he[2]))
+	var bo = snap.get("target_bbox_offset", [0.0, 0.0, 0.0])
+	if bo is Array and (bo as Array).size() >= 3:
+		p.target_bbox_offset = Vector3(float(bo[0]), float(bo[1]), float(bo[2]))
+	p.target_yaw_rad = float(snap.get("target_yaw_rad", 0.0))
+	p.target_name = str(snap.get("target_name", ""))
+	var revs = snap.get("odf_revisions", {})
+	p.captured_odf_revisions = (revs as Dictionary).duplicate(true) if revs is Dictionary else {}
+	return p

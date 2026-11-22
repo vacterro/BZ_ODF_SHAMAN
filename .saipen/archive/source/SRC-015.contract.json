@@ -1,0 +1,589 @@
+{
+  "clauses": {
+    "SRC-015:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u0418\u0441\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0440\u0430\u0441\u0441\u043e\u0433\u043b\u0430\u0441\u043e\u0432\u0430\u043d\u0438\u0435 `launch_ready` \u0438 `launch_eligible`."
+    },
+    "SRC-015:R002": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u041d\u0430\u0439\u0442\u0438 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u044b\u0439, \u0440\u0435\u0430\u043b\u044c\u043d\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u044e\u0449\u0438\u0439 \u0441\u043f\u043e\u0441\u043e\u0431 native testing \u0431\u0435\u0437 \u043d\u0435\u0441\u0430\u043d\u043a\u0446\u0438\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u043e\u0433\u043e \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f BZ2R."
+    },
+    "SRC-015:R003": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u0418\u0441\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0440\u0430\u0437\u0440\u044b\u0432 \u043c\u0435\u0436\u0434\u0443 `CombatScenario.advance()` \u0438 \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u043c Weapons Lab."
+    },
+    "SRC-015:R004": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u0421\u0434\u0435\u043b\u0430\u0442\u044c cooldown, DoT \u0438 actor state \u043f\u043e\u043b\u043d\u043e\u0446\u0435\u043d\u043d\u044b\u043c\u0438 \u0447\u0430\u0441\u0442\u044f\u043c\u0438 GUI-\u0441\u0438\u043c\u0443\u043b\u044f\u0446\u0438\u0438."
+    },
+    "SRC-015:R005": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u0418\u0441\u043f\u0440\u0430\u0432\u0438\u0442\u044c deterministic replay \u0438 \u043f\u043e\u043b\u043d\u043e\u0442\u0443 actor snapshots."
+    },
+    "SRC-015:R006": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u0417\u0430\u043f\u0440\u0435\u0442\u0438\u0442\u044c \u0443\u043d\u0438\u0447\u0442\u043e\u0436\u0435\u043d\u0438\u0435 staging \u0432\u043e \u0432\u0440\u0435\u043c\u044f \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0433\u043e \u044d\u043a\u0441\u043f\u0435\u0440\u0438\u043c\u0435\u043d\u0442\u0430."
+    },
+    "SRC-015:R007": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u041f\u0440\u0435\u0432\u0440\u0430\u0442\u0438\u0442\u044c native experiment \u0432 \u043f\u0440\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0439 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u0441\u043a\u0438\u0439 workflow."
+    },
+    "SRC-015:R008": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u0420\u0430\u0441\u0448\u0438\u0440\u0438\u0442\u044c \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0435 \u0432\u043e\u0437\u043c\u043e\u0436\u043d\u043e\u0441\u0442\u0438 ODF laboratory."
+    },
+    "SRC-015:R009": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u041f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u0438\u0442\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d\u043d\u044b\u0439 release \u0438 publication."
+    },
+    "SRC-015:R010": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0430\u0442\u044c \u0430\u0432\u0442\u043e\u043d\u043e\u043c\u043d\u043e \u043f\u043e\u0441\u043b\u0435 \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f \u0431\u043b\u0438\u0436\u0430\u0439\u0448\u0438\u0445 \u0437\u0430\u0434\u0430\u0447. **\u0413\u043b\u0430\u0432\u043d\u044b\u0439 \u043f\u0440\u0438\u043d\u0446\u0438\u043f: \u043d\u0435 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e PASS, \u0430 \u0444\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0430\u044f \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0441\u0442\u044c \u043f\u0440\u043e\u0433\u0440\u0430\u043c\u043c\u044b.** --- # 1. AUDITED BASELINE ## Archive ```text _BZ_ODF_SHAMAN_22.11.26-T11-59-12.zip ZIP members: 376 Uncompressed size: 7,786,826 bytes SHA256: 2eed4d061fe98a8a86a079eed89b435a441052e82435d97ec81aed06bdb27a41 ``` \u0410\u0440\u0445\u0438\u0432 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u0442: - Godot source. - Core ODF engine. - Weapons/Particle/Audio Labs. - Native integration. - CombatScenario. - Test suites. - Documentation. - Wintage themes. - SAIPEN Board/State/Log. - Recorded verification evidence. \u042d\u0442\u043e AUDAPACK snapshot, \u0430 \u043d\u0435 \u043f\u0440\u044f\u043c\u043e\u0439 \u0434\u043e\u0441\u0442\u0443\u043f \u043a \u0442\u0435\u043a\u0443\u0449\u0435\u043c\u0443 live Windows filesystem. \u041f\u0435\u0440\u0435\u0434 \u043f\u0440\u0430\u0432\u043a\u0430\u043c\u0438 \u0441\u0432\u0435\u0440\u0438\u0442\u044c \u0435\u0433\u043e \u0441 actual worktree. ## Project roots ```text PROJECT: V:\\___VAC\\__K\\__CODE\\_MISC\\_BZ_ODF_SHAMAN GAME: V:\\__STORE_V\\_SOFT\\Steam\\steamapps\\common\\BZ2R WORKSHOP: V:\\__STORE_V\\_SOFT\\Steam\\steamapps\\workshop\\content\\624970 VRV: V:\\___VAC\\__K\\__CODE\\_MISC\\_BZDECOMP\\vrv VRV DOCS: V:\\___VAC\\__K\\__CODE\\_MISC\\_BZDECOMP\\vrv\\BATTLEZONE\\DOCS ENGINE KNOWLEDGE: V:\\___VAC\\_BATTLEZONE\\__ARCHIVE\\BZFORUM_SITE_CLONE\\BZ2_ENGINE_KNOWLEDGE WINTAGE: V:\\___VAC\\__K\\__CODE\\_TAMPERMONKEY\\_WIN95THEME\\Wintage ``` Game/Workshop/VRV/Wintage resources \u0441\u0447\u0438\u0442\u0430\u0442\u044c read-only. --- # 2. SAIPEN \u2014 VERIFIED CURRENT SNAPSHOT \u0410\u0440\u0445\u0438\u0432\u043d\u044b\u0439 STATE: ```text phase: DONE task: none next_action: saipen validate blocker: none last_event: E-897 updated: 2026-11-22T09:51:25Z ``` Board \u043f\u0440\u043e\u0432\u0435\u0440\u0435\u043d \u043d\u0435\u043f\u043e\u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0435\u043d\u043d\u043e. ```text DOING: 0 TODO: 0 DONE: 64 BLOCKED: 0 ``` ## Latest completed tickets | Ticket | State | Scope | |---|---|---| | T-59 | DONE | saihunt/W-007 review | | T-60 | DONE | Native startup diagnosis | | T-61 | DONE | Native closure and session service | | T-62 | DONE | Persistent combat state | | T-63 | DONE | Visual/FX improvements | | T-64 | DONE | Tests, Windows build, GPU, benchmark, docs | \u0412\u0441\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u044b \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0439 SAIPEN workflow. ### Critical distinction `DONE` \u043e\u0437\u043d\u0430\u0447\u0430\u0435\u0442 \u0437\u0430\u043a\u0440\u044b\u0442\u0438\u0435 development ticket. \u042d\u0442\u043e \u043d\u0435 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043e\u0437\u043d\u0430\u0447\u0430\u0435\u0442: ```text NATIVE_VERIFIED GITHUB_PUBLISHED FULL_GAME_COMPATIBILITY ``` \u0414\u043b\u044f T-59\u2013T-64: ```text publication_state: pending ``` \u042d\u0442\u043e \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u044b\u0439 publication lifecycle. \u041d\u0435 \u0438\u0437\u043c\u0435\u043d\u044f\u0442\u044c metadata \u0432\u0440\u0443\u0447\u043d\u0443\u044e. ## Git status Agent report: ```text Local HEAD: 4ea58fd3f8b9c7c1513c41d92cb907d7b7a897cf origin/main: 6cad88b48a02f229fbbb8059c78e7e0e041c2189 Reported: 17 commits not pushed ``` Current external blocker: ```text GIT_PUSH_AUTH_REQUIRED ``` \u041d\u0435 \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u044c \u0441\u0442\u0430\u0440\u044b\u0439 GitHub-auth diagnosis \u0431\u0435\u0437 \u0441\u0432\u0435\u0436\u0435\u0439 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438 credentials. \u041d\u0435 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0442\u044c destructive Git reset/rebase \u0440\u0430\u0434\u0438 \u043f\u0443\u0431\u043b\u0438\u043a\u0430\u0446\u0438\u0438. --- # 3. RECORDED VERIFICATION ## Tests Latest recorded results: | \u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 | Recorded result | |---|---:| | Core | 990 PASS | | UI smoke | 252 PASS | | Total | 1,242 PASS | | Failures | 0 | | stderr | Empty | Evidence: ```text .saipen/evidence/suite/ fec226b1fbb9100a-20261122T094858431749Z.json ``` Suite reports: ```text status: PASS exit_code: 0 duration_s: 81.7 tree_changed_during_run: false ``` `totals` \u0432\u043d\u0443\u0442\u0440\u0438 suite JSON \u0440\u0430\u0432\u0435\u043d null; \u043a\u043e\u043d\u043a\u0440\u0435\u0442\u043d\u044b\u0435 \u0441\u0447\u0451\u0442\u0447\u0438\u043a\u0438 990/252 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u044e\u0442\u0441\u044f \u0434\u0440\u0443\u0433\u0438\u043c\u0438 recorded test outputs \u0438 \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430\u0446\u0438\u0435\u0439. ## Windows build ```text build/BZ_ODF_SHAMAN.exe Size: 112,150,720 bytes MD5: 84b9e51c57cfc6ceec08a2bfd0c3f196 ``` GPU report: ```text .saipen/evidence/gui_verify/gui_verify_report.txt ``` Recorded: ```text GPU: RTX 3060 Theme: goldendefault Font AA: none Windowed GUI self-verify: PASS ``` GPU screenshot files \u0443\u043f\u043e\u043c\u0438\u043d\u0430\u044e\u0442\u0441\u044f \u0432 evidence, \u043d\u043e \u0441\u0430\u043c\u0438 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u044f \u043e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u044e\u0442 \u0432 \u0434\u0430\u043d\u043d\u043e\u043c ZIP. \u041f\u043e\u044d\u0442\u043e\u043c\u0443 \u0438\u0445 \u0441\u043e\u0434\u0435\u0440\u0436\u0438\u043c\u043e\u0435 \u043d\u0435 \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u043e \u043d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0439 \u0432\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u043e\u0439 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u043e\u0439 \u044d\u0442\u043e\u0433\u043e \u0430\u0440\u0445\u0438\u0432\u0430. ## Benchmark Recorded: ```text Resource Index: 1208.9 ms Parse: 760.0 ms Inheritance: 126.9 ms Simulation: 5790.6 ms Static memory: 148.3 MB ``` \u042d\u0442\u043e \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u043a\u043e\u043d\u043a\u0440\u0435\u0442\u043d\u043e\u0439 \u043c\u0430\u0448\u0438\u043d\u044b \u0438 \u0443\u0441\u043b\u043e\u0432\u0438\u0439 \u043f\u0440\u043e\u0433\u043e\u043d\u0430. \u041d\u0435 \u0441\u0440\u0430\u0432\u043d\u0438\u0432\u0430\u0442\u044c \u0441 \u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u043c\u0438 benchmark \u0431\u0435\u0437 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044f \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0438 \u043a\u043e\u043d\u0444\u0438\u0433\u0443\u0440\u0430\u0446\u0438\u0438. ## Native ```text NATIVE_VERIFIED: 0 ``` \u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0439 scenario \u043f\u0440\u043e\u0448\u0451\u043b dry-run staging. **\u0420\u0435\u0430\u043b\u044c\u043d\u043e\u0439 \u043a\u0430\u043b\u0438\u0431\u0440\u043e\u0432\u043a\u0438 Godot \u043f\u0440\u043e\u0442\u0438\u0432 \u0440\u0430\u0431\u043e\u0442\u0430\u044e\u0449\u0435\u0433\u043e BZCC \u0435\u0449\u0451 \u043d\u0435\u0442.** --- # 4. WHAT IS ALREADY FIXED ## T-60 \u2014 Native startup diagnosis Verified archive evidence: ```text .saipen/evidence/native/ T-60-native-startup-diagnosis.md ``` \u0420\u0435\u0430\u043b\u044c\u043d\u0430\u044f \u043e\u0448\u0438\u0431\u043a\u0430: ```text Unable to load console font 'ds_16.bmf' ``` Stock file \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442: ```text BZ2R\\bz2r_res\\interface\\Fonts\\DS\\ds_16.bmf ``` \u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e: - Normal Steam launch \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442. - `/logconsole` \u0440\u0430\u043d\u0435\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u044f\u043b SHAMAN. - `/logconsole` \u0442\u0435\u043f\u0435\u0440\u044c opt-in. - External `/config` \u043e\u0441\u0442\u0430\u0432\u043b\u044f\u0435\u0442 game filesystem unmounted. - BZCC 2.0.185 \u043f\u0440\u0438\u043d\u0438\u043c\u0430\u0435\u0442 tested bare config filename \u0438\u0437 `@rootdir`. - Stock resources \u043d\u0430\u0447\u0438\u043d\u0430\u044e\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0430\u0442\u044c\u0441\u044f \u043f\u0440\u0438 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u043c config placement. - Steam \u0441 custom arguments \u043c\u043e\u0436\u0435\u0442 \u0442\u0440\u0435\u0431\u043e\u0432\u0430\u0442\u044c \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u044f. **\u041d\u0435 \u043f\u043e\u0432\u0442\u043e\u0440\u044f\u0442\u044c \u0440\u0430\u0441\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u043d\u0438\u0435 \u043d\u0435\u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044e\u0449\u0435\u0433\u043e `ds16.brf`.** ## T-61 \u2014 Native infrastructure Implemented: ```text scripts/native/native_session_service.gd scripts/native/native_experiment_runner.gd scripts/native/native_process_monitor.gd scripts/native/native_resource_closure.gd ``` \u0412 \u043d\u0430\u043b\u0438\u0447\u0438\u0438: - Application-owned monitoring. - Godot Timer polling. - Session recovery. - Strict resource closure. - Automatic observation path. - Checked monitor persistence. - Event-based Lua contract. - Session-aware crash log correlation. \u0421\u0442\u0430\u0440\u043e\u0435 \u0437\u0430\u043c\u0435\u0447\u0430\u043d\u0438\u0435 \u00abGUI \u0432\u043e\u043e\u0431\u0449\u0435 \u043d\u0435 \u0432\u044b\u0437\u044b\u0432\u0430\u0435\u0442 monitor\u00bb \u0431\u043e\u043b\u044c\u0448\u0435 \u043d\u0435\u0430\u043a\u0442\u0443\u0430\u043b\u044c\u043d\u043e. ## T-62 \u2014 Combat Lab Implemented: ```text scripts/sim/combat_actor_state.gd scripts/sim/combat_scenario.gd ``` \u0415\u0441\u0442\u044c: - Shooter-owned ammo. - Shooter-owned energy. - Persistent hull. - Persistent shield. - Multiple independent targets. - Shield-aware splash. - Deterministic replay framework. \u041d\u0435 \u043f\u0435\u0440\u0435\u043f\u0438\u0441\u044b\u0432\u0430\u0442\u044c \u044d\u0442\u0443 \u0430\u0440\u0445\u0438\u0442\u0435\u043a\u0442\u0443\u0440\u0443. ## T-63 \u2014 Visual/FX Implemented: - Shield HUD. - Ammo/Energy HUD. - ADD/MUL/SUB/MIX blending. - UV animation. - Light attenuation. - Emitter budget. - DOCB v1 `.msha` stub detection. \u041e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u0435: ```text .msha skeletal animation: NOT_IMPLEMENTED ``` 44-byte format stub recognition \u043d\u0435 \u043e\u0437\u043d\u0430\u0447\u0430\u0435\u0442 \u043f\u043e\u043b\u043d\u043e\u0446\u0435\u043d\u043d\u044b\u0439 animation importer. --- # 5. P0-NATIVE-01 \u2014 PREFLIGHT AND LAUNCH ELIGIBILITY DISAGREE **Severity:** P0 / Native execution correctness **Finding:** Confirmed by source inspection. Files: ```text scripts/native/native_test_adapter.gd:953\u2013971 scripts/native/native_test_adapter.gd:1956\u20132005 scripts/native/native_experiment_runner.gd:691\u2013708 scripts/native/native_experiment_runner.gd:729\u2013749 scripts/native/native_experiment_runner.gd:811\u2013826 scripts/native/native_experiment_runner.gd:1169\u20131190 ``` ## Problem `NativeTestAdapter.diagnose_config_path_compatibility()` correctly identifies: ```text CONFIG_REQUIRES_ROOTDIR_PLACEMENT ``` when SHAMAN config is staged outside BZ2R. But `preflight_experiment()` calculates launch readiness using: ```gdscript var structurally_valid := issues.is_empty() var launch_ready := structurally_valid and blockers.is_empty() ``` The config compatibility diagnostic is stored in the generated launch command, but is not consistently promoted into a mandatory launch blocker. Separately, `NativeExperimentRunner.preflight()` stores: ```gdscript var preflight_passed := bool( pre.get(\"structurally_valid\", false) ) ``` and: ```gdscript \"launch_eligible\": preflight_passed and pkg_ok ``` The function also returns: ```gdscript \"launch_eligible\": preflight_passed \"launch_ready\": bool(pre.get(\"launch_ready\", false)) ``` Thus: ```text STRUCTURALLY_VALID = true LAUNCH_READY = false LAUNCH_ELIGIBLE = true ``` can occur. That distinction is currently not enforced consistently by `stage()` and `launch()`. ## Why this matters T-60 established that external `/config` paths are not usable in the tested BZCC launch mode. Yet the runner can still store a launch-eligible session whose command references such a path. With authenticated Steam, a native launch may be attempted even though the configuration is already known to be incompatible. ## Required fix Introduce independent gates: ```text STRUCTURALLY_VALID RESOURCE_CLOSURE_VALID STAGE_ELIGIBLE CONFIG_COMPATIBLE EXECUTION_ENVIRONMENT_READY LAUNCH_ELIGIBLE ``` Define: ```text STAGE_ELIGIBLE: Valid scenario and resource closure, even if Steam isn't available. LAUNCH_ELIGIBLE: Valid stage + verified config compatibility + supported execution route. ``` Manual handoff may be prepared for a structurally valid stage. **Actual game launch must not proceed while `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` remains unresolved.** ## Acceptance ### Scenario A ```text Valid BZN/Lua Valid closure External /config Authenticated Steam ``` Expected: ```text STRUCTURALLY_VALID=true STAGE_ELIGIBLE=true LAUNCH_ELIGIBLE=false CONFIG_REQUIRES_ROOTDIR_PLACEMENT ``` ### Scenario B Known compatible config placement with all other gates satisfied. Expected: ```text LAUNCH_ELIGIBLE=true ``` ### Scenario C Steam unavailable, valid stage. Expected: ```text STAGE_ELIGIBLE=true AWAITING_OPERATOR ``` No actual process launch. Add integration regressions proving the distinction. --- # 6. P0-NATIVE-02 \u2014 COMPLETE THE SAFE BZCC LAUNCH STRATEGY **Severity:** P0 / Main product blocker T-60 established an important fact: The native game requires a compatible launch configuration, but SHAMAN's safe stage is outside the game root. Currently the documented manual procedure may require a user to place a generated config into BZ2R. That is a legitimate operator choice only when explicitly authorized. It is not a complete autonomous testing workflow. ## Main objective **Find a supported route that allows native experiments without silently modifying the game installation.** ## Research priority A \u2014 Stock configuration + My Documents addon Investigate whether the normal BZCC configuration can load a SHAMAN-owned test mod from the standard user addon area. Reference: ```text Documents\\My Games\\Battlezone Combat Commander\\addon ``` Relevant documented concepts: ```text @mydocsdir AddDirRecurse EnableAddonMods AddGlobalConfigMod ``` Do not assume these guarantee the necessary resource precedence or mission launch. Verify using real game startup logs. ### Suggested experiment"
+    },
+    "SRC-015:R011": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Inspect stock `bzone.cfg` read-only."
+    },
+    "SRC-015:R012": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Determine effective addon mount behavior."
+    },
+    "SRC-015:R013": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Create a uniquely named owned test folder."
+    },
+    "SRC-015:R014": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Stage a minimal stock LuaMission there."
+    },
+    "SRC-015:R015": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Use normal Steam launch without external `/config`."
+    },
+    "SRC-015:R016": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Test whether the game discovers the mission."
+    },
+    "SRC-015:R017": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Test whether an ODF override is selected."
+    },
+    "SRC-015:R018": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Collect provenance evidence."
+    },
+    "SRC-015:R019": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Remove only files that SHAMAN created. If this route works, it may eliminate the need to place a custom config inside BZ2R. ## Research priority B \u2014 Existing supported config mod workflow Investigate native BZCC config/addon mod loading. Use real mod examples and the local VRV documentation. Do not rewrite Steam settings or globally activate another mod without explicit permission. ## Controlled fallback If a bare config file inside BZ2R is genuinely required: - Prepare the exact file. - Display its SHA256. - Show the destination. - Check for name collision. - Require explicit operator approval. - Back up an existing same-name file if the operation is permitted. - Never overwrite an unknown file. - Record the temporary placement. - Restore/cleanup only owned files. - Verify the game's original resources remain unchanged. **Do not silently write to BZ2R.** ## Acceptance A supported native experiment must produce: ```text GAME_STARTED MISSION_LOADED RESOURCE_PROBE_CONFIRMED ``` using an explicitly authorized method. Do not claim native verification merely because a generated config is syntactically valid. --- # 7. P0-SIM-01 \u2014 THE GUI BYPASSES COMBATSCENARIO.ADVANCE() **Severity:** P0/P1 / Simulation correctness **Finding:** Confirmed by source inspection. Files: ```text scripts/lab/weapon_lab.gd:3072\u20133118 scripts/lab/weapon_lab.gd:2675\u20132682 scripts/sim/combat_scenario.gd:238\u2013245 scripts/sim/combat_actor_state.gd:200\u2013219 ``` ## Current implementation `CombatScenario.advance(dt)` correctly calls: ```gdscript sim.advance(dt) shooter.tick(dt) for target in targets: target.tick(dt) ``` The actor tick handles: - Reload cooldown. - Active effects. - Damage over time. However, the actual Weapons Lab uses: ```gdscript sim.advance(dt) ``` instead of: ```gdscript combat_scenario.advance(dt) ``` The same bypass exists in `_step_once()`. ## Consequences The full application may successfully simulate projectile movement while: - `reload_remaining` never decreases. - DoT effects do not advance. - Active actor effects remain frozen. - Combat actor timers disagree with simulation time. - Single-step playback produces different behavior from the intended CombatScenario model. The core CombatScenario tests call `advance()` directly, so they do not prove the Weapons Lab uses it. ## Required fix Make `CombatScenario` the single simulation clock owner for active combat. Replace independent Weapons Lab stepping with coordinated scenario stepping. Unify: ```text Projectile simulation Combat actor ticks Reload timers Damage over time Target effects Timeline events Replay ``` All must use the same deterministic simulation clock. ### Important Do not tick actor state twice. Audit every caller of `sim.advance()` before refactoring. ## Acceptance"
+    },
+    "SRC-015:R020": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Fire a weapon with nonzero reload."
+    },
+    "SRC-015:R021": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify cooldown decreases with simulation time."
+    },
+    "SRC-015:R022": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Pause simulation."
+    },
+    "SRC-015:R023": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify cooldown stops."
+    },
+    "SRC-015:R024": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Step one frame."
+    },
+    "SRC-015:R025": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify cooldown advances exactly one step."
+    },
+    "SRC-015:R026": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Add a DoT effect."
+    },
+    "SRC-015:R027": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify target health changes over time."
+    },
+    "SRC-015:R028": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify pause/slow-motion behavior."
+    },
+    "SRC-015:R029": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify deterministic replay. **Gate:** Core and GUI use the same combat-state progression. --- # 8. P0-SIM-02 \u2014 RELOAD RESTRICTIONS ARE BYPASSED IN ACTUAL FIRING **Finding:** Confirmed by source. Files: ```text scripts/lab/weapon_lab.gd:2733\u20132745 scripts/sim/combat_scenario.gd:149\u2013166 scripts/sim/combat_actor_state.gd:81\u2013142 ``` The GUI currently uses: ```gdscript combat_scenario.shooter.can_fire( prof.ammo_cost, prof.weapon_energy_cost, false ) ``` Then: ```gdscript combat_scenario.fire_shot( ..., false, extra_targets ) ``` The `false` value disables reload enforcement. Further, `consume_fire_resources()` internally invokes: ```gdscript can_fire(ammo_cost, energy_cost, false) ``` So the current model supports reload checks but the production firing path does not enforce them. ## Required fix Establish a clear policy for: ```text SINGLE SHOT HOLD FIRE BURST SALVO CHARGED SHOT ``` Use a coherent fire permission state machine. ```text READY RELOADING INSUFFICIENT_AMMO INSUFFICIENT_ENERGY DESTROYED DISABLED ``` Ensure shot spawning and resource consumption happen as one valid state transition. Avoid double-deducting ammo or energy. ## Acceptance A weapon with a 1-second reload: ```text t=0.0 Fire accepted t=0.2 Fire rejected t=0.9 Fire rejected t=1.0+ Fire accepted ``` Check Godot simulation time, not wall-clock time. Do not assume BZCC native weapon timing semantics beyond documented facts. Label approximation appropriately. --- # 9. P1-SIM-03 \u2014 COMBAT REPLAY DOES NOT RESTORE THE COMPLETE INITIAL SCENE **Finding:** Confirmed by source inspection. Files: ```text scripts/sim/combat_actor_state.gd:222\u2013270 scripts/sim/combat_scenario.gd:91\u2013120 scripts/sim/combat_scenario.gd:249\u2013280 ``` `CombatActorState.snapshot()` records: ```text position velocity yaw_rad radius ``` But `restore_snapshot()` restores health, shield, ammo, energy and active effects without restoring these spatial fields. It also does not restore the full hitbox representation. ## Consequence After a target moves or rotates, calling: ```gdscript reset(\"ALL\") ``` does not necessarily restore its original position, velocity or collision geometry. `replay_deterministic()` consequently may use a different scene state than the original experiment. ## Additional replay limitation `shot_history` records: ```text origin direction target_position shooter_velocity weapon_name ordnance_name ammo_spent energy_spent time ``` But replay uses the *current* WeaponProfile and externally supplied obstacles rather than an immutable snapshot of every historical shot's relevant configuration. This limits replay across: - ODF edits. - Weapon changes. - Target movement. - Obstacle changes. - Multiple actors. ## Required fix Introduce an immutable CombatReplaySnapshot containing: ```text Scenario ID Simulation seed Initial actor states Actor transforms Hitboxes Obstacles Selected ODF revisions Weapon profiles Projectile parameters Timeline input events Shot commands ``` Restore the complete initial scene before replay. Avoid overwriting the current user's scenario unexpectedly when replaying an old experiment. Prefer a sandboxed replay instance or provide an explicit destructive reset policy. ## Acceptance ```text Target starts at X=0 Shot 1 Move target to X=20 Shot 2 Replay ``` The replay must reproduce the intended historical sequence, including the move. After changing the ODF, replaying the old run must still use the old captured revision. A new run may use the newly edited ODF. This distinction is essential for meaningful A/B comparisons. --- # 10. P1-SIM-04 \u2014 RECONFIGURATION OVERWRITES THE REPLAY BASELINE **Finding:** Confirmed source behavior; user-visible consequences need regression tests. File: ```text scripts/sim/combat_scenario.gd:25\u201370 ``` `configure_from_profile()` recreates the shooter and primary target, optionally preserving current ammo/energy/hull/shield. Then it always calls: ```gdscript capture_initial_snapshots() ``` If the scenario has already fired multiple shots, `preserve_state=true` carries depleted values into the newly captured baseline. Thus the meaning of \u201cinitial scenario\u201d can change during a weapon/profile update. Also, recreating the actors can discard: - Reload state. - Active status effects. - Other transient actor state. ## Required fix Separate: ```text CREATE NEW SCENARIO UPDATE EFFECTIVE ODF PARAMETERS CHANGE WEAPON RESET TO INITIAL CAPTURE REPLAY BASELINE ``` These are different operations. A routine parameter refresh must not silently redefine the initial combat state. When changing weapon profile during an ongoing experiment: - Preserve actor resources where appropriate. - Preserve active effects. - Preserve elapsed cooldown when semantically applicable. - Record the profile change as a timeline event. - Keep the original replay baseline intact. ## Acceptance ```text Initial ammo: 30 Fire \u2192 20 Edit weapon parameter Fire \u2192 10 Reset to initial ``` Expected: ```text Ammo restored to 30 ``` not to 20. Also verify that active effects and shield state follow the selected preservation policy. --- # 11. P1-NATIVE-03 \u2014 CLEANUP CAN INTERRUPT AN ACTIVE EXPERIMENT **Finding:** Confirmed missing guard. Files: ```text scripts/native/native_experiment_runner.gd:1846\u20131879 scripts/native/native_session_service.gd:169\u2013179 ``` `NativeExperimentRunner.cleanup_stage()` does not enforce a terminal monitor state before invoking `SafeStageManager.cleanup()`. `NativeSessionService.cleanup_stage()` subsequently removes the session from its automatic monitoring list regardless of the cleanup result. ## Possible sequence ```text Native experiment active \u2193 User presses CLEANUP \u2193 Staged resources removed or partially removed \u2193 GUI monitoring stops \u2193 Experiment still running or waiting for observation ``` This can destroy the intended test lifecycle. It also risks losing automatic observation collection when cleanup fails. ## Required fix Allow normal cleanup only when the experiment is terminal. Examples: ```text COMPARISON_COMPLETE CANCELLED_AND_QUIESCENT TIMEOUT_AND_QUIESCENT FAILED_AND_QUIESCENT ``` For an active session: ```text ACTIVE_EXPERIMENT_CANNOT_CLEANUP ``` Provide an explicit Cancel \u2192 Confirm Cleanup workflow. Do not stop monitoring merely because the user attempted a cleanup that was rejected. Keep evidence artifacts separate from disposable stage files. ## Acceptance"
+    },
+    "SRC-015:R030": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Start monitoring."
+    },
+    "SRC-015:R031": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Press CLEANUP."
+    },
+    "SRC-015:R032": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Confirm cleanup is rejected."
+    },
+    "SRC-015:R033": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Confirm monitoring remains active."
+    },
+    "SRC-015:R034": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Cancel experiment."
+    },
+    "SRC-015:R035": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Confirm cancellation persisted."
+    },
+    "SRC-015:R036": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Clean up owned resources."
+    },
+    "SRC-015:R037": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify unknown or modified files are preserved. --- # 12. P1-NATIVE-04 \u2014 NATIVE VERIFICATION MUST REMAIN EVIDENCE-BOUND Current native verification count: ```text 0 ``` This is correct. Continue enforcing: ```text STRUCTURALLY_VALID STAGED LAUNCH_REQUESTED GAME_PROCESS_DETECTED MISSION_OBSERVED RESOURCE_PROBE_CONFIRMED OBSERVATION_COLLECTED COMPARISON_COMPLETE NATIVE_VERIFIED ``` A synthetic process ID, caller-supplied timestamp or expected hash repeated in Lua does not prove engine execution. ## Real experiment requirements For each claimed native observation: ```text Session ID Launch nonce Scenario hash Game executable identity Game build Actual process evidence Actual mission evidence Staged resource provenance ODF hashes Observation artifact Measurement method Godot prediction Native result Difference ``` Do not replace missing engine measurements with estimates. If a test is performed through a manual operator-assisted route, distinguish imported observation from runner-attested execution. --- # 13. NEXT MAJOR PRODUCT MILESTONE \u2014 ACTUAL NATIVE COMPARISON The strongest next achievement would be the first real successful native experiment. Suggested scope: ## First target Use a minimal stock-only BZCC mission. Avoid the extra complexity of VSR until basic mission execution works. ## Steps"
+    },
+    "SRC-015:R038": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Prepare a valid stock-only scenario."
+    },
+    "SRC-015:R039": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Resolve complete resource dependencies."
+    },
+    "SRC-015:R040": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Choose a verified launch configuration."
+    },
+    "SRC-015:R041": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Run through authenticated Steam."
+    },
+    "SRC-015:R042": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Observe mission initialization."
+    },
+    "SRC-015:R043": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Observe shooter and target creation."
+    },
+    "SRC-015:R044": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Assign weapon."
+    },
+    "SRC-015:R045": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Trigger controlled firing."
+    },
+    "SRC-015:R046": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Record target health."
+    },
+    "SRC-015:R047": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Compare with Godot."
+    },
+    "SRC-015:R048": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Save reproducible evidence. ## Second target After the stock experiment: ```text Shooter: ivtank_vsr Weapon: gatstabvsr_c Ordnance: atstabvsr_c Target: ivscav_vsr Workshop: 3532748119 ``` Use the strict ModLoadout resolver. The exact same effective source ODFs must be selected for Godot and native staging. ## Fidelity Never assume: ```text ODF damageValue(H)=100 ``` automatically means: ```text Native target hull decreases by exactly 100 ``` without validating engine damage mechanics. Record and explain differences. --- # 14. NEXT VISUAL PRODUCT DEVELOPMENT Native testing is important, but it must not indefinitely block independent Godot development. The user wants a full graphical ODF laboratory. Prioritize features that convert ODF configuration into visible, measurable behavior. ## 14.1 Combat-state Timeline Expose: ```text Fire requested Shot accepted/rejected Ammo consumed Energy consumed Projectile spawned Projectile hit Shield absorbed Hull damaged Actor destroyed Reload ready Status effect tick ``` Use one simulation clock. Each event should link to the relevant ODF property. ## 14.2 Actor Inspector For every actor display: ```text Hull Shield Ammo Energy Armor class Position Velocity Weapon Reload Active effects Destroyed state ``` Values must update during playback and replay. ## 14.3 Accurate weapon behavior Priority vertical slices: - Charge weapons. - Salvo/burst. - Beam weapons. - Mines/deployables. - Homing. - Splash. - Damage over time. - Shield interactions. Build and verify one slice at a time. Label all approximations. ## 14.4 Particle fidelity Continue existing type-specific implementations. Next targets: - Animated texture sequences. - Better curves. - Emitter timing. - Child emitter lifetime. - Animated ribbons. - Light attenuation. - Particle collision. - Type-specific blending. - Performance budgets. Do not generate unsupported BZCC fields. ## 14.5 Authentic animation Current `.msha` support is format recognition only. Next:"
+    },
+    "SRC-015:R049": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Inspect real `.msha` examples."
+    },
+    "SRC-015:R050": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Check VRV source and conversion tools."
+    },
+    "SRC-015:R051": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Identify animation payload format."
+    },
+    "SRC-015:R052": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify one decoded animation."
+    },
+    "SRC-015:R053": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Render it in Godot."
+    },
+    "SRC-015:R054": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Keep hardpoints attached correctly."
+    },
+    "SRC-015:R055": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Integrate with Weapons Lab. Do not claim full skeletal animation support without a working decoder. --- # 15. UI AND WORKFLOW Preserve: ```text Golden Default Wintage All 16 Wintage themes HoudiniScrubber Value Ladder Verdana_m1 ``` Do not introduce a redesign that destroys the existing workflow. The main interaction should remain: ```text SELECT OBJECT A SELECT OBJECT B SELECT WEAPON EDIT ODF FIRE OBSERVE EDIT PARTICLES REPLAY SAVE EXPORT NATIVE VERIFY ``` ## Improve - Actor HUD. - Persistent workspace layouts. - Compact panels. - Multi-document editing. - Real-time property provenance. - A/B comparison. - Replay snapshot selection. - Native session controls. - Dependency navigation. - Precise numeric editing. Avoid unnecessary redraws and sidebar refreshes. A 0.75-second native monitor poll must not cause the entire UI to jitter. --- # 16. MANDATORY REGRESSION TESTS ## Native launch ```text NL-01: External /config + authenticated Steam \u2192 LAUNCH_ELIGIBLE=false NL-02: Structurally valid scenario + Steam unavailable \u2192 STAGE_ELIGIBLE=true \u2192 manual handoff allowed NL-03: Compatible config + valid closure + Steam ready \u2192 LAUNCH_ELIGIBLE=true NL-04: Stage modification after preflight \u2192 launch rejected NL-05: Stock addon route, if supported \u2192 mission/resource mount observed NL-06: No unapproved writes to BZ2R or Workshop ``` ## Combat clock ```text CB-01: Weapons Lab advances CombatScenario, not only ProjectileSim CB-02: Reload timer decreases with simulation time CB-03: Pause freezes reload and DoT CB-04: Single-step advances both projectile and actor state CB-05: DoT damage persists correctly CB-06: Fire blocked while reloading CB-07: Ammo/energy deducted exactly once CB-08: Burst respects reload/salvo semantics ``` ## Replay ```text RP-01: Reset restores position RP-02: Reset restores velocity and yaw RP-03: Reset restores collision geometry RP-04: Moving-target replay deterministic RP-05: ODF edit does not mutate previous replay snapshot RP-06: Weapon/profile change does not silently redefine initial state RP-07: Reload/effects preserved according to policy RP-08: Replay does not destroy active user scenario unexpectedly ``` ## Native cleanup ```text NC-01: Active monitor blocks cleanup NC-02: Rejected cleanup leaves timer active NC-03: Cancellation persists NC-04: Cleanup after terminal state succeeds NC-05: Unknown files preserved NC-06: Modified staged files preserved NC-07: Evidence retained after cleanup ``` ## Existing regression protection ```text REG-01: ODF round-trip corpus REG-02: Workspace save/export/restart REG-03: Reset recovery REG-04: Strict ModLoadout REG-05: Authentic MSH loading REG-06: Hardpoint firing REG-07: Particle graph editing REG-08: Native session recovery REG-09: Golden Default and other themes REG-10: Houdini controls REG-11: Windows GUI REG-12: No unexpected source modifications ``` Do not run destructive tests against real game resources. --- # 17. AUTONOMOUS EXECUTION ORDER ## WAVE A \u2014 RECONCILE LIVE STATE"
+    },
+    "SRC-015:R056": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Inspect current Git worktree."
+    },
+    "SRC-015:R057": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Read current SAIPEN state."
+    },
+    "SRC-015:R058": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify archive findings against current source."
+    },
+    "SRC-015:R059": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Preserve existing uncommitted work."
+    },
+    "SRC-015:R060": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Run baseline tests."
+    },
+    "SRC-015:R061": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Reproduce new defects."
+    },
+    "SRC-015:R062": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Create focused new tickets."
+    },
+    "SRC-015:R063": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Avoid duplicating T-59\u2013T-64. ## WAVE B \u2014 NATIVE LAUNCH CORRECTNESS"
+    },
+    "SRC-015:R064": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Fix launch eligibility model."
+    },
+    "SRC-015:R065": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Make config compatibility a real execution gate."
+    },
+    "SRC-015:R066": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Investigate stock addon launch."
+    },
+    "SRC-015:R067": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Test safe supported alternatives."
+    },
+    "SRC-015:R068": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Improve operator handoff."
+    },
+    "SRC-015:R069": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Preserve game-root read-only policy."
+    },
+    "SRC-015:R070": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Add integration regressions. **Gate:** SHAMAN cannot launch a known-incompatible native configuration. ## WAVE C \u2014 COMBAT CLOCK AND REPLAY"
+    },
+    "SRC-015:R071": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Route Weapons Lab through CombatScenario."
+    },
+    "SRC-015:R072": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Enforce reload timing."
+    },
+    "SRC-015:R073": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Tick actor effects."
+    },
+    "SRC-015:R074": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Complete actor snapshots."
+    },
+    "SRC-015:R075": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Preserve replay baseline."
+    },
+    "SRC-015:R076": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Capture ODF revisions."
+    },
+    "SRC-015:R077": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Restore moving scenes."
+    },
+    "SRC-015:R078": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify deterministic replay. **Gate:** sequential GUI combat behavior agrees with the model's persistent state. ## WAVE D \u2014 NATIVE MONITOR SAFETY"
+    },
+    "SRC-015:R079": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Guard active-stage cleanup."
+    },
+    "SRC-015:R080": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Preserve monitoring after rejected cleanup."
+    },
+    "SRC-015:R081": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify terminal transitions."
+    },
+    "SRC-015:R082": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify session evidence retention."
+    },
+    "SRC-015:R083": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Re-run native lifecycle tests. ## WAVE E \u2014 FIRST NATIVE EXPERIMENT"
+    },
+    "SRC-015:R084": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Select working launch route."
+    },
+    "SRC-015:R085": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Stage stock scenario."
+    },
+    "SRC-015:R086": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Observe mission."
+    },
+    "SRC-015:R087": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Confirm resources."
+    },
+    "SRC-015:R088": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Capture combat result."
+    },
+    "SRC-015:R089": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Compare with Godot."
+    },
+    "SRC-015:R090": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Save evidence. If external conditions prevent the real launch, preserve the exact blocker and continue Wave F. ## WAVE F \u2014 USER-VISIBLE DEVELOPMENT"
+    },
+    "SRC-015:R091": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Combat Timeline."
+    },
+    "SRC-015:R092": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Actor Inspector."
+    },
+    "SRC-015:R093": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Better damage/weapon behavior."
+    },
+    "SRC-015:R094": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Particle fidelity."
+    },
+    "SRC-015:R095": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Animation pipeline."
+    },
+    "SRC-015:R096": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Usability improvements."
+    },
+    "SRC-015:R097": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Performance profiling. At least one substantial user-facing feature must advance. ## WAVE G \u2014 RELEASE"
+    },
+    "SRC-015:R098": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Full tests."
+    },
+    "SRC-015:R099": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Windows build."
+    },
+    "SRC-015:R100": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "GPU GUI verification."
+    },
+    "SRC-015:R101": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Actual mouse/keyboard interaction tests where available."
+    },
+    "SRC-015:R102": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Benchmark."
+    },
+    "SRC-015:R103": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Source integrity."
+    },
+    "SRC-015:R104": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Documentation."
+    },
+    "SRC-015:R105": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Git pre-push audit."
+    },
+    "SRC-015:R106": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "SAIPEN publication workflow. Continue the next useful development slice autonomously. --- # 18. BUILD AND TEST COMMANDS Use existing project scripts: ```bat tools\\run_tests.cmd tools\\run_bench.cmd tools\\build_windows.cmd ``` Recorded Godot location: ```text V:\\__STORE_V\\_SOFT\\Godot\\4.7.2-stable\\Godot_v4.7.2-stable_win64.exe ``` Core: ```bat Godot_v4.7.2-stable_win64.exe --headless --path . --script res://tests/test_runner.gd ``` UI smoke: ```bat Godot_v4.7.2-stable_win64.exe --headless --path . res://tests/ui_smoke.tscn ``` Native probe: ```bat tools\\run_native_experiment.cmd ``` This may initiate or prepare an actual game launch. Use only in an authorized environment and with a valid Steam session. Use isolated workspaces: ```text BZ_SHAMAN_WORKSPACE_ROOT ``` No uncontrolled cleanup or modification of BZ2R, Workshop or reference repositories. --- # 19. TECHNICAL REFERENCES Local: ```text V:\\___VAC\\__K\\__CODE\\_MISC\\_BZDECOMP\\vrv\\BATTLEZONE\\DOCS V:\\___VAC\\_BATTLEZONE\\__ARCHIVE\\BZFORUM_SITE_CLONE\\BZ2_ENGINE_KNOWLEDGE ``` External: ```text BZCC UI Config: https://steamcommunity.com/sharedfiles/filedetails/?id=1497464096 BZCC Command Line: https://steamcommunity.com/sharedfiles/filedetails/?id=1493766557 BZCC LuaMission: https://steamcommunity.com/sharedfiles/filedetails/?id=1488402495 ODF Documentation: https://vtstats.bz/odf/ VSR Weapons: https://vtstats.bz/weapons/?w=gatstabvsr&s=ivtank_vsr&t=ivscav_vsr&cat=CANN ``` Documentation is a reference for supported mechanisms, not proof that a particular experiment succeeded. --- # 20. RELEASE AND PUBLICATION The current development baseline is locally completed. But release publication remains separate. Before pushing:"
+    },
+    "SRC-015:R107": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify current branch."
+    },
+    "SRC-015:R108": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Verify remote identity."
+    },
+    "SRC-015:R109": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Confirm commit ancestry."
+    },
+    "SRC-015:R110": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Preserve local changes."
+    },
+    "SRC-015:R111": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Check for credentials and secrets."
+    },
+    "SRC-015:R112": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Check tracked BZCC/Workshop assets."
+    },
+    "SRC-015:R113": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Check oversized binaries."
+    },
+    "SRC-015:R114": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Check licensing."
+    },
+    "SRC-015:R115": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Review SAIPEN evidence intended for publication."
+    },
+    "SRC-015:R116": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Push through authorized Git credentials. Do not disclose private tokens or credentials. Do not overwrite remote history using force push without explicit authorization. Do not modify `publication_state` manually. If authentication remains unavailable, preserve: ```text BLOCKED_EXTERNAL: GIT_PUSH_AUTH_REQUIRED ``` and continue development. --- # 21. REQUIRED DEMONSTRATIONS ## Demonstration A \u2014 Correct native gate ```text CREATE NATIVE SESSION \u2193 VALIDATE BZN/LUA \u2193 VALIDATE CLOSURE \u2193 CHECK CONFIG COMPATIBILITY \u2193 STAGE \u2193 LAUNCH ONLY IF ELIGIBLE ``` A known-incompatible external config must not trigger a doomed launch. ## Demonstration B \u2014 Real persistent combat ```text SHOOTER AMMO = 30 TARGET SHIELD = 100 TARGET HULL = 500 \u2193 FIRE \u2193 AMMO DECREASES SHIELD DECREASES \u2193 WAIT FOR RELOAD \u2193 FIRE AGAIN \u2193 SHIELD DEPLETE HULL DAMAGE \u2193 APPLY DoT \u2193 STEP / PAUSE / RESUME \u2193 REPLAY \u2193 IDENTICAL RESULT ``` ## Demonstration C \u2014 Moving target replay ```text PLACE TARGET \u2193 MOVE TARGET \u2193 FIRE \u2193 MOVE AGAIN \u2193 FIRE \u2193 CAPTURE REPLAY \u2193 RESET \u2193 REPLAY ORIGINAL POSITIONS ``` ## Demonstration D \u2014 Live ODF changes ```text OPEN WEAPON ODF \u2193 EDIT PROPERTY \u2193 FIRE \u2193 OBSERVE CHANGE \u2193 UNDO \u2193 FIRE AGAIN \u2193 OBSERVE PREVIOUS BEHAVIOR \u2193 SAVE \u2193 RESTART \u2193 VERIFY PERSISTENCE ``` ## Demonstration E \u2014 Native validation If an authorized native launch route is available: ```text STAGE STOCK SCENARIO \u2193 LAUNCH BZCC \u2193 MISSION LOADED \u2193 RESOURCE PROBE \u2193 CONTROLLED FIRE \u2193 OBSERVE DAMAGE \u2193 COMPARE WITH GODOT \u2193 SAVE EVIDENCE ``` Do not claim success before actual engine observations exist. --- # 22. DEFINITION OF DONE The next development cycle is successful when: - Existing 64 tickets remain historically intact. - New defects are reproduced and repaired. - Preflight and launch eligibility are consistent. - Known-incompatible `/config` cannot launch accidentally. - A safe native launch strategy has been tested or precisely bounded. - Weapons Lab uses the complete CombatScenario clock. - Reload and actor effects are correctly applied. - Replay restores spatial and combat state. - Replay preserves original scenario revisions. - Active native sessions cannot be cleaned up unexpectedly. - At least one substantial visual improvement is delivered. - Full tests pass. - Windows build and GUI still work. - Source game assets remain unchanged. - Documentation accurately reflects real capability. - SAIPEN work is evidenced without fabricated publication claims. If native launch remains blocked, keep: ```text NATIVE_VERIFIED = 0 ``` and continue independent development. --- # 23. FINAL HAND-BACK FORMAT ```text STATUS: LIVE HEAD: SAIPEN STATE: NEW TICKETS: CLOSED TICKETS: NATIVE PREFLIGHT: LAUNCH ELIGIBILITY: CONFIG COMPATIBILITY: SAFE LAUNCH ROUTE: STOCK ADDON TEST: STEAM STATUS: NATIVE VERIFIED COUNT: COMBAT CLOCK: RELOAD TIMING: DoT: SHOOTER AMMO: SHIELD/HULL: REPLAY SNAPSHOTS: MOVING TARGET REPLAY: NATIVE CLEANUP: MONITOR LIFECYCLE: EVIDENCE INTEGRITY: 3D LAB: PARTICLE LAB: ACTOR INSPECTOR: ANIMATION SUPPORT: CORE TESTS: UI TESTS: WINDOWS BUILD: GPU GUI: BENCHMARK: GIT LOCAL HEAD: GIT REMOTE HEAD: PUBLICATION: FILES CHANGED: SOURCE INTEGRITY: EVIDENCE PATHS: KNOWN LIMITATIONS: NEXT AUTONOMOUS PRIORITY: ``` Use these result labels accurately: ```text VERIFIED IMPLEMENTED_UNVERIFIED APPROXIMATED BLOCKED_EXTERNAL KNOWN_DEFECT NOT_IMPLEMENTED ``` --- # FINAL DIRECTIVE BZ_ODF_SHAMAN has passed an important threshold. It now has a functional ODF editor, authentic models, editable particle graphs, a real 3D sandbox, persistent combat states, Wintage UI, recovery systems and a serious test infrastructure. The next phase must connect those capabilities into an accurate, reliable user workflow. The central questions are no longer whether an ODF can be parsed or a tank can be displayed. They are: **Does the simulation preserve the real scenario state?** **Does the editor correctly reproduce what happened after a property change?** **Can SHAMAN launch a native test without violating the original game's safety boundary?** **Can the user observe and compare the results without manually assembling half the test infrastructure?** Solve these questions through implementation and reproducible evidence. Do not duplicate completed work. Do not count synthetic evidence as native verification. Do not turn SAIPEN into a substitute for product development. **English:** Make it work end to end, then make it accurate. **Eesti:** *T\u00f6\u00f6kindlus enne avaldamist.* \u041d\u0430\u0434\u0451\u0436\u043d\u043e\u0441\u0442\u044c \u0432\u0430\u0436\u043d\u0435\u0435 \u043f\u0443\u0431\u043b\u0438\u043a\u0430\u0446\u0438\u0438. **\u65e5\u672c\u8a9e:** *\u518d\u73fe\u6027* (\u0441\u0430\u0439\u0433\u044d\u043d\u0441\u044d\u0439, \u0432\u043e\u0441\u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u043c\u043e\u0441\u0442\u044c) \u0438 *\u5b9f\u6a5f\u691c\u8a3c* (\u0434\u0437\u0438\u043a\u043a\u0438 \u043a\u044d\u043d\u0441\u0451:, \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 \u043d\u0430 \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u043c \u0434\u0432\u0438\u0436\u043a\u0435) \u0432\u0430\u0436\u043d\u0435\u0435 \u0444\u043e\u0440\u043c\u0430\u043b\u044c\u043d\u044b\u0445 \u0433\u0430\u043b\u043e\u0447\u0435\u043a. **MODE 2 \u2014 AUTONOMOUS NIGHT SHIFT. IMPLEMENT \u2192 VERIFY \u2192 REPAIR \u2192 CONTINUE.** --- ### \u0425\u0430\u0439\u043a\u0443 \u0422\u0430\u043d\u043a \u0441\u0442\u0440\u0435\u043b\u044f\u0435\u0442 \u0432\u043d\u043e\u0432\u044c. \u0429\u0438\u0442 \u0436\u0438\u0432\u0451\u0442, \u0430 \u0442\u0430\u0439\u043c\u0435\u0440 \u0441\u043f\u0438\u0442. PASS \u043d\u0435 \u0441\u043f\u0430\u0441\u0451\u0442, \u0431\u043b\u044f\u0434\u044c."
+    }
+  },
+  "derived_at": "2026-11-22T10:08:04Z",
+  "derived_from": "SRC-015",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "92848cb1b7d343935e8f276cf962df3444a6f3e84d06a0dd383708d463ccbcc2"
+}

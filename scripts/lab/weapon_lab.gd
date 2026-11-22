@@ -106,6 +106,15 @@ var timeline_filter_option: OptionButton
 var timeline_scrub_slider: HSlider
 var timeline_time_label: Label
 var audio_pool_label: Label
+var actor_inspector_tree: Tree
+var replay_snapshot_option: OptionButton
+var capture_replay_button: Button
+var run_replay_button: Button
+var add_dot_button: Button
+var last_replay_result: Dictionary = {}
+var _last_actor_inspector_sig: String = ""
+var _burst_is_first_shot: bool = true
+var native_launch_mode_option: OptionButton
 var bottom_tabs: TabContainer
 var _timeline_filter := "all"
 var _timeline_filtered_events: Array[Dictionary] = []
@@ -192,6 +201,8 @@ func setup(p_index: ResourceIndex, p_schema: SchemaRegistry, p_native_service = 
 	index = p_index
 	schema = p_schema
 	native_session_service = p_native_service
+	if combat_scenario != null and not combat_scenario.combat_event.is_connected(_on_combat_scenario_event):
+		combat_scenario.combat_event.connect(_on_combat_scenario_event)
 	var rec: Dictionary = {}
 	if native_session_service != null:
 		native_session_service.ensure_initialized()
@@ -532,7 +543,7 @@ func _build_ui() -> void:
 	telemetry.placeholder_text = "Simulation telemetry appears here."
 	tel_tab.add_child(telemetry)
 
-	# Tab 2: Interactive Audiovisual Timeline
+	# Tab 2: Combat-State Timeline + Live Actor Inspector (HSplit preserves 5-tab workbench)
 	var tl_tab := VBoxContainer.new()
 	tl_tab.name = "Timeline"
 	bottom_tabs.add_child(tl_tab)
@@ -542,7 +553,7 @@ func _build_ui() -> void:
 	tl_tab.add_child(tl_bar)
 	tl_bar.add_child(_mk_label("Filter"))
 	timeline_filter_option = OptionButton.new()
-	for pair in [["All", "all"], ["Weapon/Impact", "combat"], ["FX", "fx"], ["Audio", "audio"]]:
+	for pair in [["All", "all"], ["Combat State", "combat"], ["FX", "fx"], ["Audio", "audio"]]:
 		timeline_filter_option.add_item(str(pair[0]))
 		timeline_filter_option.set_item_metadata(timeline_filter_option.item_count - 1, str(pair[1]))
 	timeline_filter_option.item_selected.connect(func(idx: int):
@@ -559,7 +570,7 @@ func _build_ui() -> void:
 	timeline_scrub_slider.min_value = 0.0
 	timeline_scrub_slider.max_value = 1.0
 	timeline_scrub_slider.step = 0.005
-	timeline_scrub_slider.custom_minimum_size = Vector2(160, 18)
+	timeline_scrub_slider.custom_minimum_size = Vector2(130, 18)
 	timeline_scrub_slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	timeline_scrub_slider.tooltip_text = "Scrub timeline (Right-Click to reset to 0.0s)"
 	timeline_scrub_slider.value_changed.connect(func(v: float): scrub_timeline_to(v))
@@ -569,10 +580,30 @@ func _build_ui() -> void:
 	timeline_time_label.text = "t=0.000 s (0 events)"
 	timeline_time_label.add_theme_color_override("font_color", Color("#F0D060"))
 	tl_bar.add_child(timeline_time_label)
+	capture_replay_button = _mk_button("CAPTURE REPLAY")
+	capture_replay_button.tooltip_text = "Save immutable CombatReplaySnapshot (actors, transforms, ODF revisions, shots)"
+	capture_replay_button.pressed.connect(func(): capture_replay_snapshot())
+	tl_bar.add_child(capture_replay_button)
+	replay_snapshot_option = OptionButton.new()
+	replay_snapshot_option.custom_minimum_size = Vector2(108, 0)
+	replay_snapshot_option.tooltip_text = "Select captured replay snapshot to run in isolated sandbox"
+	tl_bar.add_child(replay_snapshot_option)
+	run_replay_button = _mk_button("REPLAY SANDBOX")
+	run_replay_button.tooltip_text = "Deterministically replay selected snapshot without mutating current active scenario"
+	run_replay_button.pressed.connect(func(): replay_selected_snapshot())
+	tl_bar.add_child(run_replay_button)
+	add_dot_button = _mk_button("+ TEST DoT")
+	add_dot_button.tooltip_text = "Apply APPROXIMATED burn DoT (25 dps for 4.0s) to primary target"
+	add_dot_button.pressed.connect(func(): apply_test_dot())
+	tl_bar.add_child(add_dot_button)
 	audio_pool_label = Label.new()
 	audio_pool_label.text = "Audio pool: 0/%d active (steals: 0)" % AUDIO_POOL_SIZE
 	audio_pool_label.add_theme_color_override("font_color", Color("#9C9371"))
 	tl_bar.add_child(audio_pool_label)
+	var tl_split := HSplitContainer.new()
+	tl_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tl_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tl_tab.add_child(tl_split)
 	timeline_tree = Tree.new()
 	timeline_tree.columns = 4
 	timeline_tree.set_column_title(0, "Time (s)")
@@ -582,9 +613,26 @@ func _build_ui() -> void:
 	timeline_tree.column_titles_visible = true
 	timeline_tree.hide_root = true
 	timeline_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	timeline_tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	timeline_tree.custom_minimum_size = Vector2(260, 0)
 	timeline_tree.item_activated.connect(_on_timeline_item_activated)
 	timeline_tree.item_selected.connect(_on_timeline_item_selected)
-	tl_tab.add_child(timeline_tree)
+	tl_split.add_child(timeline_tree)
+	actor_inspector_tree = Tree.new()
+	actor_inspector_tree.columns = 7
+	actor_inspector_tree.set_column_title(0, "Actor")
+	actor_inspector_tree.set_column_title(1, "Hull")
+	actor_inspector_tree.set_column_title(2, "Shield")
+	actor_inspector_tree.set_column_title(3, "Ammo / Energy")
+	actor_inspector_tree.set_column_title(4, "Armor / Wpn")
+	actor_inspector_tree.set_column_title(5, "Reload / FX")
+	actor_inspector_tree.set_column_title(6, "Pos / Vel")
+	actor_inspector_tree.column_titles_visible = true
+	actor_inspector_tree.hide_root = true
+	actor_inspector_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	actor_inspector_tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actor_inspector_tree.custom_minimum_size = Vector2(260, 0)
+	tl_split.add_child(actor_inspector_tree)
 
 	# Tab 3: Scene & Multi-Target / Obstacle / Sandbox Authoring
 	var sc_tab := VBoxContainer.new()
@@ -875,6 +923,15 @@ func _build_ui() -> void:
 	native_row.add_theme_constant_override("h_separation", 6)
 	native_row.add_theme_constant_override("v_separation", 3)
 	nat_tab.add_child(native_row)
+	native_row.add_child(_mk_label("Mode"))
+	native_launch_mode_option = OptionButton.new()
+	native_launch_mode_option.custom_minimum_size = Vector2(150, 0)
+	native_launch_mode_option.add_item("Stock Addon (@mydocsdir)")
+	native_launch_mode_option.set_item_metadata(0, "STOCK_ADDON")
+	native_launch_mode_option.add_item("Custom /config (Stage)")
+	native_launch_mode_option.set_item_metadata(1, "CUSTOM_CONFIG")
+	native_launch_mode_option.tooltip_text = "STOCK_ADDON uses stock bzone.cfg @mydocsdir\\addon without modifying BZ2R; CUSTOM_CONFIG generates external shaman_native.cfg (operator @rootdir handoff)"
+	native_row.add_child(native_launch_mode_option)
 	native_preflight_button = _mk_button("PREPARE EXPERIMENT")
 	native_preflight_button.tooltip_text = "Read-only preflight: BZN, Lua contract, mount cfg, resource closure, and Steam route"
 	native_preflight_button.pressed.connect(func(): run_native_preflight_only())
@@ -1672,13 +1729,13 @@ func set_weapon_override(weapon_ref: String) -> bool:
 	if not candidate.resolve(index, shooter_path, target_path, weapon_ref.strip_edges()):
 		return false
 	profile = candidate
-	combat_scenario.configure_from_profile(profile, target_node.position if target_node != null else Vector3(0, 0, -50), true)
+	combat_scenario.change_weapon(profile, true)
 	_current_health = combat_scenario.primary_target().hull_current
 	_current_shield = combat_scenario.primary_target().shield_current
 	_clear_projectiles()
-	sim.reset()
 	_update_stats()
 	_update_health_display()
+	refresh_actor_inspector(true)
 	_sync_sweep_property_labels()
 	_sync_sweep_bounds()
 	_update_chain_buttons()
@@ -2612,7 +2669,9 @@ func _update_health_display() -> void:
 		var sh = combat_scenario.shooter
 		var ammo_s := "∞" if bool(sh.ammo_unlimited) else "%d/%d" % [int(sh.ammo_current), int(sh.ammo_max)]
 		var energy_s := "∞" if bool(sh.energy_unlimited) else "%.0f/%.0f" % [float(sh.energy_current), float(sh.energy_max)]
-		shooter_resource_label.text = "Shooter ammo: %s  energy: %s  (cost %d)" % [ammo_s, energy_s, profile.ammo_cost]
+		var rld_s := "READY" if float(sh.reload_remaining) <= 0.0001 else ("RELOAD %.2fs" % float(sh.reload_remaining))
+		shooter_resource_label.text = "Shooter ammo: %s  energy: %s  [%s]" % [ammo_s, energy_s, rld_s]
+	refresh_actor_inspector(false)
 	var frac: float = _current_health / maxf(1.0, hp_max)
 	target_material = null
 	if target_node:
@@ -2630,7 +2689,7 @@ func fire_once() -> void:
 	if not profile.errors.is_empty():
 		status_changed.emit("Cannot fire: " + profile.errors[0], "danger")
 		return
-	_fire_one()
+	_fire_one(false, "SINGLE", true)
 	_running = true
 
 
@@ -2641,7 +2700,8 @@ func fire_alt() -> void:
 	if profile.alt == null:
 		status_changed.emit("This weapon chain declares no resolvable altName.", "warning")
 		return
-	_fire_one(true)
+	# Alternate weapon (altName) uses an independent weapon mode mount.
+	_fire_one(true, "SINGLE", false)
 	_running = true
 
 
@@ -2649,6 +2709,7 @@ func start_burst() -> void:
 	if profile == null or not profile.errors.is_empty():
 		return
 	_burst_left = max(1, profile.salvo_count)
+	_burst_is_first_shot = true
 	_burst_timer = 0.0
 	_running = true
 	status_changed.emit("Burst: %d shot(s)" % _burst_left, "muted")
@@ -2657,6 +2718,7 @@ func start_burst() -> void:
 func stop_fire() -> void:
 	_continuous = false
 	_burst_left = 0
+	_burst_is_first_shot = true
 	hold_button.set_pressed_no_signal(false)
 
 
@@ -2672,17 +2734,24 @@ func _on_hold_toggled(on: bool) -> void:
 		_fire_cooldown = 0.0
 
 
-func _step_once() -> void:
+func step_simulation_once(dt: float = 1.0 / 60.0) -> Array[Dictionary]:
 	_paused = true
-	pause_button.set_pressed_no_signal(true)
-	pause_button.text = "RESUME"
-	sim.advance(1.0 / 60.0)
+	if pause_button != null:
+		pause_button.set_pressed_no_signal(true)
+		pause_button.text = "RESUME"
+	var tick_evs: Array[Dictionary] = combat_scenario.advance(dt)
 	_sync_projectiles()
 	_refresh_telemetry()
+	_update_health_display()
+	refresh_actor_inspector(true)
+	return tick_evs
+
+
+func _step_once() -> void:
+	step_simulation_once(1.0 / 60.0)
 
 
 func restart_test() -> void:
-	sim.reset()
 	_clear_projectiles()
 	spawned_effects = 0
 	fx_log.clear()
@@ -2693,14 +2762,25 @@ func restart_test() -> void:
 	_running = false
 	_paused = false
 	_burst_left = 0
+	_burst_is_first_shot = true
 	_continuous = false
 	hold_button.set_pressed_no_signal(false)
 	pause_button.set_pressed_no_signal(false)
 	pause_button.text = "PAUSE"
 	if profile != null:
-		combat_scenario.configure_from_profile(profile, target_node.position if target_node != null else Vector3(0, 0, -50), false)
+		if combat_scenario.shooter != null and combat_scenario.primary_target() != null and combat_scenario._baseline_captured:
+			combat_scenario.reset("ALL")
+			combat_scenario.update_effective_odf_parameters(profile)
+			var prim0 = combat_scenario.primary_target()
+			if target_node != null and prim0 != null:
+				target_node.position = prim0.position
+				target_node.rotation_degrees.y = rad_to_deg(float(prim0.yaw_rad))
+		else:
+			combat_scenario.create_new_scenario(profile, target_node.position if target_node != null else Vector3(0, 0, -50), obstacles)
 		_current_health = combat_scenario.primary_target().hull_current
 		_current_shield = combat_scenario.primary_target().shield_current
+	else:
+		sim.reset()
 	for et in extra_targets:
 		et["health"] = float(et.get("max_health", _current_health))
 		et["shield"] = float(et.get("max_shield", 0.0))
@@ -2708,19 +2788,22 @@ func restart_test() -> void:
 			et["actor_state"].reset_to_initial()
 	_rebuild_timeline_panel()
 	_update_health_display()
+	refresh_actor_inspector(true)
 	status_changed.emit("Test reset.", "muted")
 
 
-func _fire_one(use_alt: bool = false) -> void:
+func _fire_one(use_alt: bool = false, fire_mode: String = "SINGLE", enforce_reload: bool = true) -> Dictionary:
 	var prof := profile
 	if use_alt:
 		if profile == null or profile.alt == null:
-			return
+			return {"ok": false, "state": "DISABLED", "reason": "NO_ALT_PROFILE"}
 		prof = profile.alt
+	if prof == null:
+		return {"ok": false, "state": "DISABLED", "reason": "NO_PROFILE"}
 	prof.refresh()
 	if prof.shot_speed <= 0.0:
 		_append_telemetry(sim.sim_time, "ERROR", "shotSpeed is 0; the ordnance cannot travel.")
-		return
+		return {"ok": false, "state": "DISABLED", "reason": "ZERO_SHOT_SPEED"}
 	var geom := _shot_geometry()
 	var origin: Vector3 = geom.origin
 	var target_pos: Vector3 = geom.target
@@ -2728,24 +2811,27 @@ func _fire_one(use_alt: bool = false) -> void:
 	if shooter_speed_spin != null and absf(float(shooter_speed_spin.value)) > 0.01:
 		var fwd := Vector3(0.0, 0.0, -1.0).rotated(Vector3.UP, deg_to_rad(shooter_yaw_offset_deg))
 		shooter_vel = fwd * float(shooter_speed_spin.value)
-	# Sync shooter ammo/energy & target shield max from live profile edits without
-	# resetting depleted persistent combat state between sequential shots.
-	if combat_scenario.shooter == null or combat_scenario.primary_target() == null:
-		combat_scenario.configure_from_profile(prof, target_pos, false)
-	var fire_chk: Dictionary = combat_scenario.shooter.can_fire(prof.ammo_cost, prof.weapon_energy_cost, false)
-	if not bool(fire_chk.get("ok", false)):
-		var rej := str(fire_chk.get("reason", "INSUFFICIENT_RESOURCES"))
-		_append_telemetry(sim.sim_time, "FIRE_REJECTED", "%s: ammo=%d (cost %d), energy=%.1f (cost %.1f)" % [
-			rej, int(combat_scenario.shooter.ammo_current), prof.ammo_cost,
+	# Ensure CombatScenario is initialized without resetting depleted persistent combat state.
+	if combat_scenario.shooter == null or combat_scenario.primary_target() == null or not combat_scenario._baseline_captured:
+		combat_scenario.create_new_scenario(prof, target_pos, obstacles)
+	# P0-SIM-02: Single atomic fire permission + resource consumption transition inside CombatScenario.
+	var fire_res: Dictionary = combat_scenario.fire_shot(
+		prof, origin, geom.direction, target_pos, obstacles, shooter_vel, enforce_reload, extra_targets, fire_mode
+	)
+	if not bool(fire_res.get("ok", false)):
+		var rej := str(fire_res.get("reason", "FIRE_REJECTED"))
+		var rej_st := str(fire_res.get("state", "DISABLED"))
+		_append_telemetry(sim.sim_time, "FIRE_REJECTED", "%s (%s): reload=%.2fs ammo=%d (cost %d), energy=%.1f (cost %.1f)" % [
+			rej_st, rej, float(combat_scenario.shooter.reload_remaining),
+			int(combat_scenario.shooter.ammo_current), prof.ammo_cost,
 			float(combat_scenario.shooter.energy_current), prof.weapon_energy_cost
 		])
-		status_changed.emit("Fire blocked: " + rej, "warning")
+		status_changed.emit("Fire blocked: %s (%s)" % [rej_st, rej], "warning")
 		_update_health_display()
-		return
-	var fire_res: Dictionary = combat_scenario.fire_shot(prof, origin, geom.direction, target_pos, obstacles, shooter_vel, false, extra_targets)
+		return fire_res
 	var shot = fire_res.get("shot", null)
 	if shot == null:
-		return
+		return fire_res
 	_update_health_display()
 	_record_timeline(sim.sim_time, "WEAPON_ACTIVATE", "%s -> %s (hp=%s)" % [prof.weapon_name, prof.ordnance_name, hardpoint_mode], prof.weapon_path, "ordName")
 
@@ -2817,6 +2903,107 @@ func _fire_one(use_alt: bool = false) -> void:
 	projectile_root.add_child(proj_node)
 	projectiles.append({"shot": shot, "mesh": proj_node, "bolt": bolt_node})
 	_refresh_telemetry()
+	return fire_res
+
+
+func _on_combat_scenario_event(ev: Dictionary) -> void:
+	var kind := str(ev.get("kind", "COMBAT"))
+	var detail := str(ev.get("detail", ""))
+	var odf_p := str(ev.get("odf_path", ""))
+	var odf_k := str(ev.get("odf_key", ""))
+	_record_timeline(float(ev.get("time", sim.sim_time)), kind, detail, odf_p, odf_k)
+
+
+func refresh_actor_inspector(force: bool = false) -> void:
+	if actor_inspector_tree == null or combat_scenario == null:
+		return
+	var actors: Array = combat_scenario.all_actors()
+	var sig_parts: PackedStringArray = []
+	for a in actors:
+		var eff_s := ""
+		for e in a.active_effects:
+			eff_s += "%s:%.1fs," % [str(e.get("name", "dot")), float(e.get("remaining_s", 0.0))]
+		sig_parts.append("%s|%.1f/%.1f|%.1f/%.1f|%d/%d|%.1f/%.1f|%s|%s|%.2f|%.1f,%.1f,%.1f|%.1f,%.1f,%.1f|%s|%s" % [
+			str(a.actor_id), float(a.hull_current), float(a.hull_max),
+			float(a.shield_current), float(a.shield_max),
+			int(a.ammo_current), int(a.ammo_max),
+			float(a.energy_current), float(a.energy_max),
+			str(a.armor_class), str(a.weapon_name), float(a.reload_remaining),
+			float(a.position.x), float(a.position.y), float(a.position.z),
+			float(a.velocity.x), float(a.velocity.y), float(a.velocity.z),
+			str(a.destroyed), eff_s
+		])
+	var sig := ";".join(sig_parts)
+	if not force and sig == _last_actor_inspector_sig:
+		return
+	_last_actor_inspector_sig = sig
+	actor_inspector_tree.clear()
+	var root := actor_inspector_tree.create_item()
+	for a in actors:
+		var item := actor_inspector_tree.create_item(root)
+		var state_tag := " [DESTROYED]" if bool(a.destroyed) else (" [DISABLED]" if bool(a.disabled) else "")
+		item.set_text(0, "%s (%s)%s" % [str(a.display_name), str(a.role), state_tag])
+		item.set_text(1, "%.1f / %.0f" % [float(a.hull_current), float(a.hull_max)])
+		item.set_text(2, ("%.1f / %.0f (%s)" % [float(a.shield_current), float(a.shield_max), str(a.shield_class) if str(a.shield_class) != "" else "N"]) if float(a.shield_max) > 0.0 else "none")
+		var am_s := "∞" if bool(a.ammo_unlimited) else "%d/%d" % [int(a.ammo_current), int(a.ammo_max)]
+		var en_s := "∞" if bool(a.energy_unlimited) else "%.0f/%.0f" % [float(a.energy_current), float(a.energy_max)]
+		item.set_text(3, "%s | %s" % [am_s, en_s])
+		item.set_text(4, "%s | %s" % [str(a.armor_class), str(a.weapon_name) if str(a.weapon_name) != "" else "-"])
+		var rld_txt := "READY" if float(a.reload_remaining) <= 0.0001 else ("RLD %.2fs" % float(a.reload_remaining))
+		var eff_names: PackedStringArray = []
+		for e in a.active_effects:
+			eff_names.append("%s(%.1fs)" % [str(e.get("name", "dot")), float(e.get("remaining_s", 0.0))])
+		item.set_text(5, rld_txt + ((" | " + ", ".join(eff_names)) if not eff_names.is_empty() else ""))
+		item.set_text(6, "(%.1f,%.1f,%.1f) v=%.1f" % [float(a.position.x), float(a.position.y), float(a.position.z), (a.velocity as Vector3).length()])
+
+
+func capture_replay_snapshot(label: String = "") -> Dictionary:
+	if combat_scenario == null:
+		return {}
+	var lbl := label if label != "" else ("Run %d (%s)" % [combat_scenario.saved_replay_snapshots.size() + 1, profile.weapon_name if profile != null else "sim"])
+	var snap: Dictionary = combat_scenario.save_replay_snapshot(lbl)
+	if replay_snapshot_option != null:
+		replay_snapshot_option.add_item(str(snap.get("label", lbl)))
+		replay_snapshot_option.set_item_metadata(replay_snapshot_option.item_count - 1, str(snap.get("snapshot_id", "")))
+		replay_snapshot_option.select(replay_snapshot_option.item_count - 1)
+	status_changed.emit("Captured replay snapshot: %s (%d shot(s))" % [lbl, (snap.get("shot_commands", []) as Array).size()], "success")
+	return snap
+
+
+func replay_selected_snapshot(snapshot_id: String = "") -> Dictionary:
+	if combat_scenario == null or combat_scenario.saved_replay_snapshots.is_empty():
+		status_changed.emit("Replay: capture a replay snapshot first.", "warning")
+		return {"ok": false, "reason": "NO_REPLAY_SNAPSHOT"}
+	var target_id := snapshot_id
+	if target_id == "" and replay_snapshot_option != null and replay_snapshot_option.selected >= 0:
+		target_id = str(replay_snapshot_option.get_item_metadata(replay_snapshot_option.selected))
+	var chosen: Dictionary = combat_scenario.saved_replay_snapshots[-1]
+	if target_id != "":
+		for s in combat_scenario.saved_replay_snapshots:
+			if str((s as Dictionary).get("snapshot_id", "")) == target_id:
+				chosen = s
+				break
+	# RP-08: Sandboxed replay never overwrites or destroys the active user scenario!
+	last_replay_result = CombatScenarioScript.replay_snapshot_sandboxed(chosen)
+	var prim_st: Dictionary = (last_replay_result.get("targets", {}) as Dictionary).get("primary", {})
+	_append_telemetry(sim.sim_time, "REPLAY", "Sandboxed replay '%s': %d shot(s), ammo=%d, primary hull=%.1f shield=%.1f" % [
+		str(chosen.get("label", target_id)), int(last_replay_result.get("shots_replayed", 0)),
+		int(last_replay_result.get("shooter_ammo", 0)), float(prim_st.get("hull", 0.0)), float(prim_st.get("shield", 0.0))
+	])
+	status_changed.emit("Sandboxed replay complete: %d shot(s) (active scenario untouched)" % int(last_replay_result.get("shots_replayed", 0)), "success")
+	return last_replay_result
+
+
+func apply_test_dot(actor_id: String = "primary", effect_name: String = "Burn (APPROX)", dps: float = 25.0, duration_s: float = 4.0) -> bool:
+	if combat_scenario == null:
+		return false
+	var ok: bool = combat_scenario.apply_status_effect(actor_id, effect_name, dps, duration_s)
+	if ok:
+		_running = true
+		_update_health_display()
+		refresh_actor_inspector(true)
+		status_changed.emit("Applied %s (%.1f dps, %.1fs) to %s" % [effect_name, dps, duration_s, actor_id], "muted")
+	return ok
 
 
 func _record_timeline(t: float, kind: String, text: String, odf_path: String = "", key: String = "") -> void:
@@ -2835,7 +3022,14 @@ func _event_matches_filter(ev: Dictionary, cat: String) -> bool:
 	var k := str(ev.get("kind", ""))
 	match cat:
 		"combat":
-			return k == "WEAPON_ACTIVATE" or k == "IMPACT" or k == "OBSTACLE_HIT"
+			return k in [
+				"WEAPON_ACTIVATE", "IMPACT", "OBSTACLE_HIT",
+				"FIRE_REQUESTED", "SHOT_ACCEPTED", "SHOT_REJECTED",
+				"AMMO_CONSUMED", "ENERGY_CONSUMED", "PROJECTILE_SPAWNED",
+				"PROJECTILE_HIT", "SHIELD_ABSORBED", "HULL_DAMAGED",
+				"ACTOR_DESTROYED", "RELOAD_READY", "STATUS_EFFECT_TICK",
+				"STATUS_EFFECT_APPLIED", "PROFILE_CHANGED"
+			]
 		"fx":
 			return k.begins_with("FX_")
 		"audio":
@@ -3099,23 +3293,34 @@ func _process(delta: float) -> void:
 	if _running and not _paused:
 		if target_node != null:
 			var g_live := _shot_geometry()
-			sim.update_live_target(g_live.target, deg_to_rad(target_yaw_offset_deg))
-		sim.advance(dt)
+			combat_scenario.record_actor_transform("primary", g_live.target, _target_velocity, deg_to_rad(target_yaw_offset_deg))
+		# P0-SIM-01: Single authoritative simulation clock owned by CombatScenario.
+		# Never call sim.advance(dt) directly here or tick actor state twice.
+		combat_scenario.advance(dt)
 		_sync_projectiles()
 		if _continuous:
-			_fire_cooldown -= dt
-			if _fire_cooldown <= 0.0:
-				_fire_one()
-				_fire_cooldown = max(0.02, profile.shot_delay)
+			if combat_scenario.shooter != null and float(combat_scenario.shooter.reload_remaining) <= 0.0001:
+				var hres := _fire_one(false, "HOLD", true)
+				if not bool(hres.get("ok", false)) and str(hres.get("state", "")) in ["INSUFFICIENT_AMMO", "INSUFFICIENT_ENERGY", "DESTROYED", "DISABLED"]:
+					stop_fire()
 		if _burst_left > 0:
 			_burst_timer -= dt
 			if _burst_timer <= 0.0:
-				_fire_one()
-				_burst_left -= 1
-				_burst_timer = max(0.0, salvo_delay_or_zero())
+				var bmode := "BURST" if _burst_is_first_shot else "SALVO_FOLLOWUP"
+				var enforce_rld := _burst_is_first_shot
+				var bres := _fire_one(false, bmode, enforce_rld)
+				if bool(bres.get("ok", false)):
+					_burst_left -= 1
+					_burst_is_first_shot = false
+					_burst_timer = max(0.0, salvo_delay_or_zero())
+				elif str(bres.get("state", "")) != "RELOADING":
+					_burst_left = 0
+					_burst_is_first_shot = true
 		_refresh_telemetry()
-		# Keep stepping while any projectile is in flight or fire is queued.
-		_running = _continuous or _burst_left > 0 or _any_alive()
+		_update_health_display()
+		# Keep stepping while any projectile is in flight, fire is queued, or
+		# reload/DoT timers remain active on any actor (P0-SIM-01).
+		_running = _continuous or _burst_left > 0 or _any_alive() or combat_scenario.has_active_timers()
 
 
 func salvo_delay_or_zero() -> float:
@@ -3318,18 +3523,23 @@ func run_native_preflight_only(options: Dictionary = {}) -> Dictionary:
 		return {"ok": false}
 	if native_runner == null:
 		native_runner = native_session_service.runner if native_session_service != null else NativeRunnerScript.new()
-	var res: Dictionary = native_session_service.preflight(profile, index, options) if native_session_service != null else native_runner.preflight(profile, index, options)
+	var opts := options.duplicate(true)
+	if not opts.has("launch_mode") and native_launch_mode_option != null and native_launch_mode_option.selected >= 0:
+		opts["launch_mode"] = str(native_launch_mode_option.get_item_metadata(native_launch_mode_option.selected))
+	var res: Dictionary = native_session_service.preflight(profile, index, opts) if native_session_service != null else native_runner.preflight(profile, index, opts)
 	active_native_session_id = str(res.get("session_id", ""))
 	var pre: Dictionary = res.get("preflight", {})
 	var disc: Dictionary = pre.get("discovery", {})
-	_append_telemetry(sim.sim_time, "NATIVE_PRE", "Session=%s  build_id=%s  route=%s  status=%s  reason=%s" % [
-		active_native_session_id, str(disc.get("build_id", "UNKNOWN")), str(pre.get("launch_route", "")),
-		str(pre.get("status", "")), str(pre.get("reason", ""))
+	_append_telemetry(sim.sim_time, "NATIVE_PRE", "Session=%s  mode=%s  build_id=%s  route=%s  stage_ok=%s  cfg_ok=%s  launch_ok=%s  reason=%s" % [
+		active_native_session_id, str(pre.get("launch_mode", "CUSTOM_CONFIG")),
+		str(disc.get("build_id", "UNKNOWN")), str(pre.get("launch_route", "")),
+		str(bool(pre.get("stage_eligible", false))), str(bool(pre.get("config_compatible", false))),
+		str(bool(pre.get("launch_eligible", false))), str(pre.get("reason", ""))
 	])
 	for b in pre.get("blockers", []):
 		_append_telemetry(sim.sim_time, "NATIVE_BLK", str(b))
 	_update_native_controls()
-	status_changed.emit("Native preflight: %s [%s]" % [str(pre.get("status", "")), str(pre.get("launch_route", ""))], "warning" if not bool(pre.get("launch_ready", false)) else "success")
+	status_changed.emit("Native preflight: %s [%s / %s]" % [str(pre.get("status", "")), str(pre.get("launch_route", "")), str(pre.get("launch_mode", ""))], "warning" if not bool(pre.get("launch_eligible", false)) else "success")
 	return res
 
 
@@ -3404,9 +3614,13 @@ func run_native_cleanup() -> Dictionary:
 		status_changed.emit("Native cleanup: no active session.", "warning")
 		return {"ok": false, "reason": "NO_ACTIVE_SESSION"}
 	var res: Dictionary = native_session_service.cleanup_stage(active_native_session_id) if native_session_service != null else native_runner.cleanup_stage(active_native_session_id)
-	_append_telemetry(sim.sim_time, "NATIVE_CLN", "Session=%s  state=%s" % [active_native_session_id, str(res.get("state", ""))])
+	var rsn := str(res.get("reason", ""))
+	_append_telemetry(sim.sim_time, "NATIVE_CLN", "Session=%s  state=%s  reason=%s" % [active_native_session_id, str(res.get("state", "")), rsn])
 	_update_native_controls()
-	status_changed.emit("Native cleanup: %s" % str(res.get("state", "")), "success" if bool(res.get("ok", false)) else "warning")
+	if bool(res.get("cleanup_rejected", false)):
+		status_changed.emit("Cleanup blocked (%s): click CANCEL MONITOR first." % rsn, "warning")
+	else:
+		status_changed.emit("Native cleanup: %s" % str(res.get("state", "")), "success" if bool(res.get("ok", false)) else "warning")
 	return res
 
 

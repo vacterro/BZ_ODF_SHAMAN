@@ -13,10 +13,14 @@ Equivalent:
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . res://tests/ui_smoke.tscn
 ```
 
-## `tests/test_runner.gd` — last run: 990 checks, 0 failures (`TESTED_HEADLESS`)
+## `tests/test_runner.gd` — last run: 1,067 checks, 0 failures (`TESTED_HEADLESS`)
 
 | Category | Coverage |
 |---|---|
+| Native launch eligibility & stock addon (`NL-01..06`, `T-65`) | independent gates (`STRUCTURALLY_VALID`, `RESOURCE_CLOSURE_VALID`, `STAGE_ELIGIBLE`, `CONFIG_COMPATIBLE`, `EXECUTION_ENVIRONMENT_READY`, `LAUNCH_ELIGIBLE`), external `/config` blocked from process launch with `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` while manual handoff provides SHA256 + collision check, `STOCK_ADDON` route inspecting stock `bzone.cfg` (`@mydocsdir\addon` first) and staging/cleaning only owned `SHAMAN_*` files, zero writes to `BZ2R` |
+| Unified combat clock, reload & DoT (`CB-01..08`, `T-66`) | `CombatScenario.advance()` single clock advancing `sim_time` even after projectiles finish, 1.0s reload schedule (`t=0.0` accept, `t=0.2`/`0.9` reject, `t=1.0+` accept, `RELOAD_READY` event), single-deduct ammo/energy, `READY`/`RELOADING`/`INSUFFICIENT_AMMO`/`INSUFFICIENT_ENERGY`/`DESTROYED`/`DISABLED` permission state machine, pause/single-step, DoT persistence, burst vs `SALVO_FOLLOWUP` |
+| Spatial replay snapshots & baseline preservation (`RP-01..08`, `T-67`) | `reset("ALL")` restores `position`, `velocity`, `yaw_rad`, `radius`, `half_extents`, `bbox_offset`; moving-target replay determinism; immutable `CombatReplaySnapshot` isolating historical runs from subsequent ODF edits; `update_effective_odf_parameters()`/`change_weapon()`/`configure_from_profile(..., true)` preserving initial baseline, reload & effects; sandboxed replay leaving active scenario untouched |
+| Native active-experiment cleanup guard (`NC-01..07`, `T-68`) | active monitor rejects `cleanup_stage()` (`ACTIVE_EXPERIMENT_CANNOT_CLEANUP`), `NativeSessionService` timer remains active after rejection, `cancel_monitor()` persists `CANCELLED` across restart, terminal cleanup succeeds while preserving unknown/modified files and retaining evidence artifact outside disposable stage root |
 | Native startup diagnosis & log correlation (`NB-01..08`, `T-60`) | `/logconsole` opt-in (absent by default), stock `@rootdir\maps` mount, `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` vs bare `@rootdir` config check, `CONFIG_PATH_NOT_LOADED_NO_FILESYS` vs `EXTERNAL_MISSING_FONT` classification, session-correlated crash log selection (`P1-EVIDENCE-01`), stock `ds_16.bmf` presence |
 | Native completeness & monitor persistence (`RC-01..07`, `NM-03..08`, `P1-NATIVE-06`, `T-61`) | strict stock-only vs VSR closure, synthetic ordnance-only probe rejected when `require_complete_closure=true`, automatic `observation_expected_path` resolution in `poll_monitor`, foreign-session rejection, checked `process_monitors.json` persistence (`MONITOR_PERSIST_FAILED`/`RECOVERY_PENDING`), event-driven Lua without time-based `SHOT_OBSERVED` |
 | Persistent Combat State (`CS-01..12`, `T-62`) | `CombatActorState`/`CombatScenario` shooter-owned ammo/energy independent of target `maxAmmo`, multi-shot depletion & `INSUFFICIENT_AMMO`/`INSUFFICIENT_ENERGY` block, persistent target shield & hull across shots, independent secondary target shield/hull + splash propagation, reset & deterministic replay, live ODF edit + undo |
@@ -60,7 +64,7 @@ Equivalent:
 Fixtures are read from the installed game and Workshop; nothing copyrighted is copied into the
 repository.
 
-## `tests/ui_smoke.tscn` — last run: 252 checks, 0 failures (`TESTED_HEADLESS`)
+## `tests/ui_smoke.tscn` — last run: 265 checks, 0 failures (`TESTED_HEADLESS`)
 
 Boots the real main scene and verifies:
 
@@ -135,14 +139,14 @@ tools\run_bench.cmd
 ```
 
 Prints index scan, 500-file parse throughput, 100 cold inheritance merges, 500 deterministic
-shots and static memory. There is no pass/fail threshold; compare runs by hand. Last run (2026-11-22 Wave F `T-64`):
+shots and static memory. There is no pass/fail threshold; compare runs by hand. Last run (2026-11-22 Wave G `T-70`):
 
 ```
-index: 17028 ODFs, 37161 asset names in 1208.9 ms
-parse: 500 ODFs, 0.55 MB in 760.0 ms (0.7 MB/s)
-inheritance: 100 cold merges of ivtank_vsr in 126.9 ms (1.27 ms each, 131 rows)
-sim: 500 shots in 5790.6 ms (11.58 ms each, 500 hits)
-memory: 148.3 MB static
+index: 17028 ODFs, 37161 asset names in 1213.4 ms
+parse: 500 ODFs, 0.55 MB in 599.8 ms (0.9 MB/s)
+inheritance: 100 cold merges of ivtank_vsr in 94.5 ms (0.94 ms each, 131 rows)
+sim: 500 shots in 5896.9 ms (11.79 ms each, 500 hits)
+memory: 148.4 MB static
 ```
 
 ## Regression rule
