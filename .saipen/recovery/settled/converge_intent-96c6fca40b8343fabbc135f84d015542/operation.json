@@ -1,0 +1,44 @@
+{
+  "op_id": "converge_intent-96c6fca40b8343fabbc135f84d015542",
+  "operation": "converge_intent",
+  "created_at": "2026-11-23T21:29:06Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "2f0aa42c22b8ee0e",
+  "preconditions": {
+    ".saipen/STATE.md": "d70f87c68bb888d2",
+    ".saipen/LOG.md": "b89e6ed93294f7a1"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "e5243bf160f5ffb8",
+    ".saipen/logs": "tree-missing-v1"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "b89e6ed93294f7a1",
+      "after_hash": "e293fb2aaf5c559d",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "d70f87c68bb888d2",
+      "after_hash": "735b3d336a5f1b7e",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "converge_intent",
+    "target": "done",
+    "status": "COMMITTED",
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman"
+  }
+}

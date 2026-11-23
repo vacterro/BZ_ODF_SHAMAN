@@ -48,3 +48,48 @@
 - **verified:** PASS -- saipen validate CURRENT_PASS; release parity 0.0.1 OK.
 - **instructions:** no integration required; payload [] intentional. Producer stage satisfied for this crew epoch.
 - **details:** The published tree is the current source identity; no integration payload required.
+
+## W-004: current producer surface
+- **status:** ready
+- **summary:** Producer surface verified against final release commit.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saiwiki
+- **source_head:** 714cb81cbcb7622afeb0b6939e5d93f9ea7a68df
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:54a42475a124ab0f27e83d600a284a9cc54d9668029c4828cfc48512b031df13
+- **coverage:** owned surface reviewed against current source.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** Current release tree verified; no payload.
+
+## W-005: final epoch producer surface
+- **status:** ready
+- **summary:** Producer surface verified against final release tree.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saiwiki
+- **source_head:** 714cb81cbcb7622afeb0b6939e5d93f9ea7a68df
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:54a42475a124ab0f27e83d600a284a9cc54d9668029c4828cfc48512b031df13
+- **coverage:** owned surface reviewed against final source.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** Final tree verified; no payload.
+
+## W-006: shipped-release producer surface
+- **status:** ready
+- **summary:** Producer surface verified against shipped v0.0.1 closure commit.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saiwiki
+- **source_head:** f0a75f8d38e681ec2e0a1e54961c916706ee0416
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:54a42475a124ab0f27e83d600a284a9cc54d9668029c4828cfc48512b031df13
+- **coverage:** owned surface reviewed against shipped tree.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** Shipped tree verified; no payload.

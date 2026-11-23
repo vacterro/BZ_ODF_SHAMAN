@@ -283,3 +283,33 @@
 - **verified:** PASS -- tools/run_tests.cmd canonical suite PASS; saipen validate CURRENT_PASS
 - **instructions:** no integration required; payload [] intentional. Sensor stage satisfied for this crew epoch.
 - **details:** No new actionable finding; package bound to the published 0.0.1 source identity.
+
+## W-021: current-source sensor review — no finding
+- **status:** reviewed
+- **summary:** Sensor review clean against published release 0.0.1 tree.
+- **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
+- **critical:** false
+- **producer:** saihunt
+- **source_head:** 714cb81cbcb7622afeb0b6939e5d93f9ea7a68df
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:4edb04181cb07e0946afd06fbe711166fa9dcc403e56b52e9be3844f0a71b0a5
+- **coverage:** bounded review of owned surface against current source identity.
+- **payload:** []
+- **verified:** PASS -- canonical suite PASS; saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No new actionable finding on the current tree.
+
+## W-022: shipped-release sensor review
+- **status:** reviewed
+- **summary:** Sensor review clean against shipped v0.0.1 tree.
+- **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
+- **critical:** false
+- **producer:** saihunt
+- **source_head:** f0a75f8d38e681ec2e0a1e54961c916706ee0416
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:4edb04181cb07e0946afd06fbe711166fa9dcc403e56b52e9be3844f0a71b0a5
+- **coverage:** owned surface reviewed against shipped release tree.
+- **payload:** []
+- **verified:** PASS -- canonical suite PASS; saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No new actionable finding on the shipped tree.
