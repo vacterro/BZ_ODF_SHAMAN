@@ -1,8 +1,8 @@
 # SubSaipen Manifest
 
-- saihunt -- .saipen/extensions/subs/saihunt/ | last_collect: sha256:2031695b69167e0f01a621de4ceecc80a3359514b53766c6a7cf4225993e24b0@2026-11-23T20:53:37Z
-- saitest -- .saipen/extensions/subs/saitest/ | last_collect: sha256:478b1db9b5871cf63c6b9aaddc494fe23feae69861d02f63f7c1e23acfec253d@2026-11-23T20:53:37Z
-- saipython -- .saipen/extensions/subs/saipython/ | last_collect: sha256:932c602f1c418c596dee01469dff96181ea28918725d7a5e0f363c4a9a070716@2026-11-23T20:53:37Z
+- saihunt -- .saipen/extensions/subs/saihunt/ | last_collect: sha256:6be55bad87e8504745cdf3cbcfd02f44b53bbf5dd99753f9858c7f4b8cb5221b@2026-11-23T21:12:21Z
+- saitest -- .saipen/extensions/subs/saitest/ | last_collect: sha256:0dce9416b9582ad4ea033bf3177b9e843cd0b374a07b8212a977f72cfbec89c5@2026-11-23T21:12:21Z
+- saipython -- .saipen/extensions/subs/saipython/ | last_collect: sha256:14670431892111c40a63df6cd040a07711511fe39ea6791349243fcaee781a21@2026-11-23T21:12:21Z
 - saiwiki -- .saipen/extensions/subs/saiwiki/
-- saiui -- .saipen/extensions/subs/saiui/ | last_collect: sha256:a81caeb198427632a1f81a2da039be279a3bc9ffed5e202310ece7b28996a618@2026-11-23T20:53:37Z
+- saiui -- .saipen/extensions/subs/saiui/ | last_collect: sha256:2ba6c2c8c0ca9416deba0ed49c0884d1fea5af7dcbb045c61b25058efc478056@2026-11-23T21:12:21Z
 - saitranslate -- .saipen/extensions/subs/saitranslate/

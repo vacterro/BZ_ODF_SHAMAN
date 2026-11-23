@@ -244,3 +244,18 @@
 - **verified:** PASS -- suite record 43764bfc12053f9a-20261123T202558094960Z.json PASS
 - **instructions:** no integration required; payload [] intentional. Sensor stage satisfied for this crew epoch.
 - **details:** No new actionable finding; package bound to the current 0.0.1 release source identity.
+
+## W-018: independent suite reproduction — published 0.0.1 tree
+- **status:** reviewed
+- **summary:** Fresh T-128 suite 44/44 and canonical suite PASS reproduced; no new defect.
+- **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
+- **critical:** false
+- **producer:** saitest
+- **source_head:** a37a6e46dc50f6cbafb0a1fc817f1185a5ce30bc
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:801fbfdc4be680d87b18cd21e6246d83fad5b474ebd7fe82efa83918cecf2f08
+- **coverage:** bounded current-source review of owned surface for published release 0.0.1.
+- **payload:** []
+- **verified:** PASS -- suite record PASS; saipen validate CURRENT_PASS
+- **instructions:** no integration required; payload [] intentional. Sensor stage satisfied for this crew epoch.
+- **details:** No new actionable finding; package bound to the published 0.0.1 source identity.

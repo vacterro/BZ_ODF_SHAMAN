@@ -126,3 +126,18 @@
 - **verified:** PASS -- GPU GUI self-verify EXIT=0 t128_final, UI smoke 0 failures
 - **instructions:** no integration required; payload [] intentional. Sensor stage satisfied for this crew epoch.
 - **details:** No new actionable finding; package bound to the current 0.0.1 release source identity.
+
+## W-009: UI audit — published 0.0.1 tree current
+- **status:** reviewed
+- **summary:** UI surface audited against UI.md; no new visual or interaction defect.
+- **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
+- **critical:** false
+- **producer:** saiui
+- **source_head:** a37a6e46dc50f6cbafb0a1fc817f1185a5ce30bc
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:f2e3685b908a3b9837917f12c5414628d847c35fb72567f0306e2c8b19a8dab8
+- **coverage:** bounded current-source review of owned surface for published release 0.0.1.
+- **payload:** []
+- **verified:** PASS -- GPU GUI self-verify EXIT=0 t128_final; UI smoke 0 failures
+- **instructions:** no integration required; payload [] intentional. Sensor stage satisfied for this crew epoch.
+- **details:** No new actionable finding; package bound to the published 0.0.1 source identity.

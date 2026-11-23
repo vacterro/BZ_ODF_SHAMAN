@@ -1,0 +1,54 @@
+{
+  "op_id": "convergence-fc126e9aa78f405b8c98817b1a716591",
+  "operation": "convergence_stage",
+  "created_at": "2026-11-23T21:14:05Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "2b64d6257f2fd246",
+  "preconditions": {
+    ".saipen/STATE.md": "76dba40121974d39",
+    ".saipen/LOG.md": "3c203efafc7e640b"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "1be0259fa86883ef",
+    ".saipen/logs": "tree-missing-v1",
+    ".": "source-identity-v1:c3ce1667f400aeae2b24b0b4f443b07825999703838f66b656bcadfe8e009746"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "3c203efafc7e640b",
+      "after_hash": "46ffd5f1cceb55ef",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "76dba40121974d39",
+      "after_hash": "b8176f04d0f4d03b",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "convergence_stage",
+    "status": "COMMITTED",
+    "stage": "G",
+    "verdict": "NOTHING_SAFE_REMAINED",
+    "source_head": "a37a6e46dc50f6cbafb0a1fc817f1185a5ce30bc",
+    "source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+    "detail": "canonical convergence G for published 0.0.1 tree",
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+    "input_source_head": "a37a6e46dc50f6cbafb0a1fc817f1185a5ce30bc",
+    "input_source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+    "resulting_source_head": "a37a6e46dc50f6cbafb0a1fc817f1185a5ce30bc",
+    "resulting_source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+    "event_id": "E-2106"
+  }
+}

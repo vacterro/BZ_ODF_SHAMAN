@@ -179,12 +179,23 @@
   "T-163",
   "T-162",
   "T-161",
-  "T-165"
+  "T-165",
+  "T-166",
+  "T-167",
+  "T-168",
+  "T-169",
+  "T-170",
+  "T-171",
+  "T-172",
+  "T-173",
+  "T-175",
+  "T-174",
+  "T-176"
  ],
- "last_interval_consumed": 120,
+ "last_interval_consumed": 160,
  "last_run": {
-  "counted_at_run": 136,
-  "run_id": "20261123T202804-b49fc5fa"
+  "counted_at_run": 165,
+  "run_id": "20261123T211246-25275159"
  },
  "maintenance": {
   "blockers": [
@@ -194,13 +205,13 @@
    }
   ],
   "bytes_reclaimed": 0,
-  "fingerprint": "9318695f23a8945fd9ba8779e27c530dee92d1114e1ac723b1da7a4eba5f4926",
-  "last_attempt_fingerprint": "9318695f23a8945fd9ba8779e27c530dee92d1114e1ac723b1da7a4eba5f4926",
+  "fingerprint": "24d4b80687b75ad85125cbdec6ea70d62fb1c6aee3df2dd3d7991980792217a0",
+  "last_attempt_fingerprint": "24d4b80687b75ad85125cbdec6ea70d62fb1c6aee3df2dd3d7991980792217a0",
   "protected_bytes": 8834385,
   "reason": "no reclaimable candidate exists; nothing is safe to delete",
-  "run_id": "20261123T202804-b49fc5fa",
+  "run_id": "20261123T211246-25275159",
   "state": "GC_BLOCKED_NO_SAFE_CANDIDATES",
-  "updated": "2026-11-23T20:28:05Z"
+  "updated": "2026-11-23T21:12:46Z"
  },
  "runs": [
   {
@@ -426,6 +437,13 @@
    "finished": "2026-11-23T20:28:05Z",
    "run_id": "20261123T202804-b49fc5fa",
    "started": "2026-11-23T20:28:04Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 165,
+   "finished": "2026-11-23T21:12:46Z",
+   "run_id": "20261123T211246-25275159",
+   "started": "2026-11-23T21:12:46Z"
   }
  ],
  "schema": 1

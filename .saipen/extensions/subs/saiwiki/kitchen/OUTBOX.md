@@ -33,3 +33,18 @@
 - **instructions:** no integration required; producer stage satisfied for this crew epoch.
 - **details:**
   Version surface added in T-137 (VERSION, CHANGELOG.md, four README mirrors with v0.0.1 badge); wiki surfaces remain consistent with canonical source. No page content change required.
+
+## W-003: wiki mirror current for published 0.0.1 tree
+- **status:** ready
+- **summary:** Producer surface verified against the published 0.0.1 commit a37a6e4.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saiwiki
+- **source_head:** a37a6e46dc50f6cbafb0a1fc817f1185a5ce30bc
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:54a42475a124ab0f27e83d600a284a9cc54d9668029c4828cfc48512b031df13
+- **coverage:** owned locale/wiki surfaces scanned against published release tree; no drift.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS; release parity 0.0.1 OK.
+- **instructions:** no integration required; payload [] intentional. Producer stage satisfied for this crew epoch.
+- **details:** The published tree is the current source identity; no integration payload required.
