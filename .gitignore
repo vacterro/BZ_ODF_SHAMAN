@@ -15,8 +15,8 @@ export_credentials.cfg
 .saipen/cache/
 .saipen/kitchen/*
 !.saipen/kitchen/release_scope/
-!.saipen/kitchen/digest.md
-!.saipen/kitchen/release_receipt.json
+!.saipen/kitchen/*.json
+!.saipen/kitchen/*.md
 .saipen/recovery/ops/
 .saipen/recovery/settled-index/
 .saipen/recovery/board-terminal.json

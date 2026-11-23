@@ -1,0 +1,54 @@
+{
+  "op_id": "convergence-f9dacffb66d04402940a6fc4f2bdc21a",
+  "operation": "convergence_stage",
+  "created_at": "2026-11-23T21:36:36Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "2b64d6257f2fd246",
+  "preconditions": {
+    ".saipen/STATE.md": "f9dd42d1807fcfea",
+    ".saipen/LOG.md": "54f2fa450322bd7a"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "f9c6fa03202b0cf7",
+    ".saipen/logs": "tree-missing-v1",
+    ".": "source-identity-v1:2f0e796d787aa30907bd7bf62bd6bef7016f520ce137277a737b28bbe6569c5b"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "54f2fa450322bd7a",
+      "after_hash": "6e21cf40b0e0b695",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "f9dd42d1807fcfea",
+      "after_hash": "c3de3f51a2316df9",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "convergence_stage",
+    "status": "COMMITTED",
+    "stage": "G",
+    "verdict": "NOTHING_SAFE_REMAINED",
+    "source_head": "ccf566aef2ce3d46b7fb2a13e03852b21710b7ab",
+    "source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+    "detail": "canonical G terminal epoch",
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+    "input_source_head": "ccf566aef2ce3d46b7fb2a13e03852b21710b7ab",
+    "input_source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+    "resulting_source_head": "ccf566aef2ce3d46b7fb2a13e03852b21710b7ab",
+    "resulting_source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+    "event_id": "E-2413"
+  }
+}

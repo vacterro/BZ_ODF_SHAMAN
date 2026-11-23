@@ -1,0 +1,45 @@
+{
+  "blocking_findings": {
+    "problem_count": 1,
+    "problems": [
+      {
+        "category": null,
+        "credential": false,
+        "detail": "improve report [improve-report] -- .saipen\\improve\\imp-vacterro-bz_odf_shaman-20261123-1\\saipen-01\\saipen_improve_SAIPEN.md: source_head f0a75f8d38e681ec2e0a1e54961c916706ee0416 != current HEAD ccf566",
+        "detail_hash": "f56feb65aa3e8453",
+        "finding_key": "76b48f23558dce11",
+        "rule_id": "unclassified",
+        "severity": "problem",
+        "subject_id": null,
+        "subject_kind": "global",
+        "subject_ref": null
+      }
+    ],
+    "ruleset_fingerprint": "9a47d608ed3f3a833348aaeeca5cd9e9076f3bf53b1ef92b6ade46958e3e3fec",
+    "ruleset_version": 2,
+    "status": "complete",
+    "warning_count": 16
+  },
+  "board_hash": "a2444461714387d2",
+  "canonical_next_command": "saipen improve reconcile imp-vacterro-bz_odf_shaman-20261123-1",
+  "content_hash": "a301d3b5b46a969b",
+  "exit_code": 1,
+  "external_actions": [],
+  "gate": "core",
+  "install_fingerprint": "install-v1:fc71787b7989a4f283d3d5d72111dc5ebba824229d10fb52f73efc667e3dfaee",
+  "install_home": "C:\\Users\\vac34\\AppData\\Local\\saipen\\scheduled-source",
+  "kind": "conformance_receipt",
+  "log_hash": "896cd5091c7ee7f7",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "receipt_id": "receipt-ee66e36d167b",
+  "remediation_commands": [
+    "saipen improve reconcile imp-vacterro-bz_odf_shaman-20261123-1"
+  ],
+  "schema_version": 2,
+  "source_head": "ccf566aef2ce3d46b7fb2a13e03852b21710b7ab",
+  "source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+  "state_hash": "3ca880c6c95d87e3",
+  "timestamp_utc": "2026-11-23T21:31:39.079784Z",
+  "validator_protocol_version": "1",
+  "verdict": "FAIL"
+}

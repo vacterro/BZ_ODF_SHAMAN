@@ -1,0 +1,52 @@
+{
+  "op_id": "crew-run-d15c9410e2034739ae91bcf9b0ba37ad",
+  "operation": "crew_run",
+  "created_at": "2026-11-23T21:30:19Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "5d09449d4e8be0ee",
+  "preconditions": {
+    ".saipen/STATE.md": "b8416bb41a291194",
+    ".saipen/LOG.md": "dd3311637b84def3"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "e5243bf160f5ffb8",
+    ".saipen/logs": "tree-missing-v1"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "dd3311637b84def3",
+      "after_hash": "6bc1cdf1e80023d0",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "b8416bb41a291194",
+      "after_hash": "c4f58bcfb4085e46",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "crew_run",
+    "status": "COMMITTED",
+    "crew_epoch": "converge_intent-bb957af13a3a4275bb1e71b52012de9e",
+    "role": "saitest",
+    "source_head": "ccf566aef2ce3d46b7fb2a13e03852b21710b7ab",
+    "source_tree_fingerprint": "git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195",
+    "role_revision": "sha256:801fbfdc4be680d87b18cd21e6246d83fad5b474ebd7fe82efa83918cecf2f08",
+    "package_identities": [
+      "sha256:fa7cbb512dbdd0d1e4b75358de272dc21e1f66b4e6c60cbd2127ede0204eac95"
+    ],
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+    "event_id": "E-2338"
+  }
+}

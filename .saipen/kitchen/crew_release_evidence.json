@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "operation": "crew_finalize_evidence",
+  "crew_epoch": "converge_intent-659f2379105a4497b31b5702e415cd04",
+  "release_op_id": "release-6492e9bd3457491fb096426a783ff4dd",
+  "release_tag": "v0.0.1",
+  "closure_commit": "f0a75f8d38e681ec2e0a1e54961c916706ee0416",
+  "final_state": "normal/DONE",
+  "recorded_at": "2026-11-23T21:28:51Z",
+  "ticket_id": "T-183"
+}

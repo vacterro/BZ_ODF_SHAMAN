@@ -1,0 +1,10 @@
+{
+  "created_at": "2026-11-23T21:35:51Z",
+  "op_id": "converge_intent-f8866dc65ebd4a8aad80a4f7379057ac",
+  "operation": "crew_epoch",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "schema_version": 1,
+  "status": "COMMITTED",
+  "target": "crew",
+  "ticket_id": "T-198"
+}

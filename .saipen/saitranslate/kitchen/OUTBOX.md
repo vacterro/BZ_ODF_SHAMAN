@@ -91,3 +91,33 @@
 - **verified:** PASS -- saipen validate CURRENT_PASS.
 - **instructions:** no integration required; payload [] intentional.
 - **details:** Shipped tree verified; no payload.
+
+## TR-007: current tree producer surface
+- **status:** ready
+- **summary:** Producer surface verified against current bookkeeping tree.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saitranslate
+- **source_head:** ccf566aef2ce3d46b7fb2a13e03852b21710b7ab
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:7d18729f8d94eb58471ae3bb5fad9151e8499fea291e574b26439c5c89012e41
+- **coverage:** owned surface reviewed against current source.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No payload; producer stage satisfied.
+
+## TR-008: terminal epoch producer surface
+- **status:** ready
+- **summary:** Producer surface verified against terminal release tree.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saitranslate
+- **source_head:** ccf566aef2ce3d46b7fb2a13e03852b21710b7ab
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:7d18729f8d94eb58471ae3bb5fad9151e8499fea291e574b26439c5c89012e41
+- **coverage:** owned surface reviewed against terminal source.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No payload; producer stage satisfied.
