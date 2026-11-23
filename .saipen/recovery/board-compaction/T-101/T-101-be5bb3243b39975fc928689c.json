@@ -1,0 +1,20 @@
+{
+  "externalization_event": {
+    "event_id": "E-1360",
+    "operation_id": "finish-b9216ae2fc254dc4a28af9929f2b276c",
+    "reason": "existing/proposed oversized BOARD record requires canonical ticket completion update"
+  },
+  "lossless": true,
+  "metadata_path": ".saipen/recovery/board-compaction/T-101/T-101-be5bb3243b39975fc928689c.json",
+  "operation": "board_legacy_compaction",
+  "original_record_bytes": 1209,
+  "original_record_path": ".saipen/recovery/board-compaction/T-101/T-101-be5bb3243b39975fc928689c.BOARD.md",
+  "original_record_sha256": "be5bb3243b39975fc928689cc7a8a38c059d9ea3fdcbc3d55c460c057dd36c90",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "schema_version": 1,
+  "source": ".saipen/BOARD.md",
+  "status": "COMMITTED",
+  "supersedes_detail_ref": "",
+  "ticket_id": "T-101"
+}

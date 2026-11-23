@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-028:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Fix saitest W-007: recover_partial_save_group false RECOVERED on malformed/empty journal targets; validate journal targets before durable verdict"
+    }
+  },
+  "derived_at": "2026-11-23T04:31:31Z",
+  "derived_from": "SRC-028",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "4c66be19e768b09b6a1cee4bfaf762a30c8cc698b07192d252f488d58b66e762"
+}

@@ -1,0 +1,63 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 581.29 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3060
+
+T-81 Windowed GraphNode Port Verifier
+ERROR: Index p_port_idx = 0 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_position (scene/gui/graph_node.cpp:1151)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_position (scene/gui/graph_node.cpp:1114)
+ERROR: Index p_port_idx = 0 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_color (scene/gui/graph_node.cpp:1170)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_color (scene/gui/graph_node.cpp:1133)
+ERROR: Index p_port_idx = 0 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_type (scene/gui/graph_node.cpp:1161)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_type (scene/gui/graph_node.cpp:1124)
+ERROR: Index p_port_idx = 1 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_position (scene/gui/graph_node.cpp:1151)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_position (scene/gui/graph_node.cpp:1114)
+ERROR: Index p_port_idx = 1 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_color (scene/gui/graph_node.cpp:1170)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_color (scene/gui/graph_node.cpp:1133)
+ERROR: Index p_port_idx = 1 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_type (scene/gui/graph_node.cpp:1161)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_type (scene/gui/graph_node.cpp:1124)
+ERROR: Index p_port_idx = 2 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_position (scene/gui/graph_node.cpp:1151)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_position (scene/gui/graph_node.cpp:1114)
+ERROR: Index p_port_idx = 2 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_color (scene/gui/graph_node.cpp:1170)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_color (scene/gui/graph_node.cpp:1133)
+ERROR: Index p_port_idx = 2 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_type (scene/gui/graph_node.cpp:1161)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_type (scene/gui/graph_node.cpp:1124)
+ERROR: Index p_port_idx = 3 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_position (scene/gui/graph_node.cpp:1151)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_position (scene/gui/graph_node.cpp:1114)
+ERROR: Index p_port_idx = 3 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_color (scene/gui/graph_node.cpp:1170)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_color (scene/gui/graph_node.cpp:1133)
+ERROR: Index p_port_idx = 3 is out of bounds (right_port_cache.size() = 0).
+   at: get_output_port_type (scene/gui/graph_node.cpp:1161)
+ERROR: Index p_port_idx = 0 is out of bounds (left_port_cache.size() = 0).
+   at: get_input_port_type (scene/gui/graph_node.cpp:1124)
+  [port state] output=5 input=1 children=6 keys=6
+  ✓ WIN-PORT-01: three references + emitName + add port = 5 real outputs
+  ✓ WIN-PORT-02: one real input port
+  ✓ WIN-PORT-03: every mapped key has a real output
+  ✓ WIN-PORT-05: every real port maps to its child ODF reference
+  ✓ WIN-PORT-08: real port 0 maps to slot 1 and +ADD port to slot 5
+  ✓ WIN-PORT-06: GraphEdit edges resolve exact physical ports
+  ✓ WIN-PORT-07: +ADD uses real last output port 4 (got 4)
+
+T-81 Windowed Verifier: 7 checks, 0 failure(s)
+RESULT: PASS

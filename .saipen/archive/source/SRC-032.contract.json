@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-032:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Fix P0/P1 native cleanup reconciliation, durable intent state and Recovery confirmation contract regressions per 23.11 handoff; preserve T-122"
+    }
+  },
+  "derived_at": "2026-11-23T17:23:21Z",
+  "derived_from": "SRC-032",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "05c62588680d8a77daf6ad39ff70175a515feee92fc3876b7a19cc53bb78d04e"
+}

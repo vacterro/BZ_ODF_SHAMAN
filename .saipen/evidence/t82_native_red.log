@@ -1,0 +1,46 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-73 Wave C Native Safety Verifier (NC-08..12, SA-01..09, NM-11..16)
+  ✓ NC setup: launch started active monitoring in NativeSessionService
+  ✓ NC-08: ledger write failure returns ok=false and cancel_status=CANCELLATION_PERSIST_FAILED
+  ✓ NC-08: live monitor stays active & recoverable when ledger persist fails
+  ✓ NC-10: NativeSessionService does NOT silently abandon monitoring on ledger cancel failure
+  ✓ NC-08: GUI status snapshot exposes CANCELLATION_PERSIST_FAILED
+  ✓ NC-09: process_monitors.json failure returns ok=false and cancel_status=CANCELLATION_PERSIST_FAILED
+  ✓ NC-09/NC-10: NativeSessionService keeps monitoring active on monitor-persist failure
+  ✓ NC-09: failure & recoverable state visible in GUI snapshot
+  ✓ NC-11: restart after failed cancellation reconciles deterministically to RECOVERY_PENDING (no false CANCELLED)
+  ✓ NC-11: no false terminal success after failed cancel restart
+  ✓ NC-12: successful cancellation stops monitoring and commits durable CANCELLED
+  ✓ NC-12: cleanup succeeds safely after confirmed CANCELLED
+  ✓ SA-01: two STOCK_ADDON sessions derive distinct unique mission basenames (shaman_ef0389d7cc vs shaman_612b1d73d9)
+  ✓ SA-01: two sessions have distinct observation filenames
+  ✓ SA-02: two simultaneous STOCK_ADDON stages succeed and target their own mission BZN
+  ✓ SA-03: reusing active mission basename rejected with MISSION_NAME_COLLISION (got MISSION_NAME_COLLISION)
+  ✓ SA-04: STOCK_ADDON sessions isolate mount marker ODF filenames (shaman_mk_567c23d478.odf vs shaman_mk_57bfb5b9cd.odf)
+  ✓ SA-05: foreign addon ODF collision detected and blocks launch_eligible (got ADDON_FOREIGN_ODF_COLLISION)
+  ✓ SA-06: old SHAMAN stage ODF collision detected with safe resolution options
+  ✓ SA-07: unknown/foreign addon files completely untouched after scan and cleanup
+  ✓ SA-08: inspect_stock_bzone_cfg parses active stream & comments accurately (rejects addon-not-first in active stream)
+  ✓ SA-08: real stock BZ2R bzone.cfg resolves active_stream=base with @mydocsdir\addon first
+  ✓ SA-09: STOCK_ADDON preflight records active ModLoadout provenance cleanly
+  ✓ NM-11: ARM MANUAL OBSERVATION transitions staged session to MONITOR_ARMED with active polling
+  ✓ NM-11: arming does NOT falsely claim game launched or NATIVE_VERIFIED
+  ✓ NM-12: MONITOR_ARMED persists and resumes automatically across restart
+  ✓ NM-13: preexisting PID 1111 ignored while MONITOR_ARMED
+  ✓ NM-13: late verified battlezone2.exe process transitions MONITOR_ARMED -> GAME_PROCESS_VERIFIED
+  ✓ NM-14: session-specific Lua observation collected automatically after verified process + marker
+  ✓ NM-15: manual import reaches COMPARISON_COMPLETE with unattested=true and verified=false
+  ✓ NM-16: unverified PID enters GAME_PROCESS_CANDIDATE, not GAME_PROCESS_VERIFIED
+  ✓ NM-16: fake/unverified PID + observation NEVER produces NATIVE_VERIFIED (got COMPARISON_COMPLETE)
+  ✓ NATIVE-23/26: staged owned stage reports MATCH but cleanup refused
+  ✓ NATIVE-27: terminal owned stage with matching hashes is cleanup-eligible
+  ✓ NATIVE-25: hash mismatch prevents cleanup even for terminal stage
+  ✓ NSTAGE-04/06: hash mismatch protects stage and preserves evidence
+  ✗ FAIL: NSTAGE-02: ledger active state protects owned matching stage
+  ✓ NSTAGE-01/07: terminal owned stage eligible after ledger reconciliation
+  ✓ NSTAGE-03: missing manifest stage stays protected
+  ✗ FAIL: NSTAGE-05: corrupt ledger does not erase otherwise eligible owned stage
+
+T-73 Verifier: 40 checks, 2 failure(s)
+RESULT: FAIL

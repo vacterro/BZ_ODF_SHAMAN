@@ -1,0 +1,17 @@
+{
+  "op_id": "scope-75e55fd65569463ebf5cb751d7ab1404",
+  "paths": {
+    "scripts/core/odf_document.gd": "e3f5250d0d76886118b7753c03c307fcaeecb31d7d565a291304e7c2831d317d",
+    "scripts/core/workspace_store.gd": "3a3711edd24596553da03469f5be05134eca8ddd13760e38ab9953b47c593220",
+    "scripts/ui/main_window.gd": "86c90a4213a7e3738e02d4f2d3059d26ce3beee0de314ef83ae3118592022d80",
+    "tests/test_runner.gd": "7caf8b478ee4fc37f46a19c797ed3eac83353bcce9922d4611826f98f4cb4234",
+    "tests/ui_smoke.gd": "8306f278b6b0735e7e2d85974cca527f43131de7c0ae2961d1d9816db1f653ee"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T19:32:52Z",
+  "schema_version": 2,
+  "source_head": "83a8c8e9aa70c7c4b9eabd4252ea8777b227f4c6",
+  "source_tree_fingerprint": "git-delta-v1:061e2957e225263716dc400aeeddecaf0e4e5bfdade51ba690433f9a63b58bc4",
+  "ticket": "T-38"
+}

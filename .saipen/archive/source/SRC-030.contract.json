@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-030:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Mode 2 night shift: secure recovery journal trust boundary (bytes/hash, mixed targets, path ownership, restore-working after restart, recovery UI confirmation), native provenance receipts, mid-operation crash tests, then product work"
+    }
+  },
+  "derived_at": "2026-11-23T15:23:50Z",
+  "derived_from": "SRC-030",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "1ce66b26c4d04deace80d1edf7b00c669b3713ac58f122b668ceffe87c2974a9"
+}

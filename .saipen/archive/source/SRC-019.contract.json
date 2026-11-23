@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-019:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Autonomous night shift: repair Particle Graph atomic reconnect and link validation, preserve mid-flight weapon projectiles and fix slot identity/volley results, make replay incremental with honest step-limit status, harden ResourceIndex cache integrity, complete T-75 release verification, advance product labs"
+    }
+  },
+  "derived_at": "2026-11-22T17:30:37Z",
+  "derived_from": "SRC-019",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "f6c614ac32d142d98ad4f83fa511551d1fd77c24d9c196eb755e9f8fb4f83f21"
+}

@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-016:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-71 closed with verification evidence in LOG: verify -> PASS [target: T-71] conf: high -- Reconciled all 8 audit findings against live source HEAD 44cf3e3; baseline tools/run_tests.cmd PASS (0 failures); follow-up tickets T-72..T-75 registered.",
+      "text": "V:\\___VAC\\_PIC\\_Clipboard_stuff\\SAIHANDOFF-BZ_ODF_SHAMAN-9.md",
+      "verification": "the Work this request created reached its own verification gate; see the T-71 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-71"
+    }
+  },
+  "schema_version": 1
+}

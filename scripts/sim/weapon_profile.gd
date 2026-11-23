@@ -16,6 +16,14 @@ var target_path: String = ""
 
 var weapon_name: String = ""
 var weapon_hardpoint: String = ""
+## All resolvable weaponNameN slots on the shooter (T-76). Each entry is
+## {slot, weapon, path, hardpoint, hardpoints}. The active slot is selected by
+## resolve(..., p_slot_index); index 0 keeps the historical first-weapon default.
+var weapon_slots: Array[Dictionary] = []
+var active_slot_index: int = 0
+## Barrel firing policy for multi-hardpoint weapons: TANDEM fires every barrel
+## at once, SALVO cycles them on salvoDelay, SINGLE uses one barrel.
+var barrel_mode: String = "TANDEM"
 var ordnance_name: String = ""
 var shooter_geometry: String = ""
 var shooter_geometry_scale: float = 1.0
@@ -93,7 +101,8 @@ var captured_odf_revisions: Dictionary = {}
 
 
 func resolve(p_index: ResourceIndex, p_shooter_path: String, p_target_path: String,
-		p_weapon_override: String = "", p_resolve_alt: bool = true) -> bool:
+		p_weapon_override: String = "", p_resolve_alt: bool = true,
+		p_slot_index: int = 0, p_barrel_mode: String = "") -> bool:
 	index = p_index
 	errors.clear()
 	notes.clear()
@@ -106,6 +115,10 @@ func resolve(p_index: ResourceIndex, p_shooter_path: String, p_target_path: Stri
 		errors.append("Shooter ODF could not be loaded: " + shooter_path)
 		return false
 	_read_target()
+	active_slot_index = maxi(0, p_slot_index)
+	barrel_mode = p_barrel_mode.strip_edges().to_upper() if p_barrel_mode.strip_edges() != "" else "TANDEM"
+	if barrel_mode not in ["TANDEM", "SALVO", "SINGLE"]:
+		barrel_mode = "TANDEM"
 	if not _resolve_weapon_chain(p_weapon_override):
 		return false
 	refresh()
@@ -153,17 +166,44 @@ func _resolve_weapon_chain(weapon_override: String = "") -> bool:
 				break
 	else:
 		# weaponName1..N live under GameObjectClass (variants may put them elsewhere).
+		# T-76: enumerate every resolvable slot; the operator can switch between
+		# them instead of being locked to the first one (AT Stab / minigun / mortar).
+		weapon_slots.clear()
+		var slot_entries: Array[Dictionary] = []
 		for e in shooter_doc.effective_entries():
 			var k: String = str(e.key_raw).to_lower()
-			if k.begins_with("weaponname"):
-				var candidate: String = e.core_value()
-				if candidate != "":
-					var hit := index.resolve_path_from(candidate, shooter_path)
-					if hit != "":
-						weapon_name = candidate
-						weapon_path = hit
-						weapon_hardpoint = str(hards.get(k.trim_prefix("weaponname"), ""))
-						break
+			if not k.begins_with("weaponname"):
+				continue
+			var candidate: String = e.core_value()
+			if candidate == "":
+				continue
+			var hit := index.resolve_path_from(candidate, shooter_path)
+			if hit == "":
+				continue
+			var slot := k.trim_prefix("weaponname")
+			var hps: Array[String] = []
+			var hp := str(hards.get(slot, ""))
+			if hp != "":
+				hps.append(hp)
+			slot_entries.append({
+				"slot": slot,
+				"weapon": candidate,
+				"path": hit,
+				"hardpoint": hp,
+				"hardpoints": hps,
+			})
+		slot_entries.sort_custom(func(a, b): return str(a.slot).to_int() < str(b.slot).to_int())
+		for i in range(slot_entries.size()):
+			slot_entries[i]["resolved_index"] = i
+		weapon_slots = slot_entries.duplicate(true)
+		if weapon_slots.is_empty():
+			errors.append("Shooter ODF declares no resolvable weaponNameN.")
+			return false
+		active_slot_index = clampi(active_slot_index, 0, weapon_slots.size() - 1)
+		var chosen: Dictionary = weapon_slots[active_slot_index]
+		weapon_name = str(chosen.get("weapon", ""))
+		weapon_path = str(chosen.get("path", ""))
+		weapon_hardpoint = str(chosen.get("hardpoint", ""))
 	if weapon_hardpoint == "":
 		var chain := OdfInheritance.chain(shooter_doc, index)
 		for idx_c in range(1, chain.size()):
@@ -184,7 +224,10 @@ func _resolve_weapon_chain(weapon_override: String = "") -> bool:
 	if weapon_doc == null:
 		errors.append("Weapon ODF could not be loaded: " + weapon_path)
 		return false
-	# Collect matching weaponHardN / recoilNameN for multi-hardpoint weapons (e.g. Titan dual garc_c).
+	# Collect matching weaponHardN / recoilNameN for multi-hardpoint weapons
+	# (e.g. Titan dual garc_c, ivtank dual minigun barrels). When the active
+	# slot is known, prefer ONLY that slot's barrels so switching to minigun
+	# does not also fire the AT Stab barrel (T-76).
 	weapon_hardpoints.clear()
 	recoil_node_name = ""
 	var recoils := {}
@@ -192,15 +235,22 @@ func _resolve_weapon_chain(weapon_override: String = "") -> bool:
 		var k := str(e.key_raw).to_lower()
 		if k.begins_with("recoilname"):
 			recoils[k.trim_prefix("recoilname")] = e.core_value()
+	# A weapon may occupy several consecutive slots with the SAME name (Titan
+	# garc_c in slots 1/2, ivtank minigun in slots 2/3). All such barrels belong
+	# to that one weapon and must fire together in TANDEM mode. Slots naming a
+	# DIFFERENT weapon are excluded so switching to minigun never fires AT Stab.
 	for e in shooter_doc.effective_entries():
 		var k := str(e.key_raw).to_lower()
-		if k.begins_with("weaponname") and str(e.core_value()).to_lower() == weapon_name.to_lower():
-			var slot := k.trim_prefix("weaponname")
-			var hp := str(hards.get(slot, ""))
-			if hp != "" and not weapon_hardpoints.has(hp):
-				weapon_hardpoints.append(hp)
-			if recoil_node_name == "" and recoils.has(slot):
-				recoil_node_name = str(recoils[slot])
+		if not k.begins_with("weaponname"):
+			continue
+		var slot := k.trim_prefix("weaponname")
+		if str(e.core_value()).to_lower() != weapon_name.to_lower():
+			continue
+		var hp := str(hards.get(slot, ""))
+		if hp != "" and not weapon_hardpoints.has(hp):
+			weapon_hardpoints.append(hp)
+		if recoil_node_name == "" and recoils.has(slot):
+			recoil_node_name = str(recoils[slot])
 	if weapon_hardpoints.is_empty() and weapon_hardpoint != "":
 		weapon_hardpoints.append(weapon_hardpoint)
 
@@ -537,6 +587,10 @@ func snapshot_params() -> Dictionary:
 		"target_path": target_path,
 		"weapon_name": weapon_name,
 		"weapon_hardpoint": weapon_hardpoint,
+		"weapon_slots": weapon_slots.duplicate(true),
+		"active_slot_index": active_slot_index,
+		"barrel_mode": barrel_mode,
+		"weapon_hardpoints": weapon_hardpoints.duplicate(),
 		"ordnance_name": ordnance_name,
 		"weapon_header": weapon_header,
 		"ordnance_header": ordnance_header,
@@ -596,6 +650,17 @@ static func from_snapshot(snap: Dictionary) -> WeaponProfile:
 	p.target_path = str(snap.get("target_path", ""))
 	p.weapon_name = str(snap.get("weapon_name", ""))
 	p.weapon_hardpoint = str(snap.get("weapon_hardpoint", ""))
+	var slots_snap = snap.get("weapon_slots", [])
+	if slots_snap is Array:
+		for s in slots_snap:
+			if s is Dictionary:
+				p.weapon_slots.append((s as Dictionary).duplicate(true))
+	p.active_slot_index = int(snap.get("active_slot_index", 0))
+	p.barrel_mode = str(snap.get("barrel_mode", "TANDEM"))
+	var hps_snap = snap.get("weapon_hardpoints", [])
+	if hps_snap is Array:
+		for hp_snap in hps_snap:
+			p.weapon_hardpoints.append(str(hp_snap))
 	p.ordnance_name = str(snap.get("ordnance_name", ""))
 	p.weapon_header = str(snap.get("weapon_header", ""))
 	p.ordnance_header = str(snap.get("ordnance_header", "OrdnanceClass"))

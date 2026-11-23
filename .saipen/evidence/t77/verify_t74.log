@@ -1,0 +1,29 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-74 Wave E Visual Animation, Multi-Shot Soak & ResourceIndex Cache Verifier
+  ✓ ANIM-01: BzMeshReader exposes apply_animation_pose()
+  ✓ ANIM-02: Scion fvtank_skel.msh loads cleanly and decodes 7 embedded DOCB clips
+  ✓ ANIM-03: ivturr00.msh decodes 'deploy' clip and exposes hp_gun_1 hardpoint
+  ✓ ANIM-04: playing ivturr00.msh 'deploy' animates hp_gun_1 world origin by 2.051m
+  ✓ ANIM-05: projectile spawned during 'deploy' originates at live animated hp_gun_1 position
+  ✓ ANIM-06: ibnav00.msh 'loop' clip rotates spinner node smoothly (delta=3.04 rad)
+  ✓ SOAK-01: 1-min (3600-frame) moving-target run compressed 3589 redundant transforms -> 17 timeline events
+  ✓ SOAK-02: compressed 1-min moving-target snapshot replays identically (orig=5000.0 rep=5000.0)
+  ✓ SOAK-03: CombatScenario.compare_replay_results compares two replay outcomes cleanly
+  ✓ IDX-01: ResourceIndex exposes persistent fingerprint cache & provenance_summary APIs
+  ✓ IDX-13: default index cache path is inside the active workspace (C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/verify_t74_2743010/ws_cache/resource_index_cache.json)
+  ✓ IDX-14: default cache write lands inside workspace
+  ✓ IDX-02: save_index_cache writes SHA256 fingerprint-validated cache
+  ✓ IDX-03: load_index_cache hits cleanly on unchanged roots/loadout (2 ODFs)
+  ✓ IDX-09: ResourceIndex exposes scan_or_load_cache entry point
+  ✓ IDX-10: MainWindow background index worker uses the persistent cache path
+  ✓ IDX-11: cached build reuses a valid cache without rescanning
+  ✓ IDX-12: cached build scans and persists when no valid cache exists
+  ✓ IDX-04: switching Workshop package immediately updates provenance_summary (2000001 -> 2000002) with alternatives
+  ✓ IDX-05: cache invalidates when active ModLoadout changes
+  ✓ IDX-06: cache invalidates when a source ODF is added
+  ✓ IDX-07: cache invalidates when an ODF file is removed
+  ✓ IDX-08: cache invalidates when WorkspaceStore overrides change
+
+T-74 Verifier: 23 checks, 0 failure(s)
+RESULT: PASS

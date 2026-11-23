@@ -22,5 +22,6 @@
 ## TODO
 
 ## DONE
+- [x] HUNT-001 HUNT sweep clean
 
 ## BLOCKED

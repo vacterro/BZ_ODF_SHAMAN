@@ -1,0 +1,15 @@
+{
+  "op_id": "scope-6104b27e60164061b5b37366a35cae94",
+  "paths": {
+    "tests/verify_t121_crash_phases.gd": "a19650b57e9f77e1aaf36296ab15c0e07e534b32674c41f1243219d1fafd1e03",
+    "tests/verify_t121_crash_phases.gd.uid": "37065ad2bfce0cf5d6fe580168e76820e71ba8cb1fe88a1f6bf296375c08d3fb",
+    "tests/verify_t121_journal_trust.gd": "c1b786e1b5768d82b621b4d4af58ddce37bd31f0bc20e8f53ef39aeea7ec4970"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-23T20:30:09Z",
+  "schema_version": 2,
+  "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+  "source_tree_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22",
+  "ticket": "T-142"
+}

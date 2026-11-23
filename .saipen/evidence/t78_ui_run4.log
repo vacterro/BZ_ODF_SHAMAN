@@ -1,0 +1,291 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+BZ_ODF_SHAMAN UI smoke test
+  ✓ resource index built: 17028 ODFs
+  ✓ a document auto-opened
+  ✓ weapon lab scenario resolved
+  ✓ VSR weapon resolved: gatstabvsr_c
+  ✓ T-76: weapon-slot picker populated
+  ✓ T-76: profile exposes 1 weapon slot(s)
+  ✓ T-76: barrel-mode selector has TANDEM/SALVO/SINGLE
+  ✓ authentic BZCC shooter 3D model loaded
+  ✓ authentic BZCC target 3D model loaded
+  ✓ authentic hp_cannon_1 hardpoint bound
+  ✓ turret yaw moves projectile spawn origin
+  ✓ turret yaw updates projectile launch direction
+  ✓ reload does not create duplicate shooter scene objects
+  ✓ shotSpeed present: 120.0
+  ✓ damage derived: 100.0 (armor H)
+  ✓ FIRE ALT control present
+  ✓ alternate weapon resolved
+  ✓ alternate shot fired in UI
+  ✓ telemetry: weapon activated
+  ✓ telemetry: impact or expiry recorded
+  ✓ telemetry: damage or expiry recorded
+  ✓ FX toggle control present
+  ✓ impact spawned an explosion effect
+  ✓ effect node is in the 3D scene
+  ✓ telemetry records the explosion ODF and emitter count
+  ✓ restart clears explosion effects
+  ✓ edited explosion burst spawned
+  ✓ V5: live startColor edit visible in Weapons Lab shot
+  ✓ V5: undo restores previous explosion effect color
+  ✓ damageValue(H) located or appended in ordnance ODF
+  ✓ edited damage applied by simulation (200.00)
+  ✓ editing never modified the original game file
+  ✓ undo propagated to the next simulated shot (100.00)
+  ✓ redo propagated to the next simulated shot (200.00)
+  ✓ edit propagation keeps the raw editor showing the applied value
+  ✓ edit propagation rebuilds the structured inspector
+  ✓ edit propagation refreshes dependencies
+  ✓ edit propagation keeps the weapon profile on the current revision
+  ✓ staged export file written
+  ✓ exported ODF contains the edit
+  ✓ save-all saved the edited document(s)
+  ✓ save-all wrote the workspace file
+  ✓ save-all cleared the dirty flag
+  ✓ saved document bytes equal the current working revision
+  ✓ smoke workspace is the isolated test root
+  ✓ saved file stays inside the test root
+  ✓ sweep offers a damageValue property for the target armor
+  ✓ parameter sweep produced 5 rows
+  ✓ sweep baseline uses the live 200 damage edit
+  ✓ sweep top point applies 250 damage
+  ✓ sweep results rendered in the UI
+  ✓ sweep rolled back: edit still reads 200
+  ✓ sweep CSV saved to workspace
+  ✓ sweep CSV header present
+  ✓ Audio Lab lists inherited weapon sound references
+  ✓ particle graph populated from real render ODF
+  ✓ found an unused render link to create
+  ✓ graph connection persisted as a real ODF reference
+  ✓ particle and audio labs share the live document revision
+  ✓ graph edit marks the document dirty
+  ✓ connect+disconnect restores byte-exact ODF
+  ✓ graph edit saved to the workspace
+  ✓ graph link restored after save + cache clear
+  ✓ graph duplicate created a real header: Core_copy
+  ✓ duplicate header has editable property lines
+  ✓ graph delete removed the duplicate header
+  ✓ graph undo restored the deleted header
+  ✓ graph redo removed it again
+  ✓ T-76: persisted link found on Core (renderName1)
+  ✓ T-76: COPY link copied the focused edge
+  ✓ T-76: CUT removed a real ODF reference
+  ✓ T-76: UNDO restored the cut link
+  ✓ T-76: PASTE completed without error
+  ✓ cycle detection sees the existing Core -> Shock edge
+  ✓ graph layout saved in the workspace
+  ✓ graph layout restored after reload
+  ✓ GRAPH-18: self-link refused with byte-exact rollback
+  ✓ GRAPH-13: invalid destination preserves original bytes
+  ✓ GRAPH-14/19: indirect cycle reconnection refused
+  ✓ GRAPH-20: default move refuses an occupied slot
+  ✓ GRAPH-22: explicit swap preserves both links
+  ✓ GRAPH-17: valid reconnect commits one revision
+  ✓ GRAPH-16: undo restores exact reference
+  ✓ GRAPH-16: redo reapplies exact reference
+  ✓ GRAPH-15: stale edge focus is ignored after document revision change
+  ✓ GRAPH-EDGE: commands act on selected edge only
+  ✓ GRAPH-HOTKEY: Ctrl+C while a LineEdit has focus is not captured
+  ✓ external file.header references become graph nodes
+  ✓ external node resolves to a real indexed file
+  ✓ external node offers an OPEN control
+  ✓ OPEN navigates to the referenced file
+  ✓ duplicate occurrences are labelled as a merged effective view
+  ✓ NEW NODE created a real render header
+  ✓ created node uses a documented renderBase value
+  ✓ RENAME renamed the render header
+  ✓ renamed header replaces the old name
+  ✓ rename is undoable
+  ✓ raw editor populated
+  ✓ schema registry loaded: 1490 properties
+  ✓ Wintage theme applied
+  ✓ manual rescan rebuilt the index (17028 ODFs)
+  ✓ workspace overrides restored after cache clear
+  ✓ saved damage 200 restored into the editor
+  ✓ restored document shows OVERRIDE state
+  ✓ settings stay inside the test root
+  ✓ saved-revision test found the damage entry
+  ✓ edit saved before export
+  ✓ export after save writes the saved 250 bytes
+  ✓ export report write is confirmed before success is announced
+  ✓ export report records the exported file hash
+  ✓ two exports in the same second get distinct stage directories
+  ✓ second edit saved
+  ✓ second export uses the newer saved revision
+  ✓ restart serves the last saved edit (275)
+  ✓ original game ODF has no saved override content
+  ✓ original game ODF is unchanged since the save
+  ✓ P1-07: multi-selection tracks 2 render nodes
+  ✓ P1-07: duplicate_selected_subgraph created 2 linked headers
+  ✓ P1-07: duplicated subgraph remapped internal emitName edge
+  ✓ P1-07: compound undo removed entire duplicated subgraph in one step
+  ✓ P1-07: copy_selected_nodes captured header
+  ✓ P1-07: paste_nodes created cloned header
+  ✓ P1-07: node search filter matched ChildFlame
+  ✓ P1-07: emitter preset created documented draw_twirl header
+  ✓ P1-07: quick inspector edited lifeTime
+  ✓ P1-07: quick inspector edit persisted on shared OdfDocument
+  ✓ V8: cross-file save_with_external_dependencies saved parent and external render ODFs
+  ✓ T-27 UI: Particle Lab SAVE DEPENDENCIES button present
+  ✓ T-27 V7: cross-file external edit refreshed Particle Lab live preview
+  ✓ T-27 V7: live Particle Lab emitter reflects edited external startColor
+  ✓ T-27 V8: SAVE DEPENDENCIES badge tracks dirty external dependency
+  ✓ T-27 V8: clicking SAVE DEPENDENCIES saved dirty dependencies and cleared dirty state
+  ✓ T-27 V8: original external ODF untouched on disk
+  ✓ 3D Lab: hardpoint picker populated from .msh
+  ✓ 3D Lab: hardpoint picker switches active hardpoint
+  ✓ 3D Lab: bounding-box overlay mesh rendered
+  ✓ 3D Lab: baseline shot snapshot captured
+  ✓ 3D Lab: before/after shot comparison succeeded
+  ✓ V9: synchronized audiovisual timeline recorded weapon activation + audio/impact events
+  ✓ T-26 UI: all 5 split native controls (PREFLIGHT/STAGE/LAUNCH/COLLECT/CLEANUP) present
+  ✓ T-26 UI: PREFLIGHT created active durable session
+  ✓ T-26 UI: STAGE materialized isolated native stage
+  ✗ T-26 UI: LAUNCH / HANDOFF prepared workflow cleanly
+  ✓ T-26 UI: COLLECT reports OBSERVATION_ARTIFACT_MISSING before game run
+  ✓ T-26 UI: CLEANUP safely cleaned staged files
+  ✓ T-27 UI: 5 camera presets available
+  ✓ T-27 UI: muzzle camera preset applied
+  ✓ T-27 UI: camera preset moved 3D camera
+  ✓ T-27 UI: top and overview camera presets applied
+  ✓ T-27 UI: target transform offset and yaw applied
+  ✓ T-27 UI: obstacle added to 3D scene
+  ✓ T-27 UI: 3D obstacle intercepted shot and protected target hull
+  ✓ T-27 UI: clear_obstacles removed obstacle
+  ✓ T-27 UI: secondary target took independent damage while primary stayed untouched
+  ✓ T-27 UI: interactive Timeline panel controls present
+  ✓ T-27 V9: bounded multichannel audio pool initialized to 8 channels
+  ✓ T-27 V9: audio pool remains strictly bounded at 8 after 12 rapid plays
+  ✓ T-27 UI: Timeline filter('audio') returned SFX events
+  ✓ T-27 UI: Timeline scrub_timeline_to(0.0) selected event
+  ✓ T-27 UI: select_timeline_event emitted selection cleanly
+  ✓ T-29 UI: Weapons Lab numeric controls use HoudiniScrubber
+  ✓ T-29 UI: Particle Lab speed uses HoudiniScrubber
+  ✓ T-29 UI: all horizontal and vertical splitters have visible draggers
+  ✓ T-29 UI: crisp 2D HUD mesh labels rendered above Shooter A and Target B
+  ✓ T-29 UI: Stock/VSR/VRV/Mods collection and category filters present
+  ✓ T-29 UI: Pick A (Shooter), Pick B (Target), and Swap A/B controls present
+  ✓ T-29 UI: No-AA crisp font active by default with top-bar selector
+  ✓ T-29 UI: UI scale control updates scale factor
+  ✓ T-29 UI: master audio volume control updates AudioServer bus
+  ✓ T-30 UI: main window uses embedded Verdana_m1 at 12px default
+  ✓ T-30 UI: Weapons Lab E2E combat chain bar (A -> Wpn -> Ord -> Xpl | B) present
+  ✓ T-30 UI: Weapons Lab bottom workbench consolidated into 5 focused tabs
+  ✓ T-30 UI: clicking E2E chain Ordnance button opens atstabvsr_c.odf in Right Inspector
+  ✓ T-30 UI: Right Inspector displays E2E chain breadcrumb navigation strip
+  ✓ T-30 UI: Inspector property filter and Explorer Send to Lab action present
+  ✓ T-30 UI: 1-click [+ Override] promotes inherited property into local ODF
+  ✓ T-31 UI: Reset All, Reset UI, and Reset ODF buttons present
+  ✓ T-31 UI: Weapons Lab Reset A/B, Reset Aim, and Reset Scene buttons present
+  ✓ T-31 UI: Particle Lab RESET ODF and RESET VIEW buttons present
+  ✓ T-31 P0-01 UI: distinct LAUNCH BZCC, MANUAL STEAM HANDOFF, and COMPARE controls present
+  ✓ T-31 P1-08 UI: Loadout selector active with VSR 3532748119 package
+  ✓ T-31 UI: Weapons Lab chain buttons display in-game names (Tank / Scavenger)
+  ✓ T-31 UI: 125% UI scale selects 15px 1bpp Verdana_m1 strike at 1:1 native pixels
+  ✓ T-31 UI: 85% UI scale selects 10px 1bpp Verdana_m1 strike at 1:1 native pixels
+  ✓ T-31 UI: Reset UI restores 12px 100% Golden Default
+  ✓ T-31 UI: per-property Reset restores factory default value
+  ✓ T-31 UI: per-property Reset removes local override and reverts to inherited parent value
+  ✓ T-31 UI: Particle Lab auto-configures context effects from active ODF/chain
+  ✓ T-31 UI: clicking NEW NODE immediately creates render node and populates Quick Render Inspector
+  ✓ T-31 UI: Particle Lab RESET ODF restores factory render headers
+  ✓ T-31 P1-05: forced failure on 2nd file reports PARTIAL_SAVE_RECOVERABLE
+  ✓ T-31 P1-05: recover_partial_save_group restored pre-save revision cleanly
+  ✓ T-31 P1-06: HoudiniScrubber preserves exact high-precision ODF representation
+  ✓ T-31 H-01: physical MMB press opens Houdini Value Ladder overlay
+  ✓ T-31 H-02/H-03: physical mouse motion selects sensitivity rung and scrubs value
+  ✓ T-31 H-04: physical MMB release outside control closes Value Ladder
+  ✓ T-31 UI: RMB on HoudiniScrubber resets value to default (0.0)
+  ✓ RST-01: Reset All requires explicit confirmation before mutating
+  ✓ RST-03: Reset All impact preview enumerates A (saved), B (dirty), and C (other package)
+  ✓ RST-02: Cancel Reset All preserves A, B, and C unchanged
+  ✓ RST-06: Reset current ODF restores B to factory 120
+  ✓ RST-06: Reset current ODF leaves A and C untouched
+  ✓ RST-08: deduplicated reset report accurately reports requested=2, succeeded=1, failed=1
+  ✓ RST-14 UI: confirmed Reset All creates durable recovery point
+  ✓ RST-01/13 UI: confirmed Reset All restores A, B, and C to factory defaults
+  ✓ RST-07: Particle Lab RESET ODF resets A only; external B and C remain unchanged
+  ✓ RST-07: Particle Lab RESET DEPENDENCY GRAPH requires explicit confirmation
+  ✓ RST-07: confirmed RESET DEPENDENCY GRAPH restores B and C with recovery point
+  ✓ RST-10: first reset uses original factory value 10
+  ✓ RST-10: second reset after external source change invalidates cache and uses 42
+  ✓ RST-11 UI: Particle Lab Reset Node restores factory header, removes customValue, keeps [Keep]
+  ✓ RST-12 setup: switched active loadout to VRV 3820486276
+  ✓ RST-12: Reset UI restores Golden Default, scale, and volume
+  ✓ RST-12: Reset UI preserves active mod loadout 3820486276
+  ✓ RST-12: explicit Reset Mod Loadout restores VSR 3532748119
+  ✓ T-36 UI: Live-Swap selector includes Off/Object A/Object B/Weapon/Auto
+  ✓ T-36 UI: Weapons Lab has rigid StaticBody3D floor
+  ✓ T-36 UI: Particle Lab has rigid StaticBody3D floor
+  ✓ T-36 UI: Particle Lab exposes >=10 ready emitter presets
+  ✓ T-36 UI: Titan fire_once spawns live world-space BoltBeamNode lightning
+  ✓ T-36 UI: Titan lightning persists in effect_root after hitscan shot completes
+  ✓ T-36 UI: Titan fire_alt (garc_a Arc Stream) spawns BoltBeamNode
+  ✓ T-36 UI: Live-Swap Weapon mode swaps active weapon on Object A to garc_a
+  ✓ T-36 UI: Moving Target wiggle mode active
+  ✓ T-36 UI: wiggling Moving Target updates 3D position live
+  ✓ T-36 UI: Shooter Aim mode switches to Lead Target
+  ✓ T-36 UI: Sandbox Wall, Terrain Ramp, and Pillar create rigid StaticBody3D props
+  ✓ T-36 UI: Reset Scene clears sandbox props and restores manual aim
+  ✓ T-36 UI: Particle Lab Texture Browser indexes >=20 real BZCC FX textures (120)
+  ✓ T-36 UI: Particle Lab emitter inspection computes rate and cost tier
+  ✓ T-36 UI: Particle Lab Mute toggle mutes emitter
+  ✓ T-36 UI: Particle Lab Solo toggle isolates emitter
+  ✓ T-36 UI: open_texture_browser populates >=20 visual texture items
+  ✓ T-36 UI: RMB on HoudiniScrubber slider resets value to default (50.0)
+  ✓ T-36 UI: RMB on WeaponLab distance_slider resets range to default (120 m)
+  ✓ T-34 UI: save_loadout_profile persisted ModLoadout JSON
+  ✓ T-34 UI: list_loadout_profiles lists saved ModLoadout profile
+  ✓ T-34 UI: load_loadout_profile restores multi-package priority [3532748119, 3820486276]
+  ✓ T-34 UI: save_camera_bookmark persists camera state
+  ✓ T-34 UI: save_scene_preset persists sandbox actors, motion, aim, and props
+  ✓ T-34 UI: scene reset cleared obstacles before reload
+  ✓ T-34 UI: load_scene_preset restores Wall+Ramp obstacles, orbit motion, and track aim
+  ✓ T-34 UI: apply_camera_bookmark restores saved camera view
+  ✓ T-38 UI: request_reset_current_doc binds confirmation snapshot & nonce
+  ✓ T-38 UI / RST-15: confirmed single Reset restores factory 100
+  ✓ VIS-11: Recovery History UI button & dialog present
+  ✓ VIS-11: Recovery History UI lists single-document recovery point (11)
+  ✓ VIS-11 / Demo A UI: Recovery History restore recovers unsaved 250 directly into open Inspector/editor
+  ✓ RST-21 setup: Reset All confirmation captured snapshot
+  ✓ RST-21: stale Reset All confirmation rejected with IMPACT_CHANGED_RECONFIRM_REQUIRED
+  ✓ RST-21: renewed confirmation remains pending after impact drift
+  ✓ RST-21: zero files mutated when confirmation snapshot drifted
+  ✓ RST-22: reset_project_configuration_to_default(include_workspace=true) requires confirmation first
+  ✓ RST-22: UI theme and mod loadout NOT mutated before confirmation
+  ✓ RST-22: cancelled project configuration reset leaves UI, loadout, and ODFs unmutated
+  ✓ RST-22: confirmed project config reset resets UI, loadout, and workspace in one transaction
+  ✓ RST-22: confirmed transaction restored ODFs to factory defaults
+  ✓ ML-06: Stock Only loadout enables strict empty active_packages filter
+  ✓ ML-06: Stock Only loadout strictly blocks disabled VSR ODF (ivtank_vsr.odf)
+  ✓ ML-06: Stock Only resolve_ex reports MISSING_OR_DISABLED_RESOURCE for disabled VSR file
+  ✓ ML-06: Stock Only loadout still resolves base game ivtank.odf
+  ✓ ML-06: switching back to VSR 3532748119 restores VSR resolution and refreshes Weapons Lab
+  ✓ T-41 UI: live parameter inspection reports actual particle nodes
+  ✓ T-41 UI: live radius curve point count inspected
+  ✓ NM-01 UI: MainWindow owns application-level NativeSessionService
+  ✓ NM-01 UI: WeaponLab shares MainWindow NativeSessionService
+  ✓ NM-01/NM-11 UI: Native monitor strip, Cancel/Resume, and ARM MANUAL OBSERVATION controls exist
+  ✓ Wave D/E UI: 3D Combat Actor HUD exposes Target Shield bar and Shooter Ammo/Energy label
+  ✓ Wave F/E UI: Combat-State Timeline, Live Actor Inspector & A/B Replay Compare controls exist
+  ✓ Wave E UI: DOCB .msh Animation selector/Play button and multi-shot trajectory overlay exist
+  ✓ Wave B UI: Native launch mode selector (STOCK_ADDON / CUSTOM_CONFIG) exists
+  ✓ NM-01 UI: automatic non-blocking polling started after launch
+  ✓ NM-02 UI: switching to Particle Lab does NOT interrupt NativeSessionService monitoring
+  ✓ NC-01 UI: active cleanup rejected with ACTIVE_EXPERIMENT_CANNOT_CLEANUP
+  ✓ NC-02 UI: rejected cleanup leaves automatic monitoring active
+  ✓ NM-09 UI: cancel monitor stops automatic polling cleanly
+  ✓ NC-04 UI: cleanup after cancel succeeds cleanly
+  ✓ CB-01/CB-02 UI: fire_once sets shooter reload_remaining > 0 (2.00s)
+  ✓ CB-06 UI: immediate second fire rejected while reloading
+  ✓ CB-03 UI: pause freezes reload cooldown
+  ✓ CB-04 UI: single-step advances shooter reload via CombatScenario.advance()
+  ✓ CB-04/CB-05 UI: single-step advances DoT damage on primary target
+  ✓ Wave F UI: Actor Inspector populates shooter + target rows live
+  ✓ Wave F UI: capture_replay_snapshot stores immutable snapshot
+  ✓ Wave F / RP-08 UI: sandboxed replay runs cleanly without destroying active scenario
+UI smoke: 1 failure(s)
+FAIL: T-26 UI: LAUNCH / HANDOFF prepared workflow cleanly
+RESULT: FAIL

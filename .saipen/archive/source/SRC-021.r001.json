@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-021:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "MODE 2 autonomous night shift: repair graph edge identity, hardpoint/SALVO/volley correctness, replay status honesty, advance T-75 native/AUDAPACK, docs and product work"
+    }
+  },
+  "derived_at": "2026-11-22T20:42:35Z",
+  "derived_from": "SRC-021",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "60a7d0f9dddd21798d90f023dd29981a65f6afcd8671a3947bb8c48433c5d673"
+}

@@ -22,5 +22,6 @@
 ## TODO
 
 ## DONE
+- [x] W-001 canonical wiki mirror complete
 
 ## BLOCKED

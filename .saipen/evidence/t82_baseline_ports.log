@@ -1,0 +1,41 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-82 GraphEdit Output-Port Identity Verifier
+  ✓ PORT-00: EmitterA GraphNode exists
+  ✓ PORT-04: one direct child Control per slot (6=6)
+  ✓ PORT-06: every slot backed by a direct child Control
+  ✓ PORT-11: five real output ports (got 5)
+  ✓ PORT-12: output port 0 -> emitName (got emitName)
+  ✓ PORT-12: output port 1 -> renderName1 (got renderName1)
+  ✓ PORT-12: output port 2 -> renderName2 (got renderName2)
+  ✓ PORT-12: output port 3 -> renderName3 (got renderName3)
+  ✓ PORT-12: output port 4 -> @add:renderName4 (got @add:renderName4)
+  ✓ PORT-13: emitName uses real output port 0 (got 0)
+  ✓ PORT-15: parallel references own distinct ordered ports
+  ✓ PORT-17: edge from valid physical port 0 (emitName)
+  ✓ PORT-18: edge identity resolves to emitName
+  ✓ PORT-17: edge from valid physical port 1 (renderName1)
+  ✓ PORT-18: edge identity resolves to renderName1
+  ✓ PORT-17: edge from valid physical port 2 (renderName2)
+  ✓ PORT-18: edge identity resolves to renderName2
+  ✓ PORT-17: edge from valid physical port 3 (renderName3)
+  ✓ PORT-18: edge identity resolves to renderName3
+  ✓ PORT-10: four GraphEdit connections from EmitterA (got 4)
+  ✓ HILITE-01: only renderName2 port 2 highlighted (active=[2])
+  ✓ DRAG-01: occupied port drag leaves ODF byte-exact
+  ✓ DRAG-02: occupied port selects its own physical key
+  ✓ DRAG-03: +ADD uses real last output port 4 (got 4)
+  ✓ DRAG-04: add port created renderName4 intentionally
+  ✓ DRAG-05: rebuilt node slots match its port map
+  ✓ DISC-01: exact port 4 disconnect removes only renderName4
+  ✓ DISC-02: disconnect is undoable
+  ✓ DISC-03: undo restores exact ODF bytes
+  ✓ XREF-06: external edge originates from renderName3 port 3
+  ✓ XREF-11: external edge carries typed external target identity
+  ✓ XREF-06: external edge selection survives identity check
+  ✓ XREF-07: external edge disconnect removes only its physical reference
+  ✓ XREF-08: external disconnect undo restores byte-exact ODF
+  ✓ XREF-12: external ODF bytes unchanged
+
+T-82 Verifier: 35 checks, 0 failure(s)
+RESULT: PASS

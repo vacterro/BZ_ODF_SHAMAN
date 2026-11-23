@@ -1,0 +1,16 @@
+{
+  "producer": "saitranslate",
+  "role_revision": "sha256:7d18729f8d94eb58471ae3bb5fad9151e8499fea291e574b26439c5c89012e41",
+  "base_source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+  "base_source_tree_fingerprint": "git-delta-v1:372298b50c9cf21667ba38218026fe10439d39abbe03255b6bf83f9e514c5900",
+  "base_discovery_model": "git-delta-v1",
+  "scope": "locale-surfaces-current",
+  "read_set": {},
+  "write_set": {},
+  "epoch": 0,
+  "dependency_fp": "sha256:f3d5f2ee9500852711a2c0f566792b3a7e8945f3584323eda25a286a9d55c2f9",
+  "package_identity": "sha256:5a826e0c1dee87d1f97862f8a6d936597ef89b1c0962a6ab90fa73c83a7200b2",
+  "status": "ready",
+  "payload_hashes": {},
+  "payload_bytes": {}
+}

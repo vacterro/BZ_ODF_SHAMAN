@@ -1,0 +1,54 @@
+{
+  "op_id": "convergence-887cfb89bcdf46c9a48dd7a6037a947d",
+  "operation": "convergence_stage",
+  "created_at": "2026-11-23T20:31:36Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "2b64d6257f2fd246",
+  "preconditions": {
+    ".saipen/STATE.md": "e752be0da76a50df",
+    ".saipen/LOG.md": "c1aa860afc6a34eb"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "0ba0e9bcc899a256",
+    ".saipen/logs": "tree-missing-v1",
+    ".": "source-identity-v1:e7f4db450b0ce19a6f6b57d469682ccd8d5684519763c5fcaa61f704bda35050"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "c1aa860afc6a34eb",
+      "after_hash": "22e473d101456d64",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "e752be0da76a50df",
+      "after_hash": "7ac684b396243c09",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "convergence_stage",
+    "status": "COMMITTED",
+    "stage": "G",
+    "verdict": "NOTHING_SAFE_REMAINED",
+    "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "source_tree_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22",
+    "detail": "CLEAN: nothing safe remained; every delta attributed",
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+    "input_source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "input_source_tree_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22",
+    "resulting_source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "resulting_source_tree_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22",
+    "event_id": "E-1875"
+  }
+}

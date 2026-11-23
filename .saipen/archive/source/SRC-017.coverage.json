@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-017:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-76 closed with verification evidence in LOG: verify -> PASS [target: T-76] conf: high -- saipen test suite run T-76 exit 0 (core + UI smoke, 0 failures) + verify_t76_weapons_and_hotkeys.gd 17/17 PASS + ui_smoke T-76 behavioral link hotkey checks PASS",
+      "text": "Fix per-vehicle weapon switching (AT Stab/minigun/mortar; minigun tandem-vs-salvo configurable) + node-link manipulation hotkeys (cut/move/reconnect/disconnect)",
+      "verification": "the Work this request created reached its own verification gate; see the T-76 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-76"
+    }
+  },
+  "schema_version": 1
+}

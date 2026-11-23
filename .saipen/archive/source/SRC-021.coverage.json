@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-021:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-80 closed with verification evidence in LOG: verify -> PASS [target: T-80] conf: high -- tools/run_tests.cmd via saipen test suite run T-80: 1105 ran/1105 passed/0 red (two current records); focused T-76 35/35 T-72 23/23 T-73 35/35 T-74 27/27 T-80 16/16; UI 0 failures; build/bench/GPU GUI PASS",
+      "text": "MODE 2 autonomous night shift: repair graph edge identity, hardpoint/SALVO/volley correctness, replay status honesty, advance T-75 native/AUDAPACK, docs and product work",
+      "verification": "the Work this request created reached its own verification gate; see the T-80 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-80"
+    }
+  },
+  "schema_version": 1
+}

@@ -1,0 +1,57 @@
+{
+  "op_id": "crew-run-930aa88e213e4dfc9f2b7e79b0086b2c",
+  "operation": "crew_run",
+  "created_at": "2026-11-23T06:12:08Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "0b1eb673966f1541",
+  "preconditions": {
+    ".saipen/STATE.md": "2ca123f636a3c141",
+    ".saipen/LOG.md": "ca27a83b1585ec6b"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "b892145cc876eff4",
+    ".saipen/logs": "tree-missing-v1"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "ca27a83b1585ec6b",
+      "after_hash": "00b0e7e73a74e6af",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "2ca123f636a3c141",
+      "after_hash": "8c01433009ca9336",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "crew_run",
+    "status": "COMMITTED",
+    "crew_epoch": "converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53",
+    "role": "saihunt",
+    "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "source_tree_fingerprint": "git-delta-v1:372298b50c9cf21667ba38218026fe10439d39abbe03255b6bf83f9e514c5900",
+    "role_revision": "sha256:4edb04181cb07e0946afd06fbe711166fa9dcc403e56b52e9be3844f0a71b0a5",
+    "package_identities": [
+      "sha256:3f32d4366ffd9e5c46738ee8c3902194af2d7553f5589a446c0c82d7e7aa1df7",
+      "sha256:5177abb559ce856d7c6eab4adbff1e64cbb17f8c7adfaf84cabf5c94ac8d61bc",
+      "sha256:16a227e1bdebb88a13da389bbb5514a3072ff7cdb900e90934b96b2dc953ab5b",
+      "sha256:380c9030431a50a49eb2f0d81342e3904b57b4b89301ad58f76160175b8f7b6d",
+      "sha256:5bf3c9eff1200094b375561d41cf4b39dee0bb864c8a1112bab58ff22ca4bbf8",
+      "sha256:a9c4524dead4d73b8303cee511da4c5e6a7d841983e0e1e28fff6d3232d41197"
+    ],
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+    "event_id": "E-1487"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "blocking_findings": {
+    "problem_count": 0,
+    "problems": [],
+    "ruleset_fingerprint": "9a47d608ed3f3a833348aaeeca5cd9e9076f3bf53b1ef92b6ade46958e3e3fec",
+    "ruleset_version": 2,
+    "status": "complete",
+    "warning_count": 10
+  },
+  "board_hash": "b518247d77c8492b",
+  "canonical_next_command": null,
+  "content_hash": "1d4745fdf71d82d9",
+  "exit_code": 0,
+  "external_actions": [],
+  "gate": "core",
+  "install_fingerprint": "install-v1:c45ec2878b630842d9f1a879f902edac6de57592c7026c30598897ff2317d4ed",
+  "install_home": "C:\\Users\\vac34\\AppData\\Local\\saipen\\scheduled-source",
+  "kind": "conformance_receipt",
+  "log_hash": "705134d4b3e822d2",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "receipt_id": "receipt-0e47805adda6",
+  "remediation_commands": [],
+  "schema_version": 2,
+  "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+  "source_tree_fingerprint": "git-delta-v1:a00bc0493cfa2848e1135f1ab8ddfbc26a1388479ba6217511308af505de8873",
+  "state_hash": "34a25c3ca68dddf4",
+  "timestamp_utc": "2026-11-22T21:49:50.453023Z",
+  "validator_protocol_version": "1",
+  "verdict": "PASS"
+}

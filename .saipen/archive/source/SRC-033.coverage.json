@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-033:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "E-1654",
+      "text": "MODE 2 night shift: fix native cleanup ownership/finalization/discovery/API/recovery-token safety gaps with RED-GREEN tests, advance Weapons/Particle Lab, verify suites and Windows build",
+      "verification": "saipen test suite run T-128 (command:43764bfc12053f9a, record 43764bfc12053f9a-20261123T195459624881Z.json, T-128 44/44 0 failures) -> PASS",
+      "work": "T-128"
+    }
+  },
+  "schema_version": 1
+}

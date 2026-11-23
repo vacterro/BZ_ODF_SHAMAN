@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "tools\\run_tests.cmd"
+  ],
+  "command_sha256": "ec60a408a0ad774dc3866d976dfb6ca39834dd8b000834fd804d2df2ce04a207",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": {
+    "runner": "unittest",
+    "ran": 1105,
+    "passed": 1105,
+    "red": 0,
+    "skipped": 0,
+    "counts": {
+      "core": 1105,
+      "ui": 0
+    }
+  },
+  "duration_s": 90.5,
+  "timeout_s": 3600,
+  "subject_before": "git:c506af1a4419c110a5b319a38af1a542913f2c6f42f7b154515a0d06efdf6525",
+  "subject": "git:c506af1a4419c110a5b319a38af1a542913f2c6f42f7b154515a0d06efdf6525",
+  "stdout_tail": "for disabled VSR file\n  ✓ ML-06: Stock Only loadout still resolves base game ivtank.odf\n  ✓ ML-06: switching back to VSR 3532748119 restores VSR resolution and refreshes Weapons Lab\n  ✓ T-41 UI: live parameter inspection reports actual particle nodes\n  ✓ T-41 UI: live radius curve point count inspected\n  ✓ NM-01 UI: MainWindow owns application-level NativeSessionService\n  ✓ NM-01 UI: WeaponLab shares MainWindow NativeSessionService\n  ✓ NM-01/NM-11 UI: Native monitor strip, Cancel/Resume, and ARM MANUAL OBSERVATION controls exist\n  ✓ Wave D/E UI: 3D Combat Actor HUD exposes Target Shield bar and Shooter Ammo/Energy label\n  ✓ Wave F/E UI: Combat-State Timeline, Live Actor Inspector & A/B Replay Compare controls exist\n  ✓ Wave E UI: DOCB .msh Animation selector/Play button and multi-shot trajectory overlay exist\n  ✓ Wave B UI: Native launch mode selector (STOCK_ADDON / CUSTOM_CONFIG) exists\n  ✓ NM-01 UI: automatic non-blocking polling started after launch\n  ✓ NM-02 UI: switching to Particle Lab does NOT interrupt NativeSessionService monitoring\n  ✓ NC-01 UI: active cleanup rejected with ACTIVE_EXPERIMENT_CANNOT_CLEANUP\n  ✓ NC-02 UI: rejected cleanup leaves automatic monitoring active\n  ✓ NM-09 UI: cancel monitor stops automatic polling cleanly\n  ✓ NC-04 UI: cleanup after cancel succeeds cleanly\n  ✓ CB-01/CB-02 UI: fire_once sets shooter reload_remaining > 0 (2.00s)\n  ✓ CB-06 UI: immediate second fire rejected while reloading\n  ✓ CB-03 UI: pause freezes reload cooldown\n  ✓ CB-04 UI: single-step advances shooter reload via CombatScenario.advance()\n  ✓ CB-04/CB-05 UI: single-step advances DoT damage on primary target\n  ✓ Wave F UI: Actor Inspector populates shooter + target rows live\n  ✓ Wave F UI: capture_replay_snapshot stores immutable snapshot\n  ✓ Wave F / RP-08 UI: sandboxed replay runs cleanly without destroying active scenario\nUI smoke: 0 failure(s)\nRESULT: PASS\n\nRan 1105 tests in canonical BZ_ODF_SHAMAN core+UI suite\nOK (core=1105, ui=0 failures)\nALL TESTS PASSED\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-22T20:27:24Z",
+  "verdict": "PASS",
+  "problems": []
+}

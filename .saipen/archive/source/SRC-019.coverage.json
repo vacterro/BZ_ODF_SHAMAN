@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-019:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-78 closed with verification evidence in LOG: verify -> PASS [target: T-78] conf: high -- saipen test suite run T-78: PASS, 1105 ran/1105 passed/0 red/0 skipped, record ec60a408a0ad774d-20261122T172114287252Z.json current=true; focused T-76 23/23, T-72 21/21, T-73 32/32, T-74 26/26; UI smoke 0 failures (t78_ui_run5.log); build PASS (sha256 d110c915...), bench PASS, GPU GUI PASS (t78/gui_verify)",
+      "text": "Autonomous night shift: repair Particle Graph atomic reconnect and link validation, preserve mid-flight weapon projectiles and fix slot identity/volley results, make replay incremental with honest step-limit status, harden ResourceIndex cache integrity, complete T-75 release verification, advance product labs",
+      "verification": "the Work this request created reached its own verification gate; see the T-78 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-78"
+    }
+  },
+  "schema_version": 1
+}

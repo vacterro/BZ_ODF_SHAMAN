@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-018:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "E-1044",
+      "text": "MODE 2 autonomous night shift: finish native BZCC testing integration, fix CombatScenario and NativeExperimentRunner regressions (launch eligibility gates, combat clock/reload/DoT, replay snapshots, active-stage cleanup guard), advance user-visible ODF lab features, then full tests + Windows build + GPU verify + benchmark + release check",
+      "verification": "E-1046",
+      "work": "T-77"
+    }
+  },
+  "schema_version": 1
+}

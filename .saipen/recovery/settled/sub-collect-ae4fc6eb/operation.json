@@ -1,0 +1,87 @@
+{
+  "op_id": "sub-collect-ae4fc6eb",
+  "operation": "sub_collect",
+  "created_at": "2026-11-23T20:24:35Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "7c71e2880c9f20b9",
+  "preconditions": {
+    ".saipen/LOG.md": "0019479567cdc1ad",
+    ".saipen/BOARD.md": "e17ab4c052d7f03f",
+    ".saipen/STATE.md": "a2531bb29b26bebc",
+    ".saipen/extensions/subs/MANIFEST.md": "c70f53adca2b82a8"
+  },
+  "read_preconditions": {
+    ".": "source-identity-v1:e7f4db450b0ce19a6f6b57d469682ccd8d5684519763c5fcaa61f704bda35050",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saihunt.md": "60558e6d7590fab8",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saipython.md": "a82a330b15f229c8",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saitest.md": "0a244a9bc0b9eafa",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saitranslate.md": "b08ff6b0c67e2cc3",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saiui.md": "925ced8c957e532c",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saiwiki.md": "607171a034e58e9a",
+    ".saipen/extensions/subs/saihunt/kitchen/OUTBOX.md": "30ebff701b738ca2",
+    ".saipen/extensions/subs/saipython/kitchen/OUTBOX.md": "d6776cbe8423b381",
+    ".saipen/extensions/subs/saitest/kitchen/OUTBOX.md": "11bee11d6a21e4d8",
+    ".saipen/extensions/subs/saiui/kitchen/OUTBOX.md": "f97c7009ec92b26c"
+  },
+  "verification_policy": "sub_collect",
+  "status": "COMMITTED",
+  "progress_index": 4,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "0019479567cdc1ad",
+      "after_hash": "70942bbe270bec05",
+      "applied": true
+    },
+    {
+      "path": ".saipen/BOARD.md",
+      "role": "board",
+      "action": "write",
+      "before_hash": "e17ab4c052d7f03f",
+      "after_hash": "6a048bed39e0c283",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "a2531bb29b26bebc",
+      "after_hash": "678447b53ce7019d",
+      "applied": true
+    },
+    {
+      "path": ".saipen/extensions/subs/MANIFEST.md",
+      "role": "manifest",
+      "action": "write",
+      "before_hash": "c70f53adca2b82a8",
+      "after_hash": "4fdb0f431c78905a",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "sub_collect",
+    "status": "COMMITTED",
+    "package_identities": [
+      "sha256:425fdd460527ea4631c5323be107f7f26fa56f9fc078036c2b0bbf70775fff07",
+      "sha256:59ce7940eacae0932e068161edfbba65484751ee52387fa9a7237ea7946dcd26",
+      "sha256:d166a0c9e8ae1fc04ec056ecbd095f1ff1142005ad432308f868f04fa4ee87b6",
+      "sha256:394ba8fab69101e727231c81647a6d8633f6e7a88e2a48c36dbf80a53d1a9423"
+    ],
+    "producers": [
+      "saihunt",
+      "saipython",
+      "saitest",
+      "saiui"
+    ],
+    "tickets": [
+      "T-133",
+      "T-134",
+      "T-135",
+      "T-136"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-023:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-82 closed with verification evidence in LOG: verify -> PASS [target: T-82] conf: high -- post-REVIEW fix rerun: canonical suite PASS 1105/1105/0 current record ec60a408a0ad774d-20261122T234149175476Z.json; cross-file 17/17, ports 35/35+7/7, native 57/57; UI 0; Windows exe sha256 9463307d5d5e91b66e69764355e9bb47736473a2e86ffda39de0ca507c273530; GPU GUI/bench/validate/BZ2R PASS; self-audit finding fixed with RED/GREEN",
+      "text": "Mode 2 night shift: fix GraphEdit slot/output port identity, external edges, native cleanup safety, verify fresh Windows release, continue T-75 and product work",
+      "verification": "the Work this request created reached its own verification gate; see the T-82 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-82"
+    }
+  },
+  "schema_version": 1
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 47.0,
+  "timeout_s": 3600,
+  "subject_before": "git:fba4aaccd68146924e24b95174fbcc5c302b351ea3998801def97ab560e92a90",
+  "subject": "git:fba4aaccd68146924e24b95174fbcc5c302b351ea3998801def97ab560e92a90",
+  "stdout_tail": "RY_PENDING)\n  ✓ NC-12: successful retry cancel commits CANCELLED and unlocks safe cleanup\n  ✓ SA-01/SA-04: STOCK_ADDON sessions derive unique mission basenames and unique marker ODFs\n  ✓ SA-02: two simultaneous STOCK_ADDON stages succeed cleanly\n  ✓ SA-03: reusing active mission basename rejected with MISSION_NAME_COLLISION (expected MISSION_NAME_COLLISION, got MISSION_NAME_COLLISION)\n  ✓ SA-05: foreign addon ODF collision detected and blocks launch\n  ✓ SA-06: old SHAMAN stage ODF collision detected\n  ✓ SA-07: foreign addon files untouched by scan and cleanup\n  ✓ SA-08: bzone.cfg parser strips block comments and validates active stream mount order\n  ✓ NM-11: ARM MANUAL OBSERVATION enters MONITOR_ARMED without claiming launch\n  ✓ NM-12: MONITOR_ARMED persists and resumes across restart\n  ✓ NM-13: preexisting PID ignored (expected MONITOR_ARMED, got MONITOR_ARMED)\n  ✓ NM-13: late verified PID enters GAME_PROCESS_VERIFIED (expected GAME_PROCESS_VERIFIED, got GAME_PROCESS_VERIFIED)\n  ✓ NM-14: session-specific Lua observation collected automatically\n  ✓ NM-15/NM-16: manual import / unverified PID stays unattested COMPARISON_COMPLETE, never NATIVE_VERIFIED\n\n[T-74 Wave E DOCB .msh Animations, Transform Compression & ResourceIndex Cache]\n  ✓ T-74 ANIM: Scion fvtank_skel.msh loads cleanly with embedded DOCB clips\n  ✓ T-74 ANIM: ivturr00.msh decodes 'deploy' clip and hp_gun_1\n  ✓ T-74 ANIM: playing ivturr00.msh 'deploy' animates hp_gun_1 by 2.05m\n  ✓ T-74 ANIM: ibnav00.msh 'loop' rotates vertex-colored spinner node\n  ✓ T-74 SOAK: moving-target transform compression collapses 1200 frames -> 5 events\n  ✓ T-74 A/B: CombatScenario.compare_replay_results produces clean diff summary\n  ✓ T-74 IDX: save_index_cache succeeds\n  ✓ T-74 IDX: load_index_cache hits on matching SHA256 fingerprint\n  ✓ T-74 IDX: provenance_summary updates immediately on Workshop package switch\n  ✓ T-74 IDX: cache invalidates on ModLoadout change\n\n1105 checks, 1 failure(s), 44955 ms\nRESULT: FAIL\n\nTESTS FAILED\n",
+  "stderr_tail": "  ✗ RPL-12: moving target hit by both overlapping shots identically on replay\nFAIL: T-72 Wave B Chronological Event-Scheduled Replay Concurrency (P0-SIM-01; RPL-09..RPL-16): RPL-12: moving target hit by both overlapping shots identically on replay\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-22T11:48:11Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

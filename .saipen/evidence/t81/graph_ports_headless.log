@@ -1,0 +1,27 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-81 GraphEdit Physical Port Verifier
+  ✓ PORT-00: EmitterA GraphNode exists
+  ✓ PORT-04: direct slot controls 6 equals reference keys 6
+  ✓ PORT-06: every slot backed by a direct child Control
+  ✓ PORT-07: one direct child per physical reference plus add port
+  ✓ PORT-09: edge from real output port 1
+  ✓ PORT-09: edge from real output port 2
+  ✓ PORT-09: edge from real output port 3
+  ✓ PORT-09: edge from real output port 4
+  ✓ PORT-10: four GraphEdit connections from EmitterA (got 4)
+  ✓ PORT-11: parallel references have distinct ports
+  ✓ HILITE-01: only renderName2 port highlighted (active=[3])
+  ✓ DRAG-01: occupied port drag leaves ODF byte-exact
+  ✓ DRAG-02: occupied port selects its own physical key
+  ✓ DRAG-03: dedicated add-reference port exists
+  ✓ DRAG-04: add port created renderName4 intentionally
+  ✓ DRAG-05: rebuilt node slot controls match its port map
+  ✓ DISC-01: exact port disconnect removes only renderName4
+  ✓ DISC-02: disconnect is undoable
+  ✓ DISC-03: undo restores exact ODF bytes
+  ✓ PORT-12: external reference owns a real output port
+  ✓ PORT-13: external connection originates from renderName3 port
+
+T-81 Verifier: 21 checks, 0 failure(s)
+RESULT: PASS

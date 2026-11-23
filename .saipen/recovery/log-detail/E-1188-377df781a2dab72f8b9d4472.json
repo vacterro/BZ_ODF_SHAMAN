@@ -1,0 +1,19 @@
+{
+  "event_id": "E-1188",
+  "externalization_event": {
+    "operation_id": "checkpoint-beecc00766ac4875a774a95daa60779f",
+    "reason": "new LOG event exceeds the live cap; canonical detail externalization"
+  },
+  "lossless": true,
+  "metadata_path": ".saipen/recovery/log-detail/E-1188-377df781a2dab72f8b9d4472.json",
+  "operation": "log_event_externalization",
+  "original_event_bytes": 1360,
+  "original_event_path": ".saipen/recovery/log-detail/E-1188-377df781a2dab72f8b9d4472.LOG.md",
+  "original_event_sha256": "377df781a2dab72f8b9d4472c5512dd8c5177a084fc601f076e9b5fbde7ad5be",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "schema_version": 1,
+  "source": ".saipen/LOG.md",
+  "status": "COMMITTED",
+  "ticket_id": "T-86"
+}

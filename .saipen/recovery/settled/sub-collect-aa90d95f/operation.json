@@ -1,0 +1,70 @@
+{
+  "op_id": "sub-collect-aa90d95f",
+  "operation": "sub_collect",
+  "created_at": "2026-11-23T06:46:10Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "0a28eed6b5f11faa",
+  "preconditions": {
+    ".saipen/LOG.md": "07ce2596c1d1bfd3",
+    ".saipen/BOARD.md": "7833b89c69b85321",
+    ".saipen/STATE.md": "4c15426fc7851a8f",
+    ".saipen/extensions/subs/MANIFEST.md": "3e94279e1c7966dd"
+  },
+  "read_preconditions": {
+    ".": "source-identity-v1:b8e5733632923f88ae96337a411c3f5811a2adf4a6d8bf1ee89e5d3915683d93",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saiui.md": "925ced8c957e532c",
+    ".saipen/extensions/subs/saiui/kitchen/OUTBOX.md": "fa5c9d81d96e15de"
+  },
+  "verification_policy": "sub_collect",
+  "status": "COMMITTED",
+  "progress_index": 4,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "07ce2596c1d1bfd3",
+      "after_hash": "3ade16a6d65933e3",
+      "applied": true
+    },
+    {
+      "path": ".saipen/BOARD.md",
+      "role": "board",
+      "action": "write",
+      "before_hash": "7833b89c69b85321",
+      "after_hash": "eb3978a797449f28",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "4c15426fc7851a8f",
+      "after_hash": "4c117aa84e81ccce",
+      "applied": true
+    },
+    {
+      "path": ".saipen/extensions/subs/MANIFEST.md",
+      "role": "manifest",
+      "action": "write",
+      "before_hash": "3e94279e1c7966dd",
+      "after_hash": "0af74eaa7df5e55f",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "sub_collect",
+    "status": "COMMITTED",
+    "package_identities": [
+      "sha256:ca64e1adfe25ffde1eb7454f8bdc9c34c19e0a7ff1e75f1625a18375f0cfce61"
+    ],
+    "producers": [
+      "saiui"
+    ],
+    "tickets": [
+      "T-117"
+    ]
+  }
+}

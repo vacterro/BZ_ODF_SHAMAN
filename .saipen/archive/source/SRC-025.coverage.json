@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-025:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "DUPLICATE",
+      "evidence": "E-1148 T-82 DONE; handoff-18 findings XREF-MOVE/REC and NSTAGE-17..27 implemented and verified under T-82 with RED/GREEN controls; T-83 overlap settled through SRC-024 DUPLICATE; T-75 native/AUDAPACK remains externally blocked and queued",
+      "text": "SAIHANDOFF-18 MODE 2 night shift: preserve external file.header identity through Move/Reconnect, make native inventory agree with reconcile_stage, validate nonterminal monitor states, finish T-82, resolve T-83 overlap, advance T-75 and product work",
+      "verification": null,
+      "work": "T-84"
+    }
+  },
+  "schema_version": 1
+}

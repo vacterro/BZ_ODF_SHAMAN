@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd.exe",
+    "C:/",
+    "toolsrun_tests.cmd"
+  ],
+  "command_sha256": "dc23d38c7ad70bb6f7bffabcbf13afb0dc3852b0675739437c5f357c03cd3960",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 0.1,
+  "timeout_s": 3600,
+  "subject_before": "git:0d0ec6be2746d02acf64ff4d668cd531d9f70ef4ed55e2f4f6e8004bd785fa74",
+  "subject": "git:0d0ec6be2746d02acf64ff4d668cd531d9f70ef4ed55e2f4f6e8004bd785fa74",
+  "stdout_tail": "Microsoft Windows [Version 10.0.19045.6332]\n(c) Microsoft Corporation. All rights reserved.\n\nV:\\___VAC\\__K\\__CODE\\_MISC\\_BZ_ODF_SHAMAN>",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-23T19:49:12Z",
+  "verdict": "PASS",
+  "problems": []
+}

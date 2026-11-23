@@ -1,0 +1,18 @@
+{
+  "op_id": "scope-a226d81d935a461e8ce50280f3929e09",
+  "paths": {
+    "scripts/core/mod_loadout.gd": "309cfedde739f2c9b7c3de692e48b7c1955af73adad0ff478482a4b0a8b5c248",
+    "scripts/core/resource_index.gd": "6b2e15b60f9ae04ba22add7ebcedb559602dd075aa0de8e696911feb3b45a4e8",
+    "scripts/native/native_resource_closure.gd": "449463c198d9ac112c5afdef646fa68c9c94233298b958cfccfe7a430dcd9299",
+    "scripts/ui/main_window.gd": "e020c3b9bfeb3da2a36254512c2c013ba25aa51504c53b1b557ff98e575253c0",
+    "tests/test_runner.gd": "f1fdbb1502fd515e7996c050646fa06436ab1f51d63e1203efe23b054a57dfdb",
+    "tests/ui_smoke.gd": "6bf03c717e63823813e548ee7de9a0eddfb754538189218af08c69560ac34a40"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-21T19:41:36Z",
+  "schema_version": 2,
+  "source_head": "83a8c8e9aa70c7c4b9eabd4252ea8777b227f4c6",
+  "source_tree_fingerprint": "git-delta-v1:2020185f68c45ec3876ade36cdd2c416276bd61e208befe3187e6e86292300ec",
+  "ticket": "T-39"
+}

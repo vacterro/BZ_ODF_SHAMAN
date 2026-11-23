@@ -22,5 +22,6 @@
 ## TODO
 
 ## DONE
+- [x] TEST-001 adversarial probes closed
 
 ## BLOCKED

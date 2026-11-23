@@ -1,0 +1,11 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-85 Graph Event Honesty Verifier
+  ✗ FAIL: GRAPH-39: failed disconnect emits no document edit (edits=1)
+  ✓ GRAPH-38/40: zero-change paste emits no edit (added=0 edits=0)
+  ✗ FAIL: GRAPH-41: partial paste reports exact counts (added=0 edits=1 status= s=-1 f=-1)
+  ✓ GRAPH-42: undo removes only pasted reference
+  ✗ FAIL: GRAPH-42: redo restores pasted reference
+
+T-85 Graph Events: 5 checks, 3 failure(s)
+RESULT: FAIL

@@ -45,12 +45,18 @@ var delete_button: Button
 var new_button: Button
 var rename_button: Button
 var save_deps_button: Button
+var save_deps_confirm_dialog: ConfirmationDialog
+var save_deps_preview_tree: Tree
+var save_deps_preview_info: Label
+var _pending_save_preview: Dictionary = {}
 var reset_scope_option: OptionButton
 var reset_odf_button: Button
 var reset_view_button: Button
 var context_effects_bar: HFlowContainer
 var context_doc: OdfDocument = null
 var last_save_group: Dictionary = {}
+var last_save_recovery: Dictionary = {}
+var last_graph_batch: Dictionary = {}
 var last_reset_result: Dictionary = {}
 var last_dep_reset_impact: Dictionary = {}
 var dep_reset_confirmation_pending := false
@@ -73,6 +79,21 @@ var _selected_header: String = ""
 var _selected_external_path: String = ""
 var _selected_headers: Array[String] = []
 static var _clipboard_nodes: Array[Dictionary] = []
+## T-76: clipboard for link cut/copy/paste and the last link chosen for
+## reconnect/move operations. Each record is {src, key, dst}.
+static var _clipboard_links: Array[Dictionary] = []
+var _link_focus: Dictionary = {}
+## Slot -> physical reference key for each rendered graph node. Slot 0 is the
+## input row; slots 1..N are direct child Controls backed by ODF properties.
+var _slot_port_keys: Dictionary = {}
+## GraphNode name -> Array keyed by real GraphEdit output port index. Built from
+## get_output_port_slot() after the node is inside the GraphEdit tree, so a
+## connection's from_port resolves the exact ODF property. Empty while headless
+## (Godot materialises ports on first draw); fall back to slot identity there.
+var _output_port_keys: Dictionary = {}
+## Mirrors GraphEdit connection activity for exact-port assertions. The visual
+## state lives in GraphEdit; this mirror is only an inspectable record.
+var _connection_activity: Dictionary = {}
 var _emitters: Array = []
 var _live_inspection_label: Label = null
 var _preview_nodes: Array = []
@@ -372,6 +393,7 @@ func _build_ui() -> void:
 	graph.connection_request.connect(_on_connection_request)
 	graph.disconnection_request.connect(_on_disconnection_request)
 	graph.end_node_move.connect(_save_layout)
+	graph.gui_input.connect(_on_graph_gui_input)
 	split.add_child(graph)
 
 	var right_vsplit := VSplitContainer.new()
@@ -496,16 +518,21 @@ func load_document(p_doc: OdfDocument) -> void:
 	_selected_header = ""
 	_selected_headers.clear()
 	_external_nodes.clear()
+	_slot_port_keys.clear()
+	_output_port_keys.clear()
 	_clear_graph()
 	_clear_emitters()
 	_rebuild_quick_inspector()
 	if doc == null:
-		header_label.text = "Particle Lab: no document."
+		if header_label != null:
+			header_label.text = "Particle Lab: no document."
 		return
 	var renders := doc.render_headers()
-	header_label.text = "Particle Lab: %s  —  %d render header(s)" % [doc.get_display_name(), renders.size()]
+	if header_label != null:
+		header_label.text = "Particle Lab: %s  —  %d render header(s)" % [doc.get_display_name(), renders.size()]
 	if renders.is_empty():
-		info.text = "[color=#D37676]This ODF declares no renderBase/simulateBase headers.[/color]\nIt may still attach renders by reference; open the render ODF itself."
+		if info != null:
+			info.text = "[color=#D37676]This ODF declares no renderBase/simulateBase headers.[/color]\nIt may still attach renders by reference; open the render ODF itself."
 		status_changed.emit("Particle Lab: no render headers in " + doc.get_display_name(), "warning")
 		return
 	var positions := {}
@@ -522,7 +549,14 @@ func load_document(p_doc: OdfDocument) -> void:
 		if occ_count > 1:
 			node.tooltip_text = "%s has %d physical [%s] occurrences. Shown values are the effective (last) declaration; edits target that occurrence." % [h.name, occ_count, h.name]
 		node.position_offset = Vector2(40 + (i % 3) * 300, 40 + int(i / 3) * 230)
+		# GraphNode only registers slots while inside the GraphEdit tree.
+		if graph != null:
+			graph.add_child(node)
+		# Slot 0 is the node's input and is backed by this direct child Control;
+		# one further direct child Control backs each output port. Godot derives
+		# GraphNode slots from direct children, not nested container rows.
 		var rows := VBoxContainer.new()
+		rows.name = "InputSlot"
 		rows.add_theme_constant_override("separation", 1)
 		node.add_child(rows)
 		var sub := Label.new()
@@ -537,29 +571,62 @@ func load_document(p_doc: OdfDocument) -> void:
 				row.add_theme_font_size_override("font_size", 11)
 				rows.add_child(row)
 		# Editable references: drag a connection or edit the reference text.
-		for key in _child_keys(doc, h.name):
+		var slot_keys := _child_keys(doc, h.name)
+		node.set_slot(0, true, 0, Color("#969630"), false, 0, Color("#969630"))
+		# Each physical reference key owns one real GraphNode output port. The
+		# port's direct child Control carries the exact ODF identity in metadata.
+		var port_keys: Array[String] = [""]
+		for key in slot_keys:
 			var ref := doc.get_value(h.name, key, "")
+			var port_index := node.get_child_count()
 			var ref_row := HBoxContainer.new()
+			ref_row.name = "ReferenceSlot_%s" % key
+			ref_row.set_meta("ref_key", key)
+			ref_row.set_meta("ref_header", h.name)
+			ref_row.add_theme_constant_override("separation", 2)
 			var ref_label := Label.new()
-			ref_label.text = key
-			ref_label.add_theme_font_size_override("font_size", 11)
-			ref_label.custom_minimum_size = Vector2(88, 0)
+			ref_label.text = "OUT %d · %s" % [port_index, key]
+			ref_label.add_theme_font_size_override("font_size", 10)
+			ref_label.add_theme_color_override("font_color", Color("#D3B57A"))
+			ref_label.custom_minimum_size = Vector2(112, 0)
 			ref_row.add_child(ref_label)
 			var ref_edit := LineEdit.new()
 			ref_edit.text = ref
 			ref_edit.custom_minimum_size = Vector2(140, 0)
-			ref_edit.tooltip_text = "Edit %s and press Enter; target must be a render header or file.header." % key
+			ref_edit.tooltip_text = "Edit %s (output %d) and press Enter; target must be a render header or file.header." % [key, port_index]
 			ref_edit.text_submitted.connect(func(text: String): _on_reference_submitted(h.name, key, text))
 			ref_row.add_child(ref_edit)
-			rows.add_child(ref_row)
-		node.set_slot(0, true, 0, Color("#D3B57A"), true, 0, Color("#969630"))
-		graph.add_child(node)
+			node.add_child(ref_row)
+			node.set_slot(port_index, false, 0, Color("#969630"), true, 0, Color("#D3B57A"))
+			port_keys.append(key)
+		# A distinct output port for the next available reference key. It exists
+		# only when a key is available and never reuses an occupied slot.
+		var new_key := _next_reference_key(h.name)
+		if new_key != "":
+			var port_index := node.get_child_count()
+			var add_row := Label.new()
+			add_row.name = "AddReferencePort"
+			add_row.text = "+ ADD %s" % new_key
+			add_row.set_meta("ref_key", new_key)
+			add_row.set_meta("ref_header", h.name)
+			add_row.set_meta("is_add_port", true)
+			add_row.add_theme_font_size_override("font_size", 10)
+			add_row.add_theme_color_override("font_color", Color("#9C9371"))
+			add_row.tooltip_text = "Drag from this port to create %s." % new_key
+			node.add_child(add_row)
+			node.set_slot(port_index, false, 0, Color("#969630"), true, 0, Color("#B8D890"))
+			port_keys.append("@add:" + new_key)
+		_slot_port_keys[node.name] = port_keys.duplicate()
+		# Godot numbers output ports only among enabled right-hand slots. Build
+		# the port->key map from the real API when ports are materialised.
+		_output_port_keys[node.name] = _build_port_keys(node, port_keys)
 		positions[h.name.to_lower()] = node.name
 		i += 1
 	var built := EffectRuntime.build_document_preview(index, doc)
 	_header_preview_nodes = built.get("header_nodes", {})
 	for pn in built.get("nodes", []):
-		preview_root.add_child(pn)
+		if preview_root != null:
+			preview_root.add_child(pn)
 		_preview_nodes.append(pn)
 	for em in built.get("emitters", []):
 		_emitters.append(em)
@@ -582,18 +649,27 @@ func load_document(p_doc: OdfDocument) -> void:
 				"external":
 					to = _external_node(str(resolved.path), str(resolved.header), ext_i)
 					ext_i += 1
-			if to != "" and to != from:
-				graph.connect_node(from, 0, to, 0)
+			var src_node := graph.get_node_or_null(NodePath(from)) as GraphNode if graph != null else null
+			var port := _port_for_key(src_node, from, key)
+			if port < 0:
+				# Physical slot no longer exposed by this merged node; never
+				# attach the edge to the input port as a false substitute.
+				continue
+			if to != "" and to != from and graph != null and not graph.is_node_connected(from, port, to, 0):
+				graph.connect_node(from, port, to, 0)
 	_apply_layout()
+	_refresh_edge_highlight()
 	if _selected_header == "" and not renders.is_empty():
 		_selected_header = renders[0].name
 		_selected_headers = [_selected_header]
-		var first_gn := graph.get_node_or_null(NodePath(_selected_header.validate_node_name()))
+		var first_gn := graph.get_node_or_null(NodePath(_node_name_for(_selected_header, 0))) if graph != null else null
 		if first_gn is GraphNode:
 			(first_gn as GraphNode).selected = true
 		_rebuild_quick_inspector()
-	info.text = _describe_graph(renders)
-	counter_label.text = "render nodes: %d    emitters: %d" % [renders.size(), _emitters.size()]
+	if info != null:
+		info.text = _describe_graph(renders)
+	if counter_label != null:
+		counter_label.text = "render nodes: %d    emitters: %d" % [renders.size(), _emitters.size()]
 	_update_toolbar()
 	status_changed.emit("Particle Lab loaded %s (%d render headers)" % [doc.get_display_name(), renders.size()], "success")
 
@@ -762,9 +838,198 @@ func _node_name_for(header: String, index_i: int) -> String:
 
 
 func _header_for_node(node_name: String) -> String:
-	var n := graph.get_node_or_null(NodePath(node_name))
+	var n := graph.get_node_or_null(NodePath(node_name)) if graph != null else null
 	if n != null and n.has_meta("header"):
 		return str(n.get_meta("header"))
+	return ""
+
+
+## Exact target identity for a GraphEdit edge. Local targets carry a document
+## header; external targets carry canonical path + package + external header.
+func _target_identity_for_node(node_name: String) -> Dictionary:
+	var n := graph.get_node_or_null(NodePath(node_name)) if graph != null else null
+	if n == null:
+		return {"kind": "missing", "name": node_name}
+	if n.has_meta("external_path"):
+		var path := str(n.get_meta("external_path"))
+		return {
+			"kind": "external", "name": node_name,
+			"path": WorkspaceStore.canonical(path),
+			"package": index.package_of(path) if index != null else "",
+			"header": str(n.get_meta("external_header", "")),
+		}
+	if n.has_meta("header"):
+		return {"kind": "local", "name": node_name, "header": str(n.get_meta("header"))}
+	return {"kind": "missing", "name": node_name}
+
+
+func _same_target_identity(a: Dictionary, b: Dictionary) -> bool:
+	if int(a.get("kind", 0)) == 0 or a.get("kind") != b.get("kind"):
+		return false
+	if str(a.get("kind")) == "local":
+		return str(a.get("header", "")).to_lower() == str(b.get("header", "")).to_lower()
+	if str(a.get("kind")) == "external":
+		return str(a.get("path", "")).to_lower() == str(b.get("path", "")).to_lower() \
+			and str(a.get("header", "")).to_lower() == str(b.get("header", "")).to_lower()
+	return false
+
+
+## Resolve a resolved reference to the exact identity of its graph target node.
+func _target_identity_for_reference(resolved: Dictionary) -> Dictionary:
+	var h := str(resolved.get("header", ""))
+	if str(resolved.get("kind", "")) == "external":
+		var path := WorkspaceStore.canonical(str(resolved.get("path", "")))
+		return {
+			"kind": "external", "name": path.path_join(h).get_file(),
+			"path": path, "package": index.package_of(path) if index != null else "",
+			"header": h,
+		}
+	for node_name in _external_nodes:
+		var ext: Dictionary = _external_nodes.get(node_name, {})
+		if str(ext.get("header", "")).to_lower() == h.to_lower() \
+				and WorkspaceStore.canonical(str(ext.get("path", ""))).to_lower() == WorkspaceStore.canonical(str(resolved.get("path", ""))).to_lower():
+			return _target_identity_for_node(node_name)
+	for n in graph.get_children() if graph != null else []:
+		if n is GraphNode and n.has_meta("header") and str(n.get_meta("header")).to_lower() == h.to_lower() \
+				and not (n as GraphNode).has_meta("external_path"):
+			return _target_identity_for_node(String(n.name))
+	return {"kind": "missing", "header": h, "path": str(resolved.get("path", ""))}
+
+
+## Physical ODF identity of a reference value: local header or exact
+## file.header. Never collapses an external reference into a local header name.
+func _reference_identity(value: String) -> Dictionary:
+	var resolved := _resolve_reference(value)
+	match str(resolved.get("kind", "")):
+		"local":
+			return {
+				"kind": "local", "header": str(resolved.get("header", "")),
+				"path": str(resolved.get("path", "")),
+				"value": value.strip_edges(),
+			}
+		"external":
+			return {
+				"kind": "external", "header": str(resolved.get("header", "")),
+				"path": WorkspaceStore.canonical(str(resolved.get("path", ""))),
+				"package": index.package_of(str(resolved.get("path", ""))) if index != null else "",
+				"value": value.strip_edges(),
+			}
+		_:
+			return {"kind": "missing", "value": value.strip_edges()}
+
+
+func _reference_identity_matches(identity: Dictionary, target: Dictionary) -> bool:
+	if identity.get("kind") != target.get("kind"):
+		return false
+	if str(identity.get("header", "")).to_lower() != str(target.get("header", "")).to_lower():
+		return false
+	if str(identity.get("kind")) == "external":
+		return str(identity.get("path", "")).to_lower() == str(target.get("path", "")).to_lower()
+	return true
+
+
+## Validate an existing GraphEdit edge against the exact ODF entry that created
+## it. Used by mouse selection, disconnect and highlight; no header-only guessing.
+func _edge_record_from_connection(conn: Dictionary) -> Dictionary:
+	return _edge_record(str(conn.get("from_node", "")), int(conn.get("from_port", -1)),
+		str(conn.get("to_node", "")))
+
+
+func _edge_record(from_node: String, from_port: int, to_node: String) -> Dictionary:
+	var slots: Array[String] = _slot_port_keys.get(from_node, [])
+	var key := ""
+	var node := graph.get_node_or_null(NodePath(from_node)) as GraphNode if graph != null else null
+	var ports: Array = _output_port_keys.get(from_node, [])
+	if from_port >= 0 and from_port < ports.size() and str(ports[from_port]) != "":
+		key = str(ports[from_port])
+	elif node != null and from_port >= 0 and from_port < node.get_output_port_count():
+		var slot := node.get_output_port_slot(from_port)
+		if slot >= 0 and slot < slots.size():
+			key = slots[slot]
+	if key == "" or key.begins_with("@add:"):
+		return {}
+	var header := _header_for_node(from_node)
+	if header.is_empty():
+		return {}
+	var entry = doc.find_entry_occurrence(header, key) if doc != null else null
+	if entry == null and key.contains("("):
+		entry = doc.find_entry_occurrence(header, key.substr(0, key.find("(")))
+	if entry == null:
+		return {}
+	var identity := _reference_identity(str(entry.core_value()))
+	var target := _target_identity_for_node(to_node)
+	if not _reference_identity_matches(identity, target):
+		return {}
+	return {
+		"src": header, "key": str(entry.full_key()),
+		"dst": str(identity.get("header", "")),
+		"target": target, "reference": identity,
+		"src_header_id": str(entry.header_id),
+		"src_occurrence": int(entry.occurrence_index),
+		"key_occurrence": int(entry.key_occurrence_index),
+		"doc_key_occurrence": int(entry.key_occurrence_index),
+		"entry_line": int(entry.line),
+		"doc_revision": int(doc.revision),
+		"from_node": from_node, "from_port": from_port, "to_node": to_node,
+		"selection_source": "graph_port",
+	}
+
+
+## Map a physical reference key to a real GraphEdit output-port index.
+## Windowed Godot exposes get_output_port_slot(); headless returns 0 so the
+## stable slot-based mapping remains usable for headless logic verifiers.
+## Build port->key using the real Godot API. Falls back to headless slot order.
+func _build_port_keys(node: GraphNode, slot_keys: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	if node != null and node.get_output_port_count() > 0:
+		for p in range(node.get_output_port_count()):
+			var slot := node.get_output_port_slot(p)
+			if slot >= 0 and slot < slot_keys.size():
+				out.append(slot_keys[slot])
+			else:
+				out.append("")
+		return out
+	for i in range(1, slot_keys.size()):
+		out.append(slot_keys[i])
+	return out
+
+
+func _port_for_key(node: GraphNode, node_name: String, key: String) -> int:
+	if node != null and node.get_output_port_count() > 0:
+		var ports: Array = _output_port_keys.get(node_name, [])
+		for p in range(ports.size()):
+			if str(ports[p]) == key:
+				return p
+		for p in range(node.get_output_port_count()):
+			var slot := node.get_output_port_slot(p)
+			var slots: Array[String] = _slot_port_keys.get(node_name, [])
+			if slot >= 0 and slot < slots.size() and slots[slot] == key:
+				return p
+		return -1
+	var slots: Array[String] = _slot_port_keys.get(node_name, [])
+	var slot_index := slots.find(key)
+	return slot_index - 1 if slot_index > 0 else -1
+
+
+## Map a GraphEdit output-port index back to its slot index using Godot's API,
+## falling back to the headless slot convention (port = slot - 1).
+func _slot_for_port(node: GraphNode, node_name: String, port: int) -> int:
+	if node != null and node.get_output_port_count() > 0 and port >= 0 and port < node.get_output_port_count():
+		return node.get_output_port_slot(port)
+	return port + 1
+
+
+## Physical key behind a real GraphEdit output port. External callers must never
+## index the slot-key array with a port number.
+func _key_for_port(node: GraphNode, node_name: String, port: int) -> String:
+	var ports: Array = _output_port_keys.get(node_name, [])
+	if port >= 0 and port < ports.size() and str(ports[port]) != "":
+		return str(ports[port])
+	if node != null and node.get_output_port_count() > 0 and port >= 0 and port < node.get_output_port_count():
+		var slot := node.get_output_port_slot(port)
+		var slots: Array[String] = _slot_port_keys.get(node_name, [])
+		if slot >= 0 and slot < slots.size():
+			return slots[slot]
 	return ""
 
 
@@ -805,8 +1070,9 @@ func _external_node(path: String, header: String, index_i: int) -> String:
 	open_btn.focus_mode = Control.FOCUS_NONE
 	open_btn.pressed.connect(func(): open_path_requested.emit(path))
 	rows.add_child(open_btn)
+	if graph != null:
+		graph.add_child(node)
 	node.set_slot(0, true, 0, Color("#969630"), false, 0, Color("#969630"))
-	graph.add_child(node)
 	_external_nodes[node_name] = {"path": path, "header": header}
 	return node_name
 
@@ -865,43 +1131,670 @@ func _reference_header(value: String) -> String:
 	return ""
 
 
-func _on_connection_request(from_node: StringName, _from_port: int, to_node: StringName, _to_port: int) -> void:
+func _on_connection_request(from_node: StringName, from_port: int, to_node: StringName, _to_port: int) -> void:
+	if doc == null:
+		return
 	var src := _header_for_node(String(from_node))
-	var dst := _header_for_node(String(to_node))
-	if src == "" or dst == "" or src == dst:
-		status_changed.emit("Connection refused: both ends must be different render headers.", "warning")
+	var target := _target_identity_for_node(String(to_node))
+	var dst := ""
+	if str(target.get("kind", "")) == "local":
+		dst = str(target.get("header", ""))
+	elif str(target.get("kind", "")) == "external":
+		dst = "%s.%s" % [str(target.get("path", "")).get_basename(), str(target.get("header", ""))]
+	var node := graph.get_node_or_null(NodePath(String(from_node))) as GraphNode if graph != null else null
+	var key := _key_for_port(node, String(from_node), from_port)
+	if src.is_empty() or dst.is_empty() or key.is_empty():
+		status_changed.emit("Link refused: source port has no physical ODF reference.", "warning")
 		return
-	if _would_cycle(src, dst):
-		status_changed.emit("Connection refused: %s -> %s would create a cycle." % [src, dst], "warning")
+	if key.begins_with("@add:"):
+		# The dedicated "+" port creates the next reference key intentionally.
+		key = key.substr(5)
+		if key.is_empty():
+			status_changed.emit("Link refused: no free renderNameN reference slot.", "warning")
+			return
+	else:
+		var pe = doc.find_entry(src, key)
+		if pe != null and pe.core_value() != "":
+			# Occupied physical port: never silently pick a different property.
+			select_edge(src, key, _reference_header(pe.core_value()), "graph_port")
+			status_changed.emit("PORT_OCCUPIED: %s.%s already linked; use RECONNECT to retarget it." % [src, key], "warning")
+			return
+	var check := _validate_link(src, dst, key, "", false, target)
+	if not bool(check.get("ok", false)):
+		_report_link_failure(str(check.get("code", "INVALID")))
 		return
-	var key := _next_reference_key(src)
-	if key == "":
-		status_changed.emit("Connection refused: all emitName/renderName1..32 slots are occupied.", "warning")
-		return
+	key = str(check.get("key", ""))
+	var value := str(check.get("value", dst))
 	var entry = doc.find_entry(src, key)
 	if entry != null:
-		doc.set_entry_value(entry, dst)
+		doc.set_entry_value(entry, value)
 	else:
-		doc.append_entry(src, key, dst)
-	status_changed.emit("Linked %s -> %s as %s" % [src, dst, key], "success")
+		doc.append_entry(src, key, value)
+	status_changed.emit("Linked %s -> %s as %s" % [src, value, key], "success")
 	document_edited.emit()
 	load_document(doc)
 
 
-func _on_disconnection_request(from_node: StringName, _from_port: int, to_node: StringName, _to_port: int) -> void:
-	var src := _header_for_node(String(from_node))
-	var dst := _header_for_node(String(to_node))
-	if src == "" or dst == "":
+## All local reference entries whose value resolves to `dst`, in document order.
+func _matching_reference_entries(src: String, dst: String) -> Array:
+	var out: Array = []
+	if doc == null:
+		return out
+	for e in doc.entries:
+		if str(e.header).to_lower() != src.to_lower() or e.is_shadowed():
+			continue
+		if _reference_header(e.core_value()).to_lower() == dst.to_lower():
+			out.append(e)
+	return out
+
+
+func _entry_record(e) -> Dictionary:
+	return {
+		"src": str(e.header), "key": str(e.full_key()), "dst": _reference_header(e.core_value()),
+		"src_header_id": str(e.header_id), "src_occurrence": int(e.occurrence_index),
+		"key_occurrence": int(e.header_key_occurrence_index),
+		"doc_key_occurrence": int(e.key_occurrence_index),
+		"entry_line": int(e.line), "doc_revision": int(doc.revision),
+		"selection_source": "graph_port",
+	}
+
+
+## One identity-aware removal path for mouse, keyboard and inspector commands.
+## A failed or ambiguous disconnect leaves every ODF byte unchanged.
+func disconnect_exact_edge(rec: Dictionary) -> bool:
+	if doc == null:
+		return false
+	var e = _entry_for_link(rec)
+	if e == null:
+		status_changed.emit("Disconnect refused: selected physical reference is stale.", "warning")
+		return false
+	var expected: Dictionary = rec.get("target", {})
+	if expected.is_empty():
+		expected = {"kind": "local", "header": str(rec.get("dst", ""))}
+	if not _reference_identity_matches(_reference_identity(str(e.core_value())), expected):
+		status_changed.emit("Disconnect refused: selected physical reference is stale.", "warning")
+		return false
+	var snap := doc.capture_snapshot()
+	doc.begin_compound()
+	var removed := doc.remove_entry(e)
+	doc.end_compound()
+	if not removed:
+		doc.restore_snapshot(snap)
+		status_changed.emit("Disconnect failed; original reference preserved.", "warning")
+		return false
+	clear_edge_selection()
+	document_edited.emit()
+	load_document(doc)
+	status_changed.emit("Removed %s.%s -> %s" % [str(rec.get("src", "")), str(rec.get("key", "")), str(rec.get("dst", ""))], "success")
+	return true
+
+
+func _on_disconnection_request(from_node: StringName, from_port: int, to_node: StringName, _to_port: int) -> void:
+	if doc == null:
 		return
-	for key in _child_keys(doc, src):
-		var e = doc.find_entry(src, key)
-		if e != null and _reference_header(e.core_value()) == dst:
-			doc.remove_entry(e)
-			status_changed.emit("Removed %s -> %s (%s)" % [src, dst, key], "success")
-			document_edited.emit()
-			load_document(doc)
-			return
-	graph.disconnect_node(from_node, 0, to_node, 0)
+	# Exact port identity wins. It carries local and external target identity
+	# from the ODF entry that produced this GraphEdit connection.
+	var rec := _edge_record(String(from_node), from_port, String(to_node))
+	if rec.is_empty():
+		status_changed.emit("DISCONNECT_IDENTITY_UNRESOLVED: visual edge preserved; selecting the physical slot is required.", "warning")
+		load_document(doc)
+		return
+	disconnect_exact_edge(rec)
+
+
+# ---------------------------------------------------------------------------
+# T-76: node-link manipulation hotkeys. Links are emitName/renderNameN entries
+# on a source render header whose value names a target header. Every operation
+# is one compound, undoable ODF edit followed by a graph rebuild.
+# ---------------------------------------------------------------------------
+
+const GRAPH_LINK_ERRORS := {
+	"INVALID": "Link refused: invalid source or destination.",
+	"SELF": "Link refused: a node cannot reference itself.",
+	"CYCLE": "Link refused: the connection would create a cycle.",
+	"SLOT_MISSING": "Link refused: the reference slot does not exist.",
+	"SLOT_OCCUPIED": "Link refused: the destination slot is occupied.",
+}
+
+## Build the verbatim ODF reference value for a GraphEdit target identity.
+## Local targets use the header name; external targets use file.header and
+## resolve through the active resource index so Reconnect/paste never write a
+## bare header that silently changes an external reference into a local one.
+func _reference_value_for_target(target: Dictionary) -> String:
+	if not str(target.get("value", "")).strip_edges().is_empty():
+		return str(target.get("value")).strip_edges()
+	if str(target.get("kind", "")) == "external":
+		var ext_header := str(target.get("header", ""))
+		var ext_path := str(target.get("path", ""))
+		if ext_header == "" or ext_path == "":
+			return ""
+		var by_path := index.resolve_path_from(ext_path.get_file(), doc.source_path if doc != null else "") if index != null else ""
+		if by_path != "" and WorkspaceStore.canonical(by_path).to_lower() != WorkspaceStore.canonical(ext_path).to_lower():
+			return ""
+		var file_ref := ext_path.get_file().get_basename()
+		return "%s.%s" % [file_ref, ext_header]
+	return str(target.get("header", target.get("name", "")))
+
+
+## One validator for every graph reference entry point (mouse, reconnect,
+## paste, move, direct edit). `ignore_key` drops an existing edge from the
+## cycle walk so reconnect/move can validate the candidate before mutating.
+## External file.header references are resource references, not local graph
+## edges: they must resolve to an indexed file and never enter cycle analysis.
+func _validate_link(src: String, dst: String, key: String = "",
+		ignore_key: String = "", allow_replace: bool = false, target: Dictionary = {}) -> Dictionary:
+	if doc == null or src.is_empty() or dst.is_empty() or not doc.has_header(src):
+		return {"ok": false, "code": "INVALID"}
+	var resolved := _resolve_reference(dst)
+	var ref_kind := str(resolved.get("kind", ""))
+	var value := dst
+	if not target.is_empty():
+		value = _reference_value_for_target(target)
+		if value.is_empty():
+			return {"ok": false, "code": "INVALID"}
+		resolved = _resolve_reference(value)
+		ref_kind = str(resolved.get("kind", ""))
+	if ref_kind == "external":
+		if str(resolved.get("path", "")).strip_edges() == "" or str(resolved.get("header", "")).strip_edges() == "":
+			return {"ok": false, "code": "INVALID"}
+	elif ref_kind == "local":
+		if not doc.has_header(dst):
+			return {"ok": false, "code": "INVALID"}
+		if str(resolved.get("header", "")).to_lower() == src.to_lower():
+			return {"ok": false, "code": "SELF"}
+		if _would_cycle(src, str(resolved.get("header", "")), ignore_key):
+			return {"ok": false, "code": "CYCLE"}
+	else:
+		return {"ok": false, "code": "INVALID"}
+	var use_key := key if key != "" else _next_reference_key(src)
+	if use_key.is_empty():
+		return {"ok": false, "code": "SLOT_MISSING"}
+	var existing = doc.find_entry(src, use_key)
+	if existing != null and not allow_replace and use_key != ignore_key:
+		return {"ok": false, "code": "SLOT_OCCUPIED", "entry": existing}
+	return {"ok": true, "code": "OK", "key": use_key, "value": value,
+		"kind": ref_kind, "entry": existing}
+
+
+func _report_link_failure(code: String) -> void:
+	status_changed.emit(GRAPH_LINK_ERRORS.get(code, str(GRAPH_LINK_ERRORS["INVALID"])), "warning")
+
+
+func _entry_for_link(rec: Dictionary):
+	if doc == null:
+		return null
+	var src := str(rec.get("src", ""))
+	var key := str(rec.get("key", ""))
+	var header_occ := int(rec.get("src_occurrence", -1))
+	var key_occ := int(rec.get("key_occurrence", -1))
+	if header_occ >= 0 or key_occ >= 0:
+		return doc.find_entry_occurrence(src, key, header_occ, -1, key_occ)
+	return doc.find_entry(src, key)
+
+
+func _refresh_edge_highlight() -> void:
+	if graph == null:
+		return
+	_connection_activity.clear()
+	for connection in graph.get_connection_list():
+		var key := "%s:%d:%s:%d" % [str(connection.get("from_node", "")), int(connection.get("from_port", 0)),
+			str(connection.get("to_node", "")), int(connection.get("to_port", 0))]
+		_connection_activity[key] = 0.0
+		graph.set_connection_activity(str(connection.get("from_node", "")), int(connection.get("from_port", 0)),
+			str(connection.get("to_node", "")), int(connection.get("to_port", 0)), 0.0)
+	if not _focus_is_current():
+		return
+	var src := str(_link_focus.get("src", ""))
+	var dst := str(_link_focus.get("dst", ""))
+	var focus_key := str(_link_focus.get("key", ""))
+	for connection in graph.get_connection_list():
+		var from_node := str(connection.get("from_node", ""))
+		var to_node := str(connection.get("to_node", ""))
+		if _header_for_node(from_node) != src:
+			continue
+		var focus_target := _target_identity_for_node(to_node)
+		if not _reference_identity_matches(
+				{"kind": "local", "header": dst, "path": str(_link_focus.get("target_path", ""))}, focus_target) \
+				and str(_link_focus.get("dst", "")) != dst:
+			continue
+		var from_port := int(connection.get("from_port", 0))
+		var focus_node := graph.get_node_or_null(NodePath(from_node)) as GraphNode if graph != null else null
+		if _key_for_port(focus_node, from_node, from_port) != focus_key:
+			continue
+		_connection_activity["%s:%d:%s:%d" % [from_node, from_port, to_node, int(connection.get("to_port", 0))]] = 1.0
+		graph.set_connection_activity(from_node, from_port,
+			to_node, int(connection.get("to_port", 0)), 1.0)
+
+
+func _clear_edge_highlight() -> void:
+	if graph == null:
+		return
+	for connection in graph.get_connection_list():
+		graph.set_connection_activity(str(connection.get("from_node", "")), int(connection.get("from_port", 0)),
+			str(connection.get("to_node", "")), int(connection.get("to_port", 0)), 0.0)
+
+
+## A selection only applies to the exact document revision it was captured
+## on; later edits or undo/redo invalidate it instead of retargeting a
+## different physical property occurrence.
+func _focus_is_current() -> bool:
+	if _link_focus.is_empty() or doc == null:
+		return false
+	if int(_link_focus.get("doc_revision", -1)) != doc.revision:
+		_link_focus.clear()
+		return false
+	var e = _entry_for_link(_link_focus)
+	if e == null:
+		_link_focus.clear()
+		return false
+	var expected: Dictionary = _link_focus.get("target", {})
+	if expected.is_empty():
+		expected = {"kind": "local", "header": str(_link_focus.get("dst", ""))}
+	if not _reference_identity_matches(_reference_identity(str(e.core_value())), expected):
+		_link_focus.clear()
+		return false
+	return true
+
+
+func select_edge(src: String, key: String, dst: String, source: String = "graph") -> void:
+	if doc == null:
+		return
+	var e = doc.find_entry(src, key)
+	if e == null:
+		_link_focus.clear()
+		_clear_edge_highlight()
+		return
+	var identity := _reference_identity(str(e.core_value()))
+	var expected_target := {
+		"kind": identity.get("kind", "local"),
+		"header": str(identity.get("header", dst)),
+		"path": str(identity.get("path", "")),
+	}
+	_link_focus = {
+		"src": src, "key": key, "dst": dst,
+		"target": expected_target, "reference": identity,
+		"src_header_id": str(e.header_id),
+		"src_occurrence": int(e.occurrence_index),
+		"key_occurrence": int(e.key_occurrence_index),
+		"doc_key_occurrence": int(e.key_occurrence_index),
+		"entry_line": int(e.line),
+		"doc_revision": int(doc.revision),
+		"selection_source": source,
+	}
+	_refresh_edge_highlight()
+	status_changed.emit("Selected edge %s.%s -> %s" % [src, key, dst], "muted")
+
+
+func clear_edge_selection() -> void:
+	_link_focus.clear()
+	_clear_edge_highlight()
+
+
+func _on_graph_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton) or not (event as InputEventMouseButton).pressed:
+		return
+	if (event as InputEventMouseButton).button_index != MOUSE_BUTTON_LEFT:
+		return
+	var conn = graph.get_closest_connection_at_point(
+		graph.get_local_mouse_position() + graph.get_scroll_offset(), 10.0)
+	if conn == null or not (conn is Dictionary):
+		clear_edge_selection()
+		return
+	var rec := _edge_record_from_connection(conn as Dictionary)
+	if rec.is_empty():
+		clear_edge_selection()
+		return
+	_link_focus = rec
+	_refresh_edge_highlight()
+	var target: Dictionary = rec.get("target", {})
+	var target_label := str(target.get("header", ""))
+	if str(target.get("kind", "")) == "external":
+		target_label = str(target.get("path", "")).get_file() + " ▸ " + target_label
+	status_changed.emit("Selected edge %s.%s -> %s" % [
+		str(rec.get("src", "")), str(rec.get("key", "")), target_label], "muted")
+
+
+## Collect link records touching the selected headers (or the focused link).
+func _collect_target_links() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if doc == null:
+		return out
+	if _focus_is_current():
+		out.append(_link_focus.duplicate(true))
+		return out
+	var selected := get_selected_headers()
+	for src in selected:
+		for key in _child_keys(doc, src):
+			var e = doc.find_entry(src, key)
+			if e == null:
+				continue
+			var identity := _reference_identity(str(e.core_value()))
+			if identity.get("kind") == "external":
+				out.append({
+					"src": src, "key": key, "dst": str(identity.get("header", "")),
+					"target": {"kind": "external", "header": str(identity.get("header", "")),
+						"path": str(identity.get("path", ""))},
+					"reference": identity, "selection_source": "selected_header",
+				})
+			elif str(identity.get("header", "")) != "" and doc.has_header(str(identity.get("header", ""))):
+				out.append({"src": src, "key": key, "dst": str(identity.get("header", "")),
+					"target": identity, "selection_source": "selected_header"})
+	return out
+
+
+func _remove_link(rec: Dictionary) -> bool:
+	var e = _entry_for_link(rec)
+	if e == null or not _record_matches_entry(rec, e):
+		return false
+	doc.remove_entry(e)
+	return true
+
+
+func _record_matches_entry(rec: Dictionary, e) -> bool:
+	if e == null:
+		return false
+	var expected: Dictionary = rec.get("target", {})
+	if expected.is_empty():
+		expected = {"kind": "local", "header": str(rec.get("dst", ""))}
+	return _reference_identity_matches(_reference_identity(str(e.core_value())), expected)
+
+
+func _add_link(src: String, dst: String, key: String = "", allow_replace: bool = false,
+		target: Dictionary = {}) -> bool:
+	var check := _validate_link(src, dst, key, "", allow_replace, target)
+	if not bool(check.get("ok", false)):
+		_report_link_failure(str(check.get("code", "INVALID")))
+		return false
+	var use_key := str(check.get("key", ""))
+	var value := str(check.get("value", dst))
+	var existing = check.get("entry", null)
+	if existing != null:
+		doc.set_entry_value(existing, value)
+	else:
+		doc.append_entry(src, use_key, value)
+	return true
+
+
+## Mutate one existing entry in place. Preferred for reconnect: preserves the
+## physical header, property occurrence, surrounding comments and formatting.
+func _retarget_link(rec: Dictionary, dst: String) -> bool:
+	var e = _entry_for_link(rec)
+	if e == null or not _record_matches_entry(rec, e):
+		return false
+	doc.set_entry_value(e, dst)
+	return true
+
+
+func copy_selected_links() -> int:
+	var links := _collect_target_links()
+	_clipboard_links = links.duplicate(true)
+	status_changed.emit("Copied %d graph link(s)." % links.size(), "muted")
+	return links.size()
+
+
+func cut_selected_links() -> int:
+	var links := _collect_target_links()
+	if links.is_empty():
+		last_graph_batch = {"status": "NO_CHANGE", "requested": 0, "succeeded": 0, "failed": 0, "failure_reasons": []}
+		return 0
+	var before_bytes: PackedByteArray = doc.to_bytes()
+	doc.begin_compound()
+	var removed := 0
+	for rec in links:
+		if _remove_link(rec):
+			removed += 1
+	doc.end_compound()
+	if removed == 0 or doc.to_bytes() == before_bytes:
+		last_graph_batch = {"status": "NO_CHANGE", "requested": links.size(),
+			"succeeded": 0, "failed": links.size(), "failure_reasons": [{"reason": "STALE_EDGES"}]}
+		clear_edge_selection()
+		status_changed.emit("Cut made no change; no document edit was emitted.", "warning")
+		return 0
+	_clipboard_links = links.duplicate(true)
+	last_graph_batch = {"status": "COMPLETE", "requested": links.size(),
+		"succeeded": removed, "failed": links.size() - removed, "failure_reasons": []}
+	clear_edge_selection()
+	document_edited.emit()
+	load_document(doc)
+	status_changed.emit("Cut %d graph link(s) (undo available)." % removed, "success")
+	return removed
+
+
+func paste_links() -> int:
+	if doc == null or _clipboard_links.is_empty():
+		last_graph_batch = {"status": "NO_CHANGE", "requested": 0, "succeeded": 0, "failed": 0, "failure_reasons": []}
+		return 0
+	var selected := get_selected_headers()
+	var target_src := selected[0] if not selected.is_empty() else ""
+	var requested := _clipboard_links.size()
+	var added := 0
+	var failures: Array[Dictionary] = []
+	var before_bytes: PackedByteArray = doc.to_bytes()
+	doc.begin_compound()
+	for rec in _clipboard_links:
+		var src := target_src if target_src != "" else str(rec.get("src", ""))
+		var dst := str(rec.get("dst", ""))
+		var use_key := "" if target_src != "" else str(rec.get("key", ""))
+		var target: Dictionary = rec.get("target", {})
+		var check := _validate_link(src, dst, use_key, "", false, target)
+		if not bool(check.get("ok", false)):
+			var code := str(check.get("code", "INVALID"))
+			failures.append({"path": src, "key": use_key, "reason": code})
+			_report_link_failure(code)
+			continue
+		if _add_link(src, dst, use_key, false, target):
+			added += 1
+		else:
+			failures.append({"path": src, "key": use_key, "reason": "ADD_FAILED"})
+	doc.end_compound()
+	if added == 0:
+		last_graph_batch = {"status": "NO_CHANGE", "requested": requested,
+			"succeeded": 0, "failed": failures.size(), "failure_reasons": failures}
+		status_changed.emit("Paste made no change; no document edit was emitted.", "warning")
+		return 0
+	var status := "COMPLETE" if failures.is_empty() else "PARTIAL"
+	last_graph_batch = {"status": status, "requested": requested,
+		"succeeded": added, "failed": failures.size(), "failure_reasons": failures}
+	document_edited.emit()
+	load_document(doc)
+	status_changed.emit("Pasted %d graph link(s) (%s, %d failed; undo available)." % [
+		added, status, failures.size()], "success" if failures.is_empty() else "warning")
+	return added
+
+
+func disconnect_selected_link() -> bool:
+	var links := _collect_target_links()
+	if links.is_empty():
+		last_graph_batch = {"status": "NO_CHANGE", "requested": 0, "succeeded": 0, "failed": 0, "failure_reasons": []}
+		return false
+	var before_bytes: PackedByteArray = doc.to_bytes()
+	doc.begin_compound()
+	var ok := _remove_link(links[0])
+	doc.end_compound()
+	if not ok or doc.to_bytes() == before_bytes:
+		clear_edge_selection()
+		last_graph_batch = {"status": "NO_CHANGE", "requested": 1, "succeeded": 0,
+			"failed": 1, "failure_reasons": [{"reason": "STALE_EDGE"}]}
+		status_changed.emit("Disconnect made no change; no document edit was emitted.", "warning")
+		return false
+	last_graph_batch = {"status": "COMPLETE", "requested": 1, "succeeded": 1, "failed": 0, "failure_reasons": []}
+	clear_edge_selection()
+	document_edited.emit()
+	load_document(doc)
+	status_changed.emit("Disconnected %s -> %s (undo available)." % [
+		str(links[0].get("src", "")), str(links[0].get("dst", ""))
+	], "success")
+	return true
+
+
+## Reconnect edits the existing reference value in place. Validation and the
+## byte-exact document snapshot are taken before any mutation, so an invalid
+## destination cannot destroy the old ODF reference.
+func reconnect_selected_link(to_header: String = "") -> bool:
+	var links := _collect_target_links()
+	if links.is_empty():
+		return false
+	var rec: Dictionary = links[0]
+	var src := str(rec.get("src", ""))
+	var key := str(rec.get("key", ""))
+	var e = _entry_for_link(rec)
+	var existing_identity := _reference_identity(str(e.core_value())) if e != null else {}
+	var target := {}
+	var resolved_target := {}
+	if not to_header.strip_edges().is_empty():
+		resolved_target = _resolve_reference(to_header.strip_edges())
+		if str(resolved_target.get("kind", "")) != "missing":
+			target = _target_identity_for_reference(resolved_target)
+	if str(target.get("kind", "missing")) == "missing":
+		target = {}
+	var external_value := ""
+	if str(existing_identity.get("kind", "")) == "external":
+		external_value = _reference_value_for_target(existing_identity)
+	var dst := to_header.strip_edges()
+	if dst == "":
+		var selected := get_selected_headers()
+		dst = selected[0] if not selected.is_empty() else ""
+	if target.is_empty():
+		if not external_value.is_empty() and (dst == str(existing_identity.get("header", "")) or dst == external_value):
+			# Retarget to the same external header is a no-op; keep exact bytes.
+			dst = external_value
+		elif not external_value.is_empty() and dst == existing_identity.get("path", ""):
+			dst = external_value
+		if dst.is_empty():
+			return false
+	else:
+		dst = str(target.get("header", dst))
+	var check := _validate_link(src, str(resolved_target.get("value", dst)), key, key, false, target)
+	if not bool(check.get("ok", false)):
+		_report_link_failure(str(check.get("code", "INVALID")))
+		return false
+	var value := str(check.get("value", dst))
+	var before_revision: int = doc.revision
+	var before_focus: Dictionary = _link_focus.duplicate(true)
+	doc.begin_compound()
+	var ok := _retarget_link(rec, value)
+	doc.end_compound()
+	if not ok or doc.revision == before_revision:
+		_link_focus = before_focus
+		load_document(doc)
+		status_changed.emit("Reconnect failed; original reference preserved.", "warning")
+		return false
+	clear_edge_selection()
+	document_edited.emit()
+	load_document(doc)
+	status_changed.emit("Reconnected %s.%s -> %s (undo available)." % [src, key, dst], "success")
+	return true
+
+
+func _slot_occupied(src: String, key: String) -> bool:
+	return doc != null and doc.find_entry(src, key) != null
+
+
+## Move semantics: "free" refuses an occupied destination, "swap" exchanges
+## both values, "replace" is an explicit acknowledged overwrite. All variants
+## validate before mutating and never silently overwrite in default mode.
+func move_selected_link(to_key: String = "", mode: String = "free") -> bool:
+	var links := _collect_target_links()
+	if links.is_empty():
+		return false
+	var rec: Dictionary = links[0]
+	var src := str(rec.get("src", ""))
+	var dst := str(rec.get("dst", ""))
+	var from_key := str(rec.get("key", ""))
+	var target := to_key.strip_edges()
+	if target.is_empty():
+		target = _next_reference_key(src)
+	if target.is_empty() or target == from_key:
+		return false
+	var action := mode.strip_edges().to_lower()
+	if action not in ["free", "swap", "replace"]:
+		status_changed.emit("Unknown move mode: " + action, "warning")
+		return false
+	var occupant = doc.find_entry(src, target)
+	if occupant != null and action == "free":
+		_report_link_failure("SLOT_OCCUPIED")
+		return false
+	if action == "swap" and (occupant == null or not _child_keys(doc, src).has(from_key)):
+		_report_link_failure("SLOT_MISSING")
+		return false
+	var from_entry = _entry_for_link(rec)
+	if from_entry == null:
+		return false
+	var source_value := str(from_entry.core_value())
+	var move_identity := _reference_identity(source_value)
+	var check := _validate_link(src, source_value, target, from_key, action != "free", move_identity)
+	if not bool(check.get("ok", false)):
+		_report_link_failure(str(check.get("code", "INVALID")))
+		return false
+	var dest_value := str(occupant.core_value()) if occupant != null else ""
+	if action == "swap":
+		var dest_identity := _reference_identity(dest_value)
+		var dest_check := _validate_link(src, dest_value, from_key, target, true, dest_identity)
+		if not bool(dest_check.get("ok", false)):
+			_report_link_failure(str(dest_check.get("code", "INVALID")))
+			return false
+	var before_bytes: PackedByteArray = doc.to_bytes()
+	var snap := doc.capture_snapshot()
+	doc.begin_compound()
+	if action == "swap":
+		doc.set_entry_value(from_entry, dest_value)
+		doc.set_entry_value(occupant, source_value)
+	else:
+		if occupant != null:
+			doc.remove_entry(from_entry)
+			doc.set_entry_value(occupant, source_value)
+		else:
+			var source_header_id := str(from_entry.header_id)
+			doc.remove_entry(from_entry)
+			var appended = doc.append_entry(src, target, source_value, source_header_id)
+			if appended == null:
+				doc.end_compound()
+				doc.restore_snapshot(snap)
+				status_changed.emit("Move failed; original reference preserved byte-exactly.", "warning")
+				return false
+	doc.end_compound()
+	if doc.to_bytes() == before_bytes:
+		status_changed.emit("Move made no change.", "warning")
+		return false
+	clear_edge_selection()
+	document_edited.emit()
+	load_document(doc)
+	status_changed.emit("Moved %s.%s -> %s (%s)." % [src, from_key, target, action], "success")
+	return true
+
+
+## Keyboard dispatcher for graph link manipulation. Returns true when handled.
+## MODIFIER MAP: X/Delete = cut, C = copy, V = paste, R = reconnect,
+##               M = move, Alt+Delete/Backspace = disconnect.
+func _handle_graph_hotkey(event: InputEvent) -> bool:
+	if not (event is InputEventKey) or not event.pressed or event.echo:
+		return false
+	var k := event as InputEventKey
+	if graph == null or doc == null:
+		return false
+	var fo: Control = get_viewport().get_focus_owner() as Control
+	if fo is LineEdit or fo is TextEdit or fo is SpinBox:
+		return false
+	var focused := graph.has_focus()
+	var over_graph := graph.get_global_rect().has_point(graph.get_global_mouse_position())
+	if not focused and not over_graph:
+		return false
+	var cut_key := k.keycode == KEY_X or k.keycode == KEY_DELETE
+	if k.ctrl_pressed or k.meta_pressed:
+		if k.keycode == KEY_C:
+			return copy_selected_links() >= 0
+		if k.keycode == KEY_V:
+			return paste_links() > 0
+		if k.keycode == KEY_R:
+			return reconnect_selected_link()
+		if k.keycode == KEY_M:
+			return move_selected_link()
+		return false
+	if cut_key and k.alt_pressed:
+		return disconnect_selected_link()
+	if cut_key:
+		return cut_selected_links() > 0
+	return false
 
 
 func _on_reference_submitted(header: String, key: String, text: String) -> void:
@@ -917,20 +1810,45 @@ func _on_reference_submitted(header: String, key: String, text: String) -> void:
 		"missing_header":
 			status_changed.emit("Reference rejected: %s has no [%s] header." % [str(resolved.get("path", "")).get_file(), str(resolved.get("header", ""))], "warning")
 			return
-	var target := _reference_header(value)
-	if target.to_lower() == header.to_lower():
-		status_changed.emit("Reference rejected: a node cannot reference itself.", "warning")
-		return
-	if target != "" and _would_cycle(header, target):
-		status_changed.emit("Reference rejected: %s -> %s would create a cycle." % [header, target], "warning")
-		return
 	var e = doc.find_entry(header, key)
 	if e == null:
 		return
 	if e.core_value() == value:
 		return
-	doc.set_entry_value(e, value)
-	status_changed.emit("Updated %s.%s = %s" % [header, key, value], "success")
+	var before_bytes: PackedByteArray = doc.to_bytes()
+	var kind := str(resolved.get("kind", ""))
+	if kind == "local":
+		var target := _reference_header(value)
+		if target.to_lower() == header.to_lower():
+			status_changed.emit("Reference rejected: a node cannot reference itself.", "warning")
+			return
+		var check := _validate_link(header, target, key, key)
+		if not bool(check.get("ok", false)):
+			_report_link_failure(str(check.get("code", "INVALID")))
+			return
+		if target != "" and _would_cycle(header, target):
+			status_changed.emit("Reference rejected: %s -> %s would create a cycle." % [header, target], "warning")
+			return
+		doc.set_entry_value(e, value)
+		status_changed.emit("Updated %s.%s = %s (local)" % [header, key, value], "success")
+	elif kind == "external":
+		# External file.header references are resource references, not local graph
+		# edges. They never enter local-only validation or cross-file cycle walks.
+		var ext_path := str(resolved.get("path", ""))
+		var ext_header := str(resolved.get("header", ""))
+		if ext_path == "" or ext_header == "":
+			status_changed.emit("Reference rejected: external source identity is incomplete.", "warning")
+			return
+		doc.set_entry_value(e, value)
+		status_changed.emit("Updated %s.%s = %s (external: %s ▸ [%s])" % [
+			header, key, value, ext_path.get_file(), ext_header
+		], "success")
+	else:
+		status_changed.emit("Reference rejected: unsupported reference kind.", "warning")
+		return
+	if doc.to_bytes() == before_bytes:
+		status_changed.emit("Reference edit made no change.", "warning")
+		return
 	document_edited.emit()
 	load_document(doc)
 
@@ -1400,6 +2318,31 @@ func _rebuild_quick_inspector() -> void:
 	quick_inspector_box.add_child(live_lbl)
 	_live_inspection_label = live_lbl
 
+	# Physical reference slots: each property is a separate edge even when
+	# several properties share the same endpoints. Clicking a row selects that
+	# exact entry, so commands never have to infer it from node endpoints.
+	if not _child_keys(doc, hdr).is_empty():
+		var edge_heading := Label.new()
+		edge_heading.text = "Edges (physical slots)"
+		edge_heading.add_theme_font_size_override("font_size", 11)
+		edge_heading.add_theme_color_override("font_color", Color("#D3B57A"))
+		quick_inspector_box.add_child(edge_heading)
+		for slot_key in _child_keys(doc, hdr):
+			var slot_entry = doc.find_entry(hdr, slot_key)
+			if slot_entry == null:
+				continue
+			var slot_value: String = str(slot_entry.core_value())
+			var dst_name: String = _reference_header(slot_value)
+			var row := Button.new()
+			row.text = "%s → %s" % [slot_key, dst_name if dst_name != "" else slot_value]
+			row.tooltip_text = "[%s] line %d · %s" % [hdr, int(slot_entry.line), slot_value]
+			row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			row.focus_mode = Control.FOCUS_NONE
+			var selected_key := slot_key
+			var selected_value := slot_value
+			row.pressed.connect(func(): select_edge(hdr, selected_key, dst_name if dst_name != "" else selected_value, "inspector"))
+			quick_inspector_box.add_child(row)
+
 	# 1. renderBase dropdown (RMB resets to factory)
 	var rb_row := HBoxContainer.new()
 	var rb_lbl := Label.new()
@@ -1721,116 +2664,1128 @@ func insert_preset(preset_id: String) -> String:
 	return candidate
 
 
-## Coordinated multi-file save for the active render ODF and every dirty
-## external ODF referenced via `file.header`. Saves exclusively to isolated
-## WorkspaceStore overrides; original Workshop/Game files remain untouched.
-## Implements P1-05 coordinated save-group transaction snapshot and PARTIAL_SAVE_RECOVERABLE.
+## Coordinated multi-file save with a durable write-ahead journal. The journal
+## is written and read-back verified BEFORE any document is mutated; every
+## per-document commit is recorded before the next write starts. Recovery is
+## discovered from disk after a process restart, never from in-memory state alone.
+const SAVE_GROUP_DIR := "save_groups"
+const SAVE_GROUP_SCHEMA := 1
+
+
+func _save_group_dir() -> String:
+	return ProjectSettings.globalize_path(WorkspaceStore.root().path_join(SAVE_GROUP_DIR))
+
+
+## T-122: a group id is a single filesystem path component, never a path.
+## The embedded identity must match the journal filename that carried it.
+static func validate_recovery_group_id(group_id: String, journal_file: String = "") -> Dictionary:
+	if group_id.is_empty() or group_id.length() > 96:
+		return {"ok": false, "reason": "INVALID_GROUP_ID"}
+	for i in group_id.length():
+		var c := group_id.unicode_at(i)
+		var valid := (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or \
+			(c >= 48 and c <= 57) or c == 95 or c == 45
+		if not valid:
+			return {"ok": false, "reason": "INVALID_GROUP_ID"}
+	if journal_file != "" and journal_file != group_id + ".json":
+		return {"ok": false, "reason": "GROUP_ID_MISMATCH"}
+	return {"ok": true, "reason": ""}
+
+
+func _save_group_path(group_id: String) -> String:
+	var check := validate_recovery_group_id(group_id)
+	if not bool(check.get("ok", false)):
+		return ""
+	return _save_group_dir().path_join(group_id + ".json")
+
+
+## T-122: containment check for a recovery artifact destination.
+func recovery_artifact_destination(root_path: String, group_id: String) -> Dictionary:
+	var check := validate_recovery_group_id(group_id)
+	if not bool(check.get("ok", false)):
+		return {"ok": false, "reason": str(check.get("reason", "INVALID_GROUP_ID"))}
+	var root := WorkspaceStore.canonical(root_path)
+	var dst := WorkspaceStore.canonical(root.path_join("working_" + group_id))
+	if not WorkspaceStore.is_within(root, dst):
+		return {"ok": false, "reason": "ARTIFACT_PATH_ESCAPE"}
+	return {"ok": true, "path": dst}
+
+
+func _write_save_journal(group: Dictionary) -> bool:
+	# Test-only fault injection: simulates a durable journal write failure
+	# after the documents were mutated (SAVE-66..70). Production never sets it.
+	if WorkspaceStore.fault_phases.get("save_journal_final_write", false):
+		return false
+	var gid := str(group.get("group_id", ""))
+	if not bool(validate_recovery_group_id(gid).get("ok", false)):
+		return false
+	var path := _save_group_path(gid)
+	var payload := JSON.stringify(group, "  ").to_utf8_buffer()
+	var res := WorkspaceStore.atomic_write_abs(path, payload)
+	if not bool(res.get("ok", false)) or not FileAccess.file_exists(path):
+		return false
+	return WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(path)) == WorkspaceStore._md5_bytes(payload)
+
+
+func _save_group_override_abs(sp: String) -> String:
+	var entry := WorkspaceStore.entry_for(sp)
+	if entry.is_empty():
+		return ""
+	return ProjectSettings.globalize_path(WorkspaceStore.odf_dir().path_join(str(entry.get("rel", ""))))
+
+
+const EMPTY_BYTES_MD5 := "d41d8cd98f00b204e9800998ecf8427e"
+
+
+## A journal is durable local state, not an authorization to write. Never
+## redecode a payload without proving its recorded identity first.
+static func _decode_journal_payload(b64: String, expected_md5: String) -> Dictionary:
+	var want := expected_md5.to_lower()
+	if not WorkspaceStore._is_hex_md5(want):
+		return {"ok": false, "reason": "INVALID_PAYLOAD_HASH", "bytes": PackedByteArray()}
+	if b64 == "":
+		if want != EMPTY_BYTES_MD5:
+			return {"ok": false, "reason": "HASH_MISMATCH", "bytes": PackedByteArray()}
+		return {"ok": true, "bytes": PackedByteArray()}
+	var decoded := WorkspaceStore._decode_verified_base64(b64, want)
+	if not bool(decoded.get("ok", false)):
+		return {"ok": false, "reason": str(decoded.get("status", "HASH_MISMATCH")), "bytes": PackedByteArray()}
+	return {"ok": true, "bytes": decoded.get("bytes", PackedByteArray())}
+
+
+static func _journal_source_identity(sp: String) -> String:
+	var canon := WorkspaceStore.canonical(sp)
+	return canon.to_lower() if OS.get_name() == "Windows" else canon
+
+
+## Reject absolute paths, traversal and symlink/reparse components in a journal
+## path before it can reach any filesystem mutation.
+static func _journal_path_has_link_component(abs_path: String) -> bool:
+	var canon := WorkspaceStore.canonical(abs_path)
+	if canon == "":
+		return false
+	var parts := canon.split("/", false)
+	if parts.is_empty():
+		return false
+	var cur := ""
+	if canon.begins_with("/"):
+		cur = "/"
+	elif parts[0].ends_with(":"):
+		cur = parts[0] + "/"
+		parts.remove_at(0)
+	for part in parts:
+		var parent := cur if cur != "" else "/"
+		if DirAccess.dir_exists_absolute(parent):
+			var d := DirAccess.open(parent)
+			if d != null and d.has_method("is_link") and d.is_link(part):
+				return true
+		cur = parent.path_join(part) if not parent.ends_with("/") else parent + part
+	return false
+
+
+static func _journal_abs_override_path(p: String, odf_root: String) -> String:
+	if p == "":
+		return ""
+	var has_nul := false
+	for i in p.length():
+		if p.unicode_at(i) == 0:
+			has_nul = true
+			break
+	if has_nul:
+		return ""
+	var canon := WorkspaceStore.canonical(ProjectSettings.globalize_path(p))
+	if not WorkspaceStore.is_within(odf_root, canon) or _journal_path_has_link_component(canon):
+		return ""
+	return canon
+
+
+## Validate one target's recorded paths against the authorized workspace ODF
+## directory and its source identity. A path found in JSON is data, never
+## permission to write outside this workspace.
+static func _validate_journal_target_paths(target: Dictionary, sp: String) -> Dictionary:
+	var odf_root := WorkspaceStore.canonical(ProjectSettings.globalize_path(WorkspaceStore.odf_dir()))
+	var live_entry := WorkspaceStore.entry_for(sp)
+	var prev_entry: Dictionary = target.get("previous_manifest_entry", {})
+	var expected_rel := str(live_entry.get("rel", ""))
+	if expected_rel == "":
+		expected_rel = str(prev_entry.get("rel", ""))
+	if expected_rel != "":
+		var norm := expected_rel.replace("\\", "/").strip_edges()
+		if WorkspaceStore.clean_rel(norm) != norm:
+			return {"ok": false, "reason": "INVALID_OVERRIDE_REL"}
+	var expected_abs := ""
+	if expected_rel != "":
+		expected_abs = _journal_abs_override_path(
+			ProjectSettings.globalize_path(WorkspaceStore.odf_dir().path_join(expected_rel)), odf_root)
+		if expected_abs == "":
+			return {"ok": false, "reason": "UNSAFE_OVERRIDE_PATH"}
+	# A recorded previous path that differs from the live manifest rel is not
+	# automatically an attack: recovery restores that recorded rel. Bind the
+	# path check to the value this target will actually write.
+	var recorded_prev := str(target.get("previous_override_path", ""))
+	if recorded_prev != "" and bool(target.get("had_override_before", false)):
+		var resolved_prev := _journal_abs_override_path(recorded_prev, odf_root)
+		if resolved_prev == "":
+			return {"ok": false, "reason": "UNSAFE_OVERRIDE_PATH"}
+		expected_abs = resolved_prev
+	for key in ["workspace_override_path", "previous_override_path"]:
+		var recorded := str(target.get(key, ""))
+		if recorded == "":
+			continue
+		var canon := _journal_abs_override_path(recorded, odf_root)
+		if canon == "":
+			return {"ok": false, "reason": "UNSAFE_OVERRIDE_PATH"}
+		if expected_abs != "" and canon != expected_abs:
+			return {"ok": false, "reason": "JOURNAL_MANIFEST_PATH_MISMATCH"}
+	var recorded_canonical := str(target.get("source_canonical", ""))
+	if recorded_canonical != "" and WorkspaceStore.canonical(recorded_canonical) != WorkspaceStore.canonical(sp):
+		return {"ok": false, "reason": "JOURNAL_SOURCE_IDENTITY_MISMATCH"}
+	return {"ok": true, "reason": ""}
+
+
+func _read_override_bytes(sp: String) -> PackedByteArray:
+	var abs_path := _save_group_override_abs(sp)
+	if abs_path == "" or not FileAccess.file_exists(abs_path):
+		return PackedByteArray()
+	return FileAccess.get_file_as_bytes(abs_path)
+
+
+func _save_group_source_bytes(sp: String) -> PackedByteArray:
+	if not FileAccess.file_exists(sp):
+		return PackedByteArray()
+	return FileAccess.get_file_as_bytes(sp)
+
+
+func _capture_save_target(d) -> Dictionary:
+	var sp := str(d.source_path)
+	# P0-SAVE-02: an absent override and an empty override are different states;
+	# capture them separately so recovery can restore the exact structural
+	# workspace state, not merely matching property values.
+	var had_override := _save_group_override_abs(sp) != "" and FileAccess.file_exists(_save_group_override_abs(sp))
+	var prev_raw := _read_override_bytes(sp)
+	if not had_override:
+		# No override existed: the rollback baseline is the pristine source.
+		prev_raw = _save_group_source_bytes(sp)
+	# An EXISTING override keeps its exact bytes even when empty; never
+	# substitute the source here or an empty revision would be unrestoreable.
+	var working_bytes: PackedByteArray = d.to_bytes()
+	var prev_entry := WorkspaceStore.entry_for(sp)
+	return {
+		"source_path": sp,
+		"source_canonical": WorkspaceStore.canonical(sp),
+		"workspace_override_path": _save_group_override_abs(sp),
+		"previous_override_path": _save_group_override_abs(sp) if had_override else "",
+		"source_hash": WorkspaceStore._md5_bytes(_save_group_source_bytes(sp)),
+		"had_override_before": had_override,
+		"previous_override_hash": WorkspaceStore._md5_bytes(prev_raw),
+		"previous_override_bytes": Marshalls.raw_to_base64(prev_raw),
+		"previous_manifest_entry": prev_entry.duplicate(true),
+		"working_bytes_hash": WorkspaceStore._md5_bytes(working_bytes),
+		"working_bytes": Marshalls.raw_to_base64(working_bytes),
+		"encoding": str(d.encoding),
+		"has_bom": bool(d.has_bom),
+		"revision": int(d.revision),
+		"status": "PENDING",
+	}
+
+
+## P1-TEST-01: emit a durable checkpoint from INSIDE the save-group operation,
+## then block so the parent verifier can kill the real OS process at that exact
+## phase. Production never supplies a checkpoint marker.
+static func _crash_checkpoint(phase: String, options: Dictionary, group_id: String) -> void:
+	var wanted := str(options.get("checkpoint_phase", ""))
+	var marker := str(options.get("checkpoint_marker", ""))
+	if wanted != phase or marker == "":
+		return
+	DirAccess.make_dir_recursive_absolute(marker.get_base_dir())
+	var f := FileAccess.open(marker, FileAccess.WRITE)
+	if f != null:
+		f.store_string(group_id + "\n" + phase + "\n")
+		f.flush()
+		f.close()
+	var deadline := Time.get_ticks_msec() + 120000
+	while Time.get_ticks_msec() < deadline:
+		OS.delay_msec(25)
+
+
 func save_with_external_dependencies(options: Dictionary = {}) -> Dictionary:
 	var targets: Array = []
 	var seen := {}
 	if doc != null and doc.source_path != "":
 		targets.append(doc)
-		seen[doc.source_path] = true
+		seen[WorkspaceStore.canonical(doc.source_path).to_lower()] = true
 	for ext_key in _external_nodes:
 		var ep := str((_external_nodes[ext_key] as Dictionary).get("path", ""))
-		if ep == "" or seen.has(ep):
+		var lp := WorkspaceStore.canonical(ep).to_lower()
+		if ep == "" or seen.has(lp):
 			continue
 		var ext_doc = OdfDocument.cached(ep)
 		if ext_doc is OdfDocument and (ext_doc.dirty or ext_doc.workspace_override):
 			targets.append(ext_doc)
-			seen[ep] = true
+			seen[lp] = true
 
 	var fail_on := WorkspaceStore.canonical(str(options.get("fail_on_path", ""))).to_lower() if str(options.get("fail_on_path", "")) != "" else ""
-	var group_id := "pgrp_%d" % Time.get_ticks_usec()
-	var snapshots := {}
+	var group_id := "pgrp_%d_%d" % [Time.get_ticks_usec(), randi()]
+	var targets_data: Array[Dictionary] = []
 	for d in targets:
-		var sp := str(d.source_path)
-		var prev_ws_bytes := PackedByteArray()
-		var ws_entry := WorkspaceStore.entry_for(sp)
-		var had_ws := not ws_entry.is_empty()
-		if had_ws:
-			var ws_abs := ProjectSettings.globalize_path(WorkspaceStore.odf_dir().path_join(str(ws_entry.get("rel", ""))))
-			if FileAccess.file_exists(ws_abs):
-				prev_ws_bytes = FileAccess.get_file_as_bytes(ws_abs)
-		snapshots[sp] = {
-			"had_workspace_override": had_ws,
-			"previous_workspace_bytes": "" if prev_ws_bytes.is_empty() else Marshalls.raw_to_base64(prev_ws_bytes),
-			"working_text": d.text,
-			"revision": int(d.revision),
-		}
+		targets_data.append(_capture_save_target(d))
+	var group: Dictionary = {
+		"schema": SAVE_GROUP_SCHEMA,
+		"group_id": group_id,
+		"state": "PREPARED",
+		"created_at": Time.get_datetime_string_from_system(),
+		"updated_at": Time.get_datetime_string_from_system(),
+		"targets": targets_data,
+	}
+	DirAccess.make_dir_recursive_absolute(_save_group_dir())
+	if not _write_save_journal(group):
+		last_save_group = group
+		last_save_recovery = {"ok": false, "reason": "JOURNAL_WRITE_FAILED", "state": "RECOVERY_PENDING"}
+		return {"ok": false, "status": "RECOVERY_PENDING", "reason": "JOURNAL_WRITE_FAILED",
+			"group_id": group_id, "saved": [], "failed": [], "recoverable": false,
+			"error": "durable save-group intent could not be verified; no document was written"}
+	_crash_checkpoint("AFTER_PREPARED_JOURNAL", options, group_id)
+
+	group["state"] = "COMMITTING"
+	group["updated_at"] = Time.get_datetime_string_from_system()
+	if not _write_save_journal(group):
+		last_save_group = group
+		last_save_recovery = {"ok": false, "reason": "JOURNAL_UPDATE_FAILED", "state": "RECOVERY_PENDING"}
+		return {"ok": false, "status": "RECOVERY_PENDING", "reason": "JOURNAL_UPDATE_FAILED",
+			"group_id": group_id, "saved": [], "failed": [], "recoverable": false,
+			"error": "committing state could not be persisted; no document was written"}
+	_crash_checkpoint("AFTER_COMMITTING_JOURNAL", options, group_id)
 
 	var saved: Array[String] = []
 	var failed: Array[Dictionary] = []
-	for d in targets:
+	for i in range(targets.size()):
+		var d = targets[i]
 		var sp := str(d.source_path)
 		if fail_on != "" and WorkspaceStore.canonical(sp).to_lower() == fail_on:
 			failed.append({"path": sp, "error": "FORCED_SAVE_FAILURE"})
-			continue
-		if not d.dirty and d.workspace_override:
+			targets_data[i]["status"] = "FAILED"
+		elif not d.dirty and d.workspace_override:
 			saved.append(sp)
-			continue
-		var res := WorkspaceStore.save_document(d)
-		if bool(res.get("ok", false)):
-			saved.append(sp)
+			targets_data[i]["status"] = "SAVED"
+			targets_data[i]["new_override_hash"] = str(targets_data[i].get("previous_override_hash", ""))
 		else:
-			failed.append({"path": sp, "error": str(res.get("error", "save failed"))})
+			if i == 0:
+				_crash_checkpoint("BEFORE_FIRST_OVERRIDE_WRITE", options, group_id)
+			var res := WorkspaceStore.save_document(d)
+			if i == 0:
+				_crash_checkpoint("AFTER_FIRST_OVERRIDE_WRITE", options, group_id)
+			if bool(res.get("ok", false)):
+				saved.append(sp)
+				targets_data[i]["status"] = "SAVED"
+				var after := _read_override_bytes(sp)
+				targets_data[i]["new_override_hash"] = WorkspaceStore._md5_bytes(after)
+			else:
+				failed.append({"path": sp, "error": str(res.get("error", "save failed"))})
+				targets_data[i]["status"] = "FAILED"
+		group["updated_at"] = Time.get_datetime_string_from_system()
+		if i == 0:
+			_crash_checkpoint("BEFORE_FIRST_TARGET_JOURNAL", options, group_id)
+		if not _write_save_journal(group):
+			last_save_group = group
+			last_save_recovery = {"ok": false, "reason": "JOURNAL_UPDATE_FAILED", "state": "RECOVERY_PENDING"}
+			return {"ok": false, "status": "RECOVERY_PENDING", "reason": "JOURNAL_UPDATE_FAILED",
+				"group_id": group_id, "saved": saved, "failed": failed, "recoverable": true,
+				"error": "per-document commit could not be journaled; remaining documents were not attempted"}
+		if i == 0:
+			_crash_checkpoint("AFTER_FIRST_TARGET_JOURNAL", options, group_id)
+		if not failed.is_empty():
+			break
 
 	var status := "COMPLETE"
 	if not failed.is_empty() and not saved.is_empty():
 		status = "PARTIAL_SAVE_RECOVERABLE"
 	elif not failed.is_empty():
 		status = "SAVE_FAILED"
-
-	last_save_group = {
-		"group_id": group_id,
-		"status": status,
-		"saved": saved,
-		"failed": failed,
-		"snapshots": snapshots,
-		"timestamp": Time.get_datetime_string_from_system(),
-	}
-	var grp_dir := ProjectSettings.globalize_path(WorkspaceStore.root().path_join("save_groups"))
-	DirAccess.make_dir_recursive_absolute(grp_dir)
-	WorkspaceStore.atomic_write_abs(grp_dir.path_join(group_id + ".json"), JSON.stringify(last_save_group, "  ").to_utf8_buffer())
+	group["state"] = status
+	group["updated_at"] = Time.get_datetime_string_from_system()
+	_crash_checkpoint("BEFORE_FINAL_JOURNAL", options, group_id)
+	var final_write := _write_save_journal(group)
+	if not final_write and status == "COMPLETE":
+		status = "RECOVERY_PENDING"
+		group["state"] = status
+		_write_save_journal(group)
+	last_save_group = group
 	return {
-		"ok": failed.is_empty(),
+		"ok": failed.is_empty() and status == "COMPLETE",
 		"status": status,
 		"group_id": group_id,
 		"saved": saved,
 		"failed": failed,
-		"recoverable": status == "PARTIAL_SAVE_RECOVERABLE",
+		"recoverable": status in ["PARTIAL_SAVE_RECOVERABLE", "RECOVERY_PENDING", "SAVE_FAILED",
+			"RECOVERY_CONFLICT_PENDING", "RECOVERY_FINALIZATION_PENDING"],
 	}
 
 
-func recover_partial_save_group() -> Dictionary:
-	if last_save_group.is_empty():
+func discover_incomplete_save_groups() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var dir := DirAccess.open(_save_group_dir())
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var n := dir.get_next()
+	while n != "":
+		if n.ends_with(".json"):
+			var res := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(_save_group_dir().path_join(n)))
+			if bool(res.get("ok", false)) and res.get("data", null) is Dictionary:
+				var g: Dictionary = res.get("data", {})
+				if not bool(validate_recovery_group_id(str(g.get("group_id", "")), n).get("ok", false)):
+					n = dir.get_next()
+					continue
+				if int(g.get("schema", 0)) == SAVE_GROUP_SCHEMA and \
+						str(g.get("state", "")) not in ["COMPLETE", "RECOVERED",
+							"RECOVERY_CONFLICT_RESOLVED", "RECOVERY_FINALIZED"]:
+					out.append(g)
+		n = dir.get_next()
+	dir.list_dir_end()
+	return out
+
+
+func _persist_working_recovery_artifact(group_id: String, target: Dictionary) -> String:
+	var decoded := _decode_journal_payload(str(target.get("working_bytes", "")),
+		str(target.get("working_bytes_hash", "")))
+	if not bool(decoded.get("ok", false)):
+		return ""
+	var bytes: PackedByteArray = decoded.get("bytes", PackedByteArray())
+	if bytes.is_empty():
+		return ""
+	var dest := recovery_artifact_destination(_save_group_dir(), group_id)
+	if not bool(dest.get("ok", false)):
+		return ""
+	var dst_dir := str(dest.get("path", ""))
+	# P1-SAVE-04: two dependencies with the same basename must never overwrite
+	# each other's recovery artifact. Disambiguate by a stable source identity
+	# derived from the canonical source path.
+	var sp := str(target.get("source_path", ""))
+	var identity := sp
+	if sp == "":
+		identity = "nosource"
+	else:
+		var canon := WorkspaceStore.canonical(sp)
+		# Keep the basename visible for humans, but make the directory unique.
+		identity = canon.get_file() + "-" + WorkspaceStore._md5_bytes(canon.to_utf8_buffer())
+	var leaf := sp.get_file() if sp != "" else "working.odf"
+	var dst := dst_dir.path_join(identity).path_join(leaf)
+	DirAccess.make_dir_recursive_absolute(dst.get_base_dir())
+	var write := WorkspaceStore.atomic_write_abs(dst, bytes)
+	if not bool(write.get("ok", false)):
+		return ""
+	# Never claim an artifact is preserved unless its bytes read back equal.
+	if WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(dst)) != str(target.get("working_bytes_hash", "")):
+		return ""
+	return dst
+
+
+## Resolve the override path for a transaction target. The journal records the
+## exact path at capture time; the live manifest is only a fallback because a
+## lost manifest entry must not hide an override the journal knows existed.
+func _save_group_target_override_abs(target: Dictionary, sp: String) -> String:
+	var odf_root := WorkspaceStore.canonical(ProjectSettings.globalize_path(WorkspaceStore.odf_dir()))
+	var live := _save_group_override_abs(sp)
+	if live != "":
+		return _journal_abs_override_path(live, odf_root)
+	if bool(target.get("had_override_before", false)):
+		return _journal_abs_override_path(str(target.get("previous_override_path", "")), odf_root)
+	return ""
+
+
+## P0-SAVE-03: classify the current override revision against the transaction
+## record before any destructive recovery decision.
+func _classify_current_override(target: Dictionary) -> String:
+	var sp := str(target.get("source_path", ""))
+	var expected_new := str(target.get("new_override_hash", ""))
+	var expected_prev := str(target.get("previous_override_hash", ""))
+	var abs_override := _save_group_target_override_abs(target, sp)
+	var current := _read_override_bytes(sp)
+	if abs_override == "" or not FileAccess.file_exists(abs_override):
+		# No override exists now. When none existed before the transaction
+		# either, this is the expected structural state, not a conflict: the
+		# transaction never created (or never reached) this target's override.
+		if not bool(target.get("had_override_before", false)):
+			return "CURRENT_IS_EXPECTED_ABSENT"
+		# An override that existed before is now unexpectedly gone; someone
+		# removed it after the journal was written. Diagnose, never guess.
+		return "CURRENT_UNKNOWN"
+	# current exists and equals the recorded previous revision (including the
+	# legitimate empty revision, whose md5 is the empty-string md5).
+	if not current.is_empty() and WorkspaceStore._md5_bytes(current) == expected_prev:
+		return "CURRENT_EQUALS_PREVIOUS"
+	if current.is_empty() and expected_prev == "d41d8cd98f00b204e9800998ecf8427e":
+		return "CURRENT_EQUALS_PREVIOUS"
+	if expected_new != "" and WorkspaceStore._md5_bytes(current) == expected_new:
+		return "CURRENT_EQUALS_RECORDED_COMMIT"
+	if expected_new != "" or not current.is_empty():
+		return "CURRENT_IS_NEWER"
+	return "CURRENT_UNKNOWN"
+
+
+func _resolve_recovery_conflict(group: Dictionary, gid: String,
+		restored: Array[String], failed: Array[Dictionary],
+		conflicts: Array[Dictionary], artifacts: Array[String]) -> Dictionary:
+	# P1-SAVE-05: an unresolved conflict is NOT a hidden terminal state. The
+	# journal stays discoverable at startup until a human resolves it.
+	group["state"] = "RECOVERY_CONFLICT_PENDING"
+	group["updated_at"] = Time.get_datetime_string_from_system()
+	_write_save_journal(group)
+	last_save_group = group
+	last_save_recovery = {"ok": false, "state": str(group["state"]), "restored": restored,
+		"failed": failed, "conflicts": conflicts, "working_artifacts": artifacts}
+	return {"ok": false, "status": str(group["state"]), "group_id": gid,
+		"restored": restored, "failed": failed, "conflicts": conflicts,
+		"working_artifacts": artifacts, "reason": "RECOVERY_CONFLICT"}
+
+
+## T-122: capture the exact on-disk revisions that a confirmation describes.
+## The UI and any other call site must pass this token back to the resolver;
+## a bare group id is no longer sufficient authority for a destructive write.
+func build_recovery_confirmation_token(group_id: String, action: String) -> Dictionary:
+	var gid_check := validate_recovery_group_id(group_id)
+	if not bool(gid_check.get("ok", false)):
+		return {"ok": false, "reason": "INVALID_GROUP_ID"}
+	var path := _save_group_path(group_id)
+	var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(path))
+	if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
 		return {"ok": false, "reason": "NO_SAVE_GROUP"}
-	var snaps: Dictionary = last_save_group.get("snapshots", {})
-	var restored: Array[String] = []
+	var group: Dictionary = jres.get("data", {})
+	if not bool(validate_recovery_group_id(str(group.get("group_id", "")), group_id + ".json").get("ok", false)):
+		return {"ok": false, "reason": "GROUP_ID_MISMATCH"}
+	var target_hashes := {}
+	var target_existence := {}
+	var target_source_ids: Array[String] = []
+	for item in group.get("targets", []):
+		if not (item is Dictionary):
+			continue
+		var target: Dictionary = item
+		var sp := str(target.get("source_path", ""))
+		if sp == "":
+			continue
+		if not target_source_ids.has(sp):
+			target_source_ids.append(sp)
+		var abs_override := _save_group_target_override_abs(target, sp)
+		var effective := abs_override
+		if effective == "" or not FileAccess.file_exists(effective):
+			effective = sp
+		var exists := FileAccess.file_exists(effective)
+		target_existence[sp] = exists
+		target_hashes[sp] = FileAccess.get_md5(effective) if exists else ""
+	return {"ok": true, "group_id": group_id, "action": action,
+		"journal_hash": WorkspaceStore._md5_bytes(JSON.stringify(group, "  ").to_utf8_buffer()),
+		"target_source_ids": target_source_ids,
+		"current_file_hashes": target_hashes,
+		"current_file_existence": target_existence,
+		"manifest_revision": WorkspaceStore.manifest_fingerprint(),
+		"preview_revision": str(group.get("updated_at", ""))}
+
+
+## T-122: a direct disk restore must converge every shared cached document.
+## A dirty document keeps its unsaved content by becoming conflict-flagged
+## instead of being silently overwritten; a clean one reloads restored bytes.
+func _sync_cached_recovered_document(sp: String, bytes: PackedByteArray,
+		target: Dictionary, is_override: bool) -> void:
+	var cached_doc = OdfDocument.cached(sp)
+	if not (cached_doc is OdfDocument):
+		OdfDocument.invalidate_cache(sp)
+		return
+	var d: OdfDocument = cached_doc
+	if d.dirty:
+		d.workspace_conflict = true
+		OdfDocument.invalidate_cache(sp)
+		return
+	var source_ref := _save_group_source_bytes(sp)
+	var rel_after := str(WorkspaceStore.entry_for(sp).get("rel", "")) if is_override else ""
+	d.apply_recovered_bytes(bytes, source_ref, false, is_override, rel_after, "",
+		str(target.get("encoding", "")), 1 if bool(target.get("has_bom", false)) else 0)
+	OdfDocument.cache_document(d)
+
+
+func verify_recovery_confirmation(group_id: String, action: String, token: Dictionary) -> Dictionary:
+	return _verify_recovery_confirmation(group_id, action, token)
+
+
+func _verify_recovery_confirmation(group_id: String, action: String, token: Dictionary) -> Dictionary:
+	var fresh: Dictionary = build_recovery_confirmation_token(group_id, action)
+	if not bool(fresh.get("ok", false)):
+		return {"ok": false, "reason": str(fresh.get("reason", "NO_SAVE_GROUP"))}
+	if str(token.get("group_id", "")) != group_id or str(token.get("action", "")) != action:
+		return {"ok": false, "reason": "CONFIRMATION_IDENTITY_MISMATCH"}
+	var expected_ids: Array = token.get("target_source_ids", [])
+	var actual_ids: Array = fresh.get("target_source_ids", [])
+	if not (token.get("target_source_ids", null) is Array) or expected_ids.size() != actual_ids.size():
+		return {"ok": false, "reason": "TARGET_IDENTITY_SET_MISMATCH"}
+	for want in actual_ids:
+		if not expected_ids.has(want):
+			return {"ok": false, "reason": "TARGET_IDENTITY_SET_MISMATCH"}
+	for want in expected_ids:
+		if not actual_ids.has(want):
+			return {"ok": false, "reason": "TARGET_IDENTITY_SET_MISMATCH"}
+	if str(fresh.get("journal_hash", "")) != str(token.get("journal_hash", "")):
+		return {"ok": false, "reason": "JOURNAL_CHANGED"}
+	if str(fresh.get("manifest_revision", "")) != str(token.get("manifest_revision", "")):
+		return {"ok": false, "reason": "MANIFEST_CHANGED"}
+	var expected: Dictionary = token.get("current_file_hashes", {})
+	var actual: Dictionary = fresh.get("current_file_hashes", {})
+	if not (expected is Dictionary) or expected.size() != actual.size():
+		return {"ok": false, "reason": "TARGET_IDENTITY_SET_MISMATCH"}
+	for sp in expected:
+		if not actual.has(sp) or str(actual[sp]) != str(expected[sp]):
+			return {"ok": false, "reason": "CURRENT_REVISION_CHANGED"}
+	var expected_exist: Dictionary = token.get("current_file_existence", {})
+	var actual_exist: Dictionary = fresh.get("current_file_existence", {})
+	if expected_exist.size() != actual_exist.size():
+		return {"ok": false, "reason": "INVALID_CONFIRMATION_TOKEN"}
+	for sp in expected_exist:
+		if not actual_exist.has(sp) or bool(actual_exist[sp]) != bool(expected_exist[sp]):
+			return {"ok": false, "reason": "CURRENT_REVISION_CHANGED"}
+	return {"ok": true}
+
+
+func resolve_recovery_conflict(group_id: String, action: String, token: Dictionary = {}) -> Dictionary:
+	## Explicit human resolution of a RECOVERY_CONFLICT_PENDING group. The two
+	## allowed actions deliberately choose which revision survives; nothing is
+	## overwritten automatically.
+	var group: Dictionary = {}
+	var res := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(_save_group_path(group_id)))
+	if bool(res.get("ok", false)) and res.get("data", null) is Dictionary:
+		group = res.get("data", {})
+	if group.is_empty() or int(group.get("schema", 0)) != SAVE_GROUP_SCHEMA:
+		return {"ok": false, "reason": "NO_SAVE_GROUP", "state": "NO_SAVE_GROUP"}
+	if str(group.get("state", "")) != "RECOVERY_CONFLICT_PENDING":
+		return {"ok": false, "reason": "NOT_CONFLICT_PENDING", "state": str(group.get("state", ""))}
+	if not bool(validate_recovery_group_id(str(group.get("group_id", "")), group_id + ".json").get("ok", false)):
+		return {"ok": false, "reason": "INVALID_GROUP_ID", "state": str(group.get("state", ""))}
+	if token.is_empty():
+		# Legacy call sites (T-86/T-121) may resolve without an explicit UI
+		# token. Capture one atomically at call time so the same revision guard
+		# still runs immediately before mutation.
+		var auto := build_recovery_confirmation_token(group_id, action)
+		if not bool(auto.get("ok", false)):
+			return {"ok": false, "reason": str(auto.get("reason", "NO_SAVE_GROUP"))}
+		token = auto
+	var revision_check := _verify_recovery_confirmation(group_id, action, token)
+	if not bool(revision_check.get("ok", false)):
+		return {"ok": false, "reason": str(revision_check.get("reason", "CONFIRMATION_REFUSED")),
+			"state": str(group.get("state", ""))}
+	var preflight := _validate_recovery_journal(group)
+	if not bool(preflight.get("ok", false)):
+		return {"ok": false, "reason": str(preflight.get("reason", "INVALID_JOURNAL_TARGETS")),
+			"state": "RECOVERY_PENDING"}
+	var gid := str(group.get("group_id", ""))
+	var applied: Array[String] = []
 	var failed: Array[Dictionary] = []
-	for sp in snaps:
-		var sinfo: Dictionary = snaps[sp]
-		var had_ws := bool(sinfo.get("had_workspace_override", false))
-		var d = OdfDocument.cached(str(sp))
-		if not had_ws:
-			if d != null:
-				var rres := WorkspaceStore.revert_document(d)
-				if not bool(rres.get("ok", false)):
-					failed.append({"path": str(sp), "status": str(rres.get("status", "FAILED")), "error": str(rres.get("error", ""))})
+	if action == "keep_current":
+		# The user inspected both revisions and keeps what is on disk now.
+		for item in group.get("targets", []):
+			if item is Dictionary and str((item as Dictionary).get("source_path", "")) != "":
+				applied.append(str((item as Dictionary).get("source_path", "")))
+	elif action == "restore_working":
+		# The user explicitly restores the preserved working revision from the
+		# recovery artifact over the current override bytes.
+		for item in group.get("targets", []):
+			if not (item is Dictionary):
+				continue
+			var target: Dictionary = item
+			var sp := str(target.get("source_path", ""))
+			if sp == "":
+				continue
+			var artifact := _persist_working_recovery_artifact(gid, target)
+			if artifact == "":
+				failed.append({"path": sp, "reason": "WORKING_ARTIFACT_WRITE_FAILED"})
+				continue
+			var wdec := _decode_journal_payload(str(target.get("working_bytes", "")),
+				str(target.get("working_bytes_hash", "")))
+			if not bool(wdec.get("ok", false)):
+				failed.append({"path": sp, "reason": "WORKING_BYTES_HASH_MISMATCH"})
+				continue
+			var working: PackedByteArray = wdec.get("bytes", PackedByteArray())
+			var abs_override := _save_group_target_override_abs(target, sp)
+			if abs_override == "":
+					# No override existed before and none was created: restoring
+					# the working revision must go through the same committed save
+					# route the transaction would have used (override + manifest
+					# entry), never a bare file write.
+					# P1-SAVE-04: a real restart may not have opened this ODF yet;
+					# load it through the real document route instead of demanding
+					# a pre-populated memory cache.
+					if not FileAccess.file_exists(sp):
+						failed.append({"path": sp, "reason": "SOURCE_MISSING"})
+						continue
+					var wdoc = OdfDocument.cached(sp)
+					if not (wdoc is OdfDocument):
+						wdoc = OdfDocument.load_cached(sp)
+					if not (wdoc is OdfDocument):
+						failed.append({"path": sp, "reason": "SOURCE_LOAD_FAILED"})
+						continue
+					wdoc.apply_recovered_bytes(working, _save_group_source_bytes(sp),
+						false, false, "", "", str(target.get("encoding", "")),
+						1 if bool(target.get("has_bom", false)) else 0)
+					var wsv := WorkspaceStore.save_document_with_rel(wdoc,
+						str(target.get("source_path", "")).get_file())
+					if not bool(wsv.get("ok", false)):
+						failed.append({"path": sp, "reason": "RESTORE_WRITE_FAILED",
+							"error": str(wsv.get("error", ""))})
+						continue
+					_sync_cached_recovered_document(sp, working, target, true)
+
+			else:
+				var wres := WorkspaceStore.atomic_write_abs(abs_override, working)
+				if not bool(wres.get("ok", false)):
+					failed.append({"path": sp, "reason": "RESTORE_WRITE_FAILED"})
 					continue
-		else:
-			var prev_raw := Marshalls.base64_to_raw(str(sinfo.get("previous_workspace_bytes", "")))
-			if not prev_raw.is_empty() and d != null:
-				d.replace_text(prev_raw.get_string_from_utf8())
-				var sres := WorkspaceStore.save_document(d)
-				if not bool(sres.get("ok", false)):
-					failed.append({"path": str(sp), "status": str(sres.get("status", "FAILED")), "error": str(sres.get("error", ""))})
-					continue
-		restored.append(str(sp))
-	last_save_group["status"] = "RECOVERED" if failed.is_empty() else "PARTIAL_RECOVERY"
+				_sync_cached_recovered_document(sp, working, target, true)
+			applied.append(sp)
+	else:
+		return {"ok": false, "reason": "UNKNOWN_CONFLICT_ACTION", "state": str(group.get("state", ""))}
+	group["state"] = "RECOVERY_CONFLICT_RESOLVED" if failed.is_empty() else "RECOVERY_CONFLICT_PENDING"
+	group["conflict_resolution"] = {
+		"action": action,
+		"resolved_at": Time.get_datetime_string_from_system(),
+		"applied": applied,
+		"failed": failed,
+	}
+	group["updated_at"] = Time.get_datetime_string_from_system()
+	if not _write_save_journal(group):
+		# P1-SAVE-06 applies here too: never claim a durable resolution when
+		# the journal could not be finalized.
+		group["state"] = "RECOVERY_CONFLICT_PENDING"
+		last_save_group = group
+		last_save_recovery = {"ok": false, "state": "RECOVERY_FINALIZATION_PENDING",
+			"failed": failed, "conflicts": []}
+		return {"ok": false, "status": "RECOVERY_FINALIZATION_PENDING", "group_id": gid,
+			"restored": applied, "failed": failed, "conflicts": [],
+			"reason": "JOURNAL_FINALIZATION_FAILED"}
+	last_save_group = group
+	last_save_recovery = {"ok": failed.is_empty(), "state": str(group["state"]),
+		"restored": applied, "failed": failed, "conflicts": []}
 	if doc != null:
 		load_document(doc)
-	return {"ok": failed.is_empty(), "status": str(last_save_group["status"]), "restored": restored, "failed": failed}
+	return {"ok": failed.is_empty(), "status": str(group["state"]), "group_id": gid,
+		"restored": applied, "failed": failed, "conflicts": []}
+
+
+## Product feature: read-only ODF revision comparison for a save-group target.
+## Decodes the journal's authenticated historical bytes, compares them with the
+## preserved working revision and the current on-disk override, and reports a
+## compact property-level diff. This never edits a document or journal.
+## T-122: independent physical-source comparison. Property-level effective
+## diffs cannot see comment, whitespace, duplicate-occurrence or BOM changes.
+static func _physical_signature(doc) -> Array[String]:
+	var sig: Array[String] = []
+	if doc == null:
+		return sig
+	for e in doc.entries:
+		var odf_e = e
+		sig.append("%s|%s|%d|%d|%s|%s" % [
+			str(odf_e.header), str(odf_e.key_raw), int(odf_e.occurrence_index),
+			int(odf_e.key_occurrence_index), str(odf_e.comment), str(odf_e.value_raw)])
+	return sig
+
+
+static func _physical_document_diff(before, live, before_bytes: PackedByteArray,
+		live_bytes: PackedByteArray) -> Dictionary:
+	var b_sig := _physical_signature(before)
+	var l_sig := _physical_signature(live)
+	var comment_changes: Array[String] = []
+	var duplicate_changes: Array[String] = []
+	var b_comments := {}
+	var l_comments := {}
+	for e in (before.entries if before != null else []):
+		b_comments[str(e.line)] = str(e.comment)
+	for e in (live.entries if live != null else []):
+		l_comments[str(e.line)] = str(e.comment)
+	for line in b_comments:
+		if l_comments.has(line) and str(b_comments[line]) != str(l_comments[line]):
+			comment_changes.append("line %s" % str(line))
+	var b_counts := {}
+	var l_counts := {}
+	for s in b_sig:
+		var key := str(s).split("|", false, 2)[0] + "|" + str(s).split("|", false, 2)[1]
+		b_counts[key] = int(b_counts.get(key, 0)) + 1
+	for s in l_sig:
+		var key := str(s).split("|", false, 2)[0] + "|" + str(s).split("|", false, 2)[1]
+		l_counts[key] = int(l_counts.get(key, 0)) + 1
+	for key in b_counts:
+		if int(b_counts[key]) != int(l_counts.get(key, 0)):
+			duplicate_changes.append(str(key))
+	var b_bom := bool(before.has_bom) if before != null else false
+	var l_bom := bool(live.has_bom) if live != null else false
+	var b_enc := str(before.encoding) if before != null else ""
+	var l_enc := str(live.encoding) if live != null else ""
+	return {
+		"byte_identical": before_bytes == live_bytes,
+		"comment_changes": comment_changes,
+		"duplicate_key_changes": duplicate_changes,
+		"encoding_changes": b_bom != l_bom or b_enc != l_enc,
+		"previous_bom": b_bom, "current_bom": l_bom,
+		"previous_encoding": b_enc, "current_encoding": l_enc,
+		"physical_entries_changed": b_sig != l_sig,
+	}
+
+
+func compare_journal_target_revision(target: Dictionary) -> Dictionary:
+	var sp := str(target.get("source_path", ""))
+	if sp == "":
+		return {}
+	var prev := _decode_journal_payload(str(target.get("previous_override_bytes", "")),
+		str(target.get("previous_override_hash", "")))
+	var work := _decode_journal_payload(str(target.get("working_bytes", "")),
+		str(target.get("working_bytes_hash", "")))
+	if not bool(prev.get("ok", false)) or not bool(work.get("ok", false)):
+		return {"source_path": sp, "error": "REVISION_PAYLOAD_UNVERIFIED"}
+	var abs_override := _save_group_target_override_abs(target, sp)
+	var current := _read_override_bytes(sp)
+	if abs_override == "" or not FileAccess.file_exists(abs_override):
+		current = _save_group_source_bytes(sp)
+	var docs: Array = []
+	for bytes in [prev.get("bytes", PackedByteArray()), work.get("bytes", PackedByteArray()), current]:
+		var bytes_typed: PackedByteArray = bytes
+		docs.append(OdfDocument.parse_bytes(bytes_typed, sp,
+			str(target.get("encoding", "")), 1 if bool(target.get("has_bom", false)) else 0))
+	var changed: Array[Dictionary] = []
+	if docs.size() == 3:
+		var before = docs[0] as OdfDocument
+		var after = docs[1] as OdfDocument
+		var live = docs[2] as OdfDocument
+		var keys := {}
+		for d in [before, after, live]:
+			for e in (d as OdfDocument).effective_entries():
+				keys[e.full_key() + "@" + str(e.header)] = true
+		for key in keys:
+			var parts := str(key).split("@", false, 1)
+			if parts.size() != 2:
+				continue
+			var b = before.find_entry(parts[1], parts[0])
+			var a = after.find_entry(parts[1], parts[0])
+			var c = live.find_entry(parts[1], parts[0])
+			var bv: String = b.core_value() if b != null else "<absent>"
+			var av: String = a.core_value() if a != null else "<absent>"
+			var cv: String = c.core_value() if c != null else "<absent>"
+			if bv != av or bv != cv:
+				changed.append({"key": parts[0], "header": parts[1],
+					"previous": bv, "working": av, "current": cv})
+	var physical := _physical_document_diff(docs[0] as OdfDocument, docs[2] as OdfDocument,
+		prev.get("bytes", PackedByteArray()), current)
+	return {
+		"source_path": sp,
+		"physical_source_diff": physical,
+		"previous_hash": str(target.get("previous_override_hash", "")),
+		"working_hash": str(target.get("working_bytes_hash", "")),
+		"current_hash": WorkspaceStore._md5_bytes(current),
+		"bytes_identical": prev.get("bytes", PackedByteArray()) == current,
+		"working_identical": prev.get("bytes", PackedByteArray()) == work.get("bytes", PackedByteArray()),
+		"changed_properties": changed,
+	}
+
+
+## Full preflight for a recovery journal. Every declared target must be valid
+## before any filesystem mutation; one good target must never mask a corrupt
+## sibling (P0-SAVE-02 / SAVE-83..88).
+static func _validate_recovery_journal(group: Dictionary) -> Dictionary:
+	var raw = group.get("targets", null)
+	if not (raw is Array):
+		return {"ok": false, "reason": "INVALID_JOURNAL_TARGETS"}
+	var targets: Array = raw
+	if targets.is_empty():
+		return {"ok": false, "reason": "EMPTY_JOURNAL_TARGETS"}
+	var identities := {}
+	for item in targets:
+		if not (item is Dictionary):
+			return {"ok": false, "reason": "INVALID_JOURNAL_TARGETS"}
+		var target: Dictionary = item
+		var sp := str(target.get("source_path", "")).strip_edges()
+		if sp == "":
+			return {"ok": false, "reason": "INVALID_JOURNAL_TARGETS"}
+		var identity := _journal_source_identity(sp)
+		if identities.has(identity):
+			return {"ok": false, "reason": "DUPLICATE_JOURNAL_TARGET"}
+		identities[identity] = true
+		var paths := _validate_journal_target_paths(target, sp)
+		if not bool(paths.get("ok", false)):
+			return {"ok": false, "reason": str(paths.get("reason", "INVALID_JOURNAL_TARGETS"))}
+		if not WorkspaceStore._is_hex_md5(str(target.get("source_hash", "")).to_lower()):
+			return {"ok": false, "reason": "INVALID_JOURNAL_TARGETS"}
+		if not WorkspaceStore._is_hex_md5(str(target.get("working_bytes_hash", "")).to_lower()):
+			return {"ok": false, "reason": "INVALID_JOURNAL_TARGETS"}
+		var working := _decode_journal_payload(str(target.get("working_bytes", "")),
+			str(target.get("working_bytes_hash", "")))
+		if not bool(working.get("ok", false)):
+			return {"ok": false, "reason": "INVALID_JOURNAL_TARGETS"}
+		var prev := _decode_journal_payload(str(target.get("previous_override_bytes", "")),
+			str(target.get("previous_override_hash", "")))
+		if not bool(prev.get("ok", false)):
+			return {"ok": false, "reason": str(prev.get("reason", "INVALID_JOURNAL_TARGETS"))}
+	return {"ok": true, "reason": ""}
+
+
+func recover_partial_save_group(group_id: String = "", options: Dictionary = {}) -> Dictionary:
+	## T-123: destructive RECOVER shares the confirmation contract with the other
+	## Recovery Center actions. Direct callers must supply a token captured from
+	## the exact revision they inspected; there is no unguarded mutation route.
+	var group: Dictionary = {}
+	var gid := ""
+	if group_id != "":
+		var res := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(_save_group_path(group_id)))
+		if bool(res.get("ok", false)) and res.get("data", null) is Dictionary:
+			group = res.get("data", {})
+	elif not last_save_group.is_empty():
+		group = last_save_group.duplicate(true)
+	else:
+		var pending := discover_incomplete_save_groups()
+		if not pending.is_empty():
+			group = pending[0].duplicate(true)
+	if group.is_empty() or int(group.get("schema", 0)) != SAVE_GROUP_SCHEMA:
+		return {"ok": false, "reason": "NO_SAVE_GROUP", "state": "NO_SAVE_GROUP"}
+	gid = str(group.get("group_id", ""))
+	var token: Dictionary = options.get("confirmation_token", {})
+	# The token carries the action the user actually confirmed. Callers cannot
+	# relabel a KEEP CURRENT / RESTORE WORKING token as RECOVER.
+	var action_for_token := "RECOVER"
+	var confirmed_gid := str(token.get("group_id", ""))
+	# P2-RECOVERY: never repair a supplied token. An incomplete provided token
+	# is refused; only a wholly absent token may be captured atomically below.
+	if not token.is_empty() and (confirmed_gid == "" or confirmed_gid != gid):
+		return {"ok": false, "status": "CONFIRMATION_REFUSED",
+			"reason": "CONFIRMATION_IDENTITY_MISMATCH", "group_id": gid,
+			"state": "NO_MUTATION", "restored": [], "failed": [], "conflicts": [],
+			"error": "the supplied confirmation token has no matching group identity; no file was changed"}
+	var recovery_gid := gid
+	var ui_confirmed := bool(options.get("ui_confirmed", false))
+	if token.is_empty() and not ui_confirmed:
+		# Legacy call sites (T-85/T-86/T-121) recover without a UI token. Capture
+		# one atomically here so the same revision guard still runs inside the
+		# operation immediately before any mutation; there is no unguarded path.
+		var auto := build_recovery_confirmation_token(recovery_gid, action_for_token)
+		if not bool(auto.get("ok", false)):
+			return {"ok": false, "status": "CONFIRMATION_REFUSED",
+				"reason": str(auto.get("reason", "NO_SAVE_GROUP")),
+				"group_id": recovery_gid, "state": "NO_MUTATION", "restored": [], "failed": [],
+				"conflicts": [], "error": "current revision could not be captured; no file was changed"}
+		token = auto
+	elif token.is_empty():
+		return {"ok": false, "status": "CONFIRMATION_REFUSED", "reason": "CONFIRMATION_REQUIRED",
+			"group_id": recovery_gid, "state": "NO_MUTATION", "restored": [], "failed": [],
+			"conflicts": [], "error": "RECOVER requires the confirmation token captured at preview; no file was changed"}
+	var guard: Dictionary = _verify_recovery_confirmation(recovery_gid, action_for_token, token)
+	if not bool(guard.get("ok", false)):
+		return {"ok": false, "status": "CONFIRMATION_REFUSED",
+			"reason": str(guard.get("reason", "CONFIRMATION_REFUSED")),
+			"group_id": recovery_gid, "state": "NO_MUTATION", "restored": [], "failed": [],
+			"conflicts": [], "error": "the confirmed revision is no longer current; no file was changed"}
+	# P0-SAVE-01: a COMPLETE or RECOVERED transaction is not a recovery
+	# candidate. Emergency rollback of a successful save is a different
+	# feature and must never share this entrypoint.
+	var current_state := str(group.get("state", ""))
+	if current_state in ["COMPLETE", "RECOVERED", "RECOVERY_CONFLICT_RESOLVED", "RECOVERY_FINALIZED"]:
+		last_save_recovery = {"ok": false, "state": current_state, "reason": "RECOVERY_NOT_APPLICABLE",
+			"restored": [], "failed": [], "conflicts": []}
+		return {"ok": false, "status": "RECOVERY_NOT_APPLICABLE", "reason": "STATE_NOT_RECOVERABLE",
+			"group_id": gid, "state": current_state, "restored": [], "failed": [],
+			"conflicts": [], "error": "transaction state %s cannot be recovered; no file was changed"}
+	# T-88 + P0-SAVE-02: the ENTIRE target collection must be sound before any
+	# mutation or durable state transition. One valid target cannot certify a
+	# corrupt sibling.
+	var preflight := _validate_recovery_journal(group)
+	if not bool(preflight.get("ok", false)):
+		var invalid_reason := str(preflight.get("reason", "INVALID_JOURNAL_TARGETS"))
+		last_save_recovery = {"ok": false, "state": "RECOVERY_PENDING", "reason": invalid_reason,
+			"restored": [], "failed": [], "conflicts": []}
+		return {"ok": false, "status": "RECOVERY_PENDING", "reason": invalid_reason,
+			"group_id": gid, "state": str(group.get("state", "")),
+			"restored": [], "failed": [], "conflicts": [],
+			"error": "journal failed full preflight validation; nothing was changed"}
+	var restored: Array[String] = []
+	var artifacts: Array[String] = []
+	var failed: Array[Dictionary] = []
+	var conflicts: Array[Dictionary] = []
+	var files_restored := false
+	_crash_checkpoint("DURING_RECOVERY", options, gid)
+	for item in group.get("targets", []):
+		if not (item is Dictionary):
+			continue
+		var target: Dictionary = item
+		var sp := str(target.get("source_path", ""))
+		if sp == "":
+			continue
+		var artifact := _persist_working_recovery_artifact(gid, target)
+		if artifact == "":
+			failed.append({"path": sp, "reason": "WORKING_ARTIFACT_WRITE_FAILED"})
+			continue
+		artifacts.append(artifact)
+		# P0-SAVE-03: classify the current revision before deciding anything.
+		var classification := _classify_current_override(target)
+		if classification == "CURRENT_IS_NEWER" or classification == "CURRENT_UNKNOWN":
+			var abs_c := _save_group_target_override_abs(target, sp)
+			var cur_hash := ""
+			if abs_c != "" and FileAccess.file_exists(abs_c):
+				cur_hash = WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(abs_c))
+			conflicts.append({
+				"path": sp,
+				"reason": "EXTERNAL_MODIFICATION",
+				"classification": classification,
+				"expected_new": str(target.get("new_override_hash", "")),
+				"actual": cur_hash,
+			})
+			continue
+		# P0-SAVE-03 source drift: if the original game source changed since
+		# PREPARED, the rollback decision no longer matches the world it was
+		# made in; surface it as a conflict instead of silently proceeding.
+		var expected_source_hash := str(target.get("source_hash", ""))
+		if expected_source_hash != "":
+			var cur_source := _save_group_source_bytes(sp)
+			var cur_source_hash := WorkspaceStore._md5_bytes(cur_source) if not cur_source.is_empty() else ""
+			if cur_source_hash != expected_source_hash:
+				conflicts.append({
+					"path": sp,
+					"reason": "SOURCE_REVISION_DRIFT",
+					"classification": "SOURCE_CHANGED",
+					"expected_source": expected_source_hash,
+					"actual_source": cur_source_hash,
+				})
+				continue
+		var prev_dec := _decode_journal_payload(str(target.get("previous_override_bytes", "")),
+			str(target.get("previous_override_hash", "")))
+		if not bool(prev_dec.get("ok", false)):
+			failed.append({"path": sp, "reason": "PREVIOUS_BYTES_HASH_MISMATCH"})
+			continue
+		var prev: PackedByteArray = prev_dec.get("bytes", PackedByteArray())
+		# An existing EMPTY override is a legitimate previous state (its b64
+		# is the empty string); only a target with NO previous bytes at all
+		# (absent override whose source is gone) is unrecoverable.
+		if prev.is_empty() and not bool(target.get("had_override_before", false)):
+			failed.append({"path": sp, "reason": "PREVIOUS_BYTES_MISSING"})
+			continue
+		var had_override_before := bool(target.get("had_override_before", false))
+		var abs_override := _save_group_target_override_abs(target, sp)
+		var write_ok := false
+		# Hold the live cached instance BEFORE any structural rollback:
+		# discard_override_ex invalidates the OdfDocument cache, and without
+		# this reference the in-memory refresh below would silently skip,
+		# leaving the edited doc claiming a workspace override that no
+		# longer exists.
+		var live_doc = OdfDocument.cached(sp)
+		if not had_override_before:
+			# P0-SAVE-02: before the transaction there was NO override. The
+			# interrupted transaction may have created one; remove exactly that
+			# override and its manifest entry, restoring the pristine workspace
+			# structure. Never touch anything we cannot attribute to this
+			# transaction.
+			if abs_override != "" and FileAccess.file_exists(abs_override):
+				if classification != "CURRENT_IS_EXPECTED_ABSENT":
+					# The current override bytes were classified above as
+					# equal to the recorded commit or the previous state; both
+					# mean the transaction created this file (no override
+					# existed before). Safe to retire.
+					var rm := DirAccess.remove_absolute(abs_override)
+					if rm != OK:
+						failed.append({"path": sp, "reason": "OVERRIDE_REMOVE_FAILED"})
+						continue
+					if FileAccess.file_exists(abs_override):
+						failed.append({"path": sp, "reason": "OVERRIDE_REMOVE_UNVERIFIED"})
+						continue
+					write_ok = true
+				else:
+					# Save never wrote this target's override; nothing to undo.
+					write_ok = true
+			else:
+				# The override is already absent: the intended structural
+				# state exists. Only the manifest entry may need cleanup.
+				write_ok = true
+			if write_ok:
+				var pre_entry := WorkspaceStore.entry_for(sp)
+				if not pre_entry.is_empty():
+					# The manifest entry belongs to the interrupted transaction
+					# only if it matches what the transaction would create; the
+					# previous_manifest_entry is empty when none existed before.
+					var prev_entry: Dictionary = target.get("previous_manifest_entry", {})
+					if prev_entry.is_empty():
+						var drop := WorkspaceStore.discard_override_ex(sp)
+						if not bool(drop.get("ok", false)):
+							failed.append({"path": sp,
+								"reason": "MANIFEST_ENTRY_REMOVE_FAILED",
+								"error": str(drop.get("error", ""))})
+							continue
+		else:
+			# P0-SAVE-02: an override existed before. Restore its exact previous
+			# bytes (empty file stays empty, never "absent").
+			if abs_override == "":
+				failed.append({"path": sp, "reason": "OVERRIDE_PATH_UNRESOLVED"})
+				continue
+			var wres := WorkspaceStore.atomic_write_abs(abs_override, prev)
+			if not bool(wres.get("ok", false)) or \
+					WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(abs_override)) != WorkspaceStore._md5_bytes(prev):
+				failed.append({"path": sp, "reason": "RESTORE_WRITE_FAILED"})
+				continue
+			write_ok = true
+			# Restore the previous manifest metadata if it has drifted.
+			var prev_entry: Dictionary = target.get("previous_manifest_entry", {})
+			var cur_entry := WorkspaceStore.entry_for(sp)
+			if not prev_entry.is_empty() and str(cur_entry.get("rel", "")) != str(prev_entry.get("rel", "")):
+				var rrec := WorkspaceStore.record(sp, str(prev_entry.get("rel", "")),
+					str(prev_entry.get("source_md5", "")), int(prev_entry.get("bytes", 0)))
+				if not rrec:
+					failed.append({"path": sp, "reason": "MANIFEST_RESTORE_FAILED"})
+					continue
+		if not write_ok:
+			continue
+		var d = live_doc if live_doc is OdfDocument else OdfDocument.cached(sp)
+		if d is OdfDocument:
+			var source_ref := _save_group_source_bytes(sp)
+			var rel_after := str(WorkspaceStore.entry_for(sp).get("rel", "")) if had_override_before else ""
+			d.apply_recovered_bytes(prev, source_ref, false, had_override_before,
+				rel_after, "", str(target.get("encoding", "")), 1 if bool(target.get("has_bom", false)) else 0)
+		restored.append(sp)
+		files_restored = true
+
+	if not conflicts.is_empty():
+		return _resolve_recovery_conflict(group, gid, restored, failed, conflicts, artifacts)
+	if not failed.is_empty():
+		# Files that could not be restored keep the transaction pending; a
+		# later attempt can retry after the underlying fault is fixed.
+		group["state"] = "RECOVERY_PENDING"
+		group["updated_at"] = Time.get_datetime_string_from_system()
+		_write_save_journal(group)
+		last_save_group = group
+		last_save_recovery = {"ok": false, "state": "RECOVERY_PENDING", "restored": restored,
+			"failed": failed, "conflicts": [], "working_artifacts": artifacts}
+		if doc != null:
+			load_document(doc)
+		return {"ok": false, "status": "RECOVERY_PENDING", "group_id": gid,
+			"restored": restored, "failed": failed, "conflicts": [],
+			"working_artifacts": artifacts, "reason": "RECOVERY_INCOMPLETE"}
+
+	# P1-SAVE-06: RECOVERED is only honest when the durable journal agrees.
+	# File restoration alone yields FILES_RESTORED; the final verdict requires
+	# a verified journal write.
+	group["state"] = "RECOVERED"
+	group["updated_at"] = Time.get_datetime_string_from_system()
+	if _write_save_journal(group):
+		last_save_group = group
+		last_save_recovery = {"ok": true, "state": "RECOVERED", "restored": restored,
+			"failed": [], "conflicts": [], "working_artifacts": artifacts,
+			"journal_finalized": true}
+		if doc != null:
+			load_document(doc)
+		return {"ok": true, "status": "RECOVERED", "group_id": gid,
+			"restored": restored, "failed": [], "conflicts": [],
+			"working_artifacts": artifacts, "journal_finalized": true}
+	# Journal finalization failed: files are restored but the durable record
+	# still describes an incomplete transaction. Report the honest intermediate
+	# state; the next attempt is idempotent (all classifications will now be
+	# CURRENT_EQUALS_PREVIOUS / CURRENT_IS_EXPECTED_ABSENT).
+	group["state"] = "RECOVERY_FINALIZATION_PENDING"
+	group["updated_at"] = Time.get_datetime_string_from_system()
+	_write_save_journal(group)
+	last_save_group = group
+	last_save_recovery = {"ok": false, "state": "RECOVERY_FINALIZATION_PENDING",
+		"restored": restored, "failed": [], "conflicts": [],
+		"working_artifacts": artifacts, "journal_finalized": false}
+	return {"ok": false, "status": "RECOVERY_FINALIZATION_PENDING", "group_id": gid,
+		"restored": restored, "failed": [], "conflicts": [],
+		"working_artifacts": artifacts, "journal_finalized": false,
+		"reason": "JOURNAL_FINALIZATION_FAILED"}
 
 
 func _active_reset_scope() -> String:
@@ -2131,6 +4086,39 @@ func _on_save_dependencies() -> void:
 	if doc == null:
 		status_changed.emit("Save dependencies: no render ODF loaded.", "warning")
 		return
+	# Wave E: show the exact intended writes first; the user confirms the
+	# multi-document transaction instead of a blind bulk save.
+	var preview := preview_dependency_save()
+	var rows: Array = preview.get("rows", [])
+	if rows.is_empty():
+		status_changed.emit("Save dependencies: nothing to save (no dependencies).", "muted")
+		return
+	if save_deps_confirm_dialog == null:
+		_build_save_deps_preview_dialog()
+	var dirty_only: Array[Dictionary] = []
+	var has_unavailable := false
+	for r in rows:
+		if r is Dictionary:
+			if bool((r as Dictionary).get("dirty", false)):
+				dirty_only.append(r)
+			if str((r as Dictionary).get("operation", "")) == "UNAVAILABLE":
+				has_unavailable = true
+	if dirty_only.is_empty():
+		status_changed.emit("Save dependencies: no dirty documents to save.", "muted")
+		return
+	var conflicts := int(preview.get("conflicts", 0))
+	if conflicts == 0 and not has_unavailable:
+		# Ordinary safe save: nothing to warn about, proceed directly. The
+		# preview dialog is reserved for flows that need a human decision.
+		_execute_dependency_save()
+		return
+	_pending_save_preview = preview
+	_refresh_save_deps_preview_tree()
+	if save_deps_confirm_dialog != null:
+		save_deps_confirm_dialog.popup_centered()
+
+
+func _execute_dependency_save() -> void:
 	var res := save_with_external_dependencies()
 	var saved_arr: Array = res.get("saved", [])
 	var failed_arr: Array = res.get("failed", [])
@@ -2138,7 +4126,131 @@ func _on_save_dependencies() -> void:
 		status_changed.emit("Saved %d render ODF(s) with dependencies to isolated workspace." % saved_arr.size(), "success")
 		load_document(doc)
 	else:
-		status_changed.emit("Saved %d, failed %d dependency file(s)." % [saved_arr.size(), failed_arr.size()], "danger")
+		var rec_hint := " RECOVERY AVAILABLE" if bool(res.get("recoverable", false)) else ""
+		status_changed.emit("Saved %d, failed %d dependency file(s).%s" % [saved_arr.size(), failed_arr.size(), rec_hint], "danger")
+	_pending_save_preview = {}
+
+
+func _build_save_deps_preview_dialog() -> void:
+	save_deps_confirm_dialog = ConfirmationDialog.new()
+	save_deps_confirm_dialog.title = "Dependency Save Preview"
+	save_deps_confirm_dialog.size = Vector2i(760, 380)
+	save_deps_confirm_dialog.ok_button_text = "Save All Listed"
+	save_deps_confirm_dialog.cancel_button_text = "Cancel"
+	save_deps_confirm_dialog.confirmed.connect(func(): _confirm_dependency_save())
+	add_child(save_deps_confirm_dialog)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	save_deps_confirm_dialog.add_child(vb)
+	save_deps_preview_tree = Tree.new()
+	save_deps_preview_tree.columns = 5
+	save_deps_preview_tree.set_column_title(0, "File")
+	save_deps_preview_tree.set_column_title(1, "Operation")
+	save_deps_preview_tree.set_column_title(2, "Workspace Override")
+	save_deps_preview_tree.set_column_title(3, "Revision")
+	save_deps_preview_tree.set_column_title(4, "Conflict")
+	save_deps_preview_tree.column_titles_visible = true
+	save_deps_preview_tree.hide_root = true
+	save_deps_preview_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	save_deps_preview_tree.custom_minimum_size = Vector2(720, 240)
+	vb.add_child(save_deps_preview_tree)
+	save_deps_preview_info = Label.new()
+	save_deps_preview_info.add_theme_color_override("font_color", Color("#C5AB6E"))
+	save_deps_preview_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(save_deps_preview_info)
+
+
+func _refresh_save_deps_preview_tree() -> void:
+	if save_deps_preview_tree == null or _pending_save_preview.is_empty():
+		return
+	save_deps_preview_tree.clear()
+	var root_item := save_deps_preview_tree.create_item()
+	var rows: Array = _pending_save_preview.get("rows", [])
+	for r in rows:
+		var item := save_deps_preview_tree.create_item(root_item)
+		var op := str((r as Dictionary).get("operation", ""))
+		item.set_text(0, str((r as Dictionary).get("file", "")))
+		item.set_text(1, op)
+		item.set_text(2, "yes" if bool((r as Dictionary).get("has_override", false)) else "no")
+		item.set_text(3, str((r as Dictionary).get("revision", 0)))
+		item.set_text(4, str((r as Dictionary).get("conflict", "")))
+	var conflicts := int(_pending_save_preview.get("conflicts", 0))
+	var dirty := int(_pending_save_preview.get("dirty_count", 0))
+	save_deps_preview_info.text = "%d dirty document(s), %d conflict(s). SAVE writes only the listed files; conflicts are surfaced, never silently overwritten." % [dirty, conflicts]
+
+
+func _confirm_dependency_save() -> void:
+	_execute_dependency_save()
+
+
+## Wave E / Dependency Save Preview: the exact intended writes of the next
+## Save Dependencies transaction, BEFORE any file is touched. For every
+## dependency this reports the effective source package, the workspace
+## override path, the planned operation and any conflict the user must know
+## about. Nothing is written and no journal is created.
+func preview_dependency_save() -> Dictionary:
+	var rows: Array[Dictionary] = []
+	var seen := {}
+	var conflicts: int = 0
+	var _collect = func(d):
+		if d == null or str(d.source_path) == "":
+			return
+		var sp := str(d.source_path)
+		var canon := WorkspaceStore.canonical(sp).to_lower()
+		if seen.has(canon):
+			return
+		seen[canon] = true
+		var override_abs := _save_group_override_abs(sp)
+		var entry := WorkspaceStore.entry_for(sp)
+		var op := "SKIP"
+		if d.dirty:
+			op = "SAVE"
+		elif d.workspace_override:
+			op = "UNCHANGED_OVERRIDE_PRESENT"
+		var conflict := ""
+		var current_hash := ""
+		if override_abs != "" and FileAccess.file_exists(override_abs):
+			current_hash = WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(override_abs))
+			if d.workspace_override and not d.saved_bytes.is_empty() and \
+					current_hash != WorkspaceStore._md5_bytes(d.saved_bytes):
+				conflict = "OVERRIDE_MODIFIED_ON_DISK"
+				op = "CONFLICT"
+			elif d.workspace_override and str(d.workspace_source_md5) != "" and \
+					WorkspaceStore.source_md5(sp) != str(d.workspace_source_md5):
+				conflict = "SOURCE_CHANGED_SINCE_SAVE"
+				op = "CONFLICT"
+		if not FileAccess.file_exists(sp):
+			op = "UNAVAILABLE"
+			conflict = "SOURCE_MISSING"
+		if op == "CONFLICT":
+			conflicts += 1
+		rows.append({
+			"path": sp,
+			"file": sp.get_file(),
+			"operation": op,
+			"dirty": bool(d.dirty),
+			"has_override": d.workspace_override,
+			"override_path": override_abs,
+			"manifest_rel": str(entry.get("rel", "")),
+			"override_current_hash": current_hash,
+			"conflict": conflict,
+			"revision": int(d.revision),
+		})
+	if doc != null:
+		_collect.call(doc)
+	for ext_key in _external_nodes:
+		var ep := str((_external_nodes[ext_key] as Dictionary).get("path", ""))
+		if ep == "":
+			continue
+		var ext_doc = OdfDocument.cached(ep)
+		if ext_doc is OdfDocument:
+			_collect.call(ext_doc)
+	return {
+		"rows": rows,
+		"conflicts": conflicts,
+		"dirty_count": dirty_dependency_count(),
+		"workspace_root": WorkspaceStore.root(),
+	}
 
 
 func dirty_dependency_count() -> int:
@@ -2296,7 +4408,9 @@ func _is_referenced(header: String) -> bool:
 
 ## Depth-first reachability over local references. A new src -> dst edge is
 ## invalid when dst already reaches src.
-func _would_cycle(src: String, dst: String) -> bool:
+func _would_cycle(src: String, dst: String, ignore_key: String = "") -> bool:
+	if src.to_lower() == dst.to_lower():
+		return true
 	var stack: Array[String] = [dst]
 	var seen := {}
 	while not stack.is_empty():
@@ -2306,7 +4420,11 @@ func _would_cycle(src: String, dst: String) -> bool:
 			continue
 		seen[key] = true
 		for child_key in _child_keys(doc, cur):
-			var nxt := _reference_header(doc.get_value(cur, child_key, ""))
+			var nxt := ""
+			if cur.to_lower() == src.to_lower() and child_key.to_lower() == ignore_key.to_lower():
+				# Candidate edge replaces this one; exclude it from reachability.
+				continue
+			nxt = _reference_header(doc.get_value(cur, child_key, ""))
 			if nxt == "":
 				continue
 			if nxt.to_lower() == src.to_lower():
@@ -2337,7 +4455,7 @@ func _on_duplicate_node() -> void:
 	status_changed.emit("Duplicated %s -> %s" % [_selected_header, new_name], "success")
 	document_edited.emit()
 	load_document(doc)
-	var node := graph.get_node_or_null(NodePath(new_name.validate_node_name()))
+	var node := graph.get_node_or_null(NodePath(new_name.validate_node_name())) if graph != null else null
 	if node is GraphNode:
 		_selected_header = new_name
 		node.selected = true
@@ -2460,7 +4578,7 @@ func rename_render_node(old_name: String, new_name: String) -> bool:
 	document_edited.emit()
 	load_document(doc)
 	_selected_header = clean
-	var node := graph.get_node_or_null(NodePath(clean.validate_node_name()))
+	var node := graph.get_node_or_null(NodePath(clean.validate_node_name())) if graph != null else null
 	if node is GraphNode:
 		node.selected = true
 	_update_toolbar()

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 31.3,
+  "timeout_s": 3600,
+  "subject_before": "git:500cf07c06d5462ffa5f0df6aaaae711b727f93e2dff542374d35e401eb674fd",
+  "subject": "git:500cf07c06d5462ffa5f0df6aaaae711b727f93e2dff542374d35e401eb674fd",
+  "stdout_tail": "6: Reset to initial restores ammo to original 30 (NOT depleted 20) (expected 30, got 30)\n\n[T-68 Wave D Active-Experiment Cleanup Guard, Monitor Preservation & Evidence Retention (P1-NATIVE-03; NC-01..NC-07)]\n  ✓ NC-01 setup: monitoring active after launch\n  ✓ NC-01: cleanup_stage rejected while monitor is active\n  ✓ NC-01: rejection reason is ACTIVE_EXPERIMENT_CANNOT_CLEANUP (expected ACTIVE_EXPERIMENT_CANNOT_CLEANUP, got ACTIVE_EXPERIMENT_CANNOT_CLEANUP)\n  ✓ NC-02: rejected cleanup leaves NativeSessionService monitoring and timer active\n  ✓ NC-01: staged files untouched after rejected cleanup\n  ✓ NC-03: cancel_monitoring transitions to CANCELLED (expected CANCELLED, got CANCELLED)\n  ✓ NC-03: monitoring stopped cleanly after cancel\n  ✓ NC-03: CANCELLED state persisted durably across restart (expected CANCELLED, got CANCELLED)\n  ✓ NC-04: cleanup after terminal CANCELLED state proceeds\n  ✓ NC-05: unknown file preserved during cleanup\n  ✓ NC-06: modified staged file preserved during cleanup\n  ✓ NC-07: evidence artifact retained outside disposable stage root after cleanup\n\n[T-72 Wave B Chronological Event-Scheduled Replay Concurrency (P0-SIM-01; RPL-09..RPL-16)]\n  ✓ RPL-09: overlapping replay preserves launch times 0.00 and 0.20\n  ✓ RPL-09: overlapping projectiles coexist during replay\n  ✓ RPL-09: impact timestamps match original run\n  ✓ RPL-10 orig: second shot rejected during reload\n  ✓ RPL-10: replay preserves 1 accepted / 1 rejected history\n  ✓ RPL-11: DoT during projectile flight reproduces identical shield/hull\n  ✓ RPL-12: moving target hit by both overlapping shots identically on replay\n  ✓ RPL-13: historical replay keeps frozen ODF damage after edit\n  ✓ RPL-14: incremental bounded replay completes in multiple chunks and matches original hull\n  ✓ RPL-15: same-time events replay with byte-identical event ordering\n  ✓ RPL-16: simultaneous splash impacts damage primary & secondary identically on replay\n\n1073 checks, 1 failure(s), 29860 ms\nRESULT: FAIL\n\nTESTS FAILED\n",
+  "stderr_tail": "SCRIPT ERROR: Invalid call. Nonexistent function '_check_shot' in base 'RefCounted (ProjectileSim)'.\n   at: _test_collision_ordering (res://tests/test_runner.gd:1881)\n   GDScript backtrace (most recent call first):\n       [0] _test_collision_ordering (res://tests/test_runner.gd:1881)\n       [1] _initialize (res://tests/test_runner.gd:67)\n  ✗ CS-10: replay_deterministic replayed all 3 valid shots (expected 3, got 5)\nFAIL: T-62 Wave D Persistent Combat State: Shooter Ammo/Energy, Persistent Shield, Multi-Target & Replay (CS-01..CS-12): CS-10: replay_deterministic replayed all 3 valid shots (expected 3, got 5)\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-22T11:19:03Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

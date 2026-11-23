@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "code": "SUITE_RECORDED",
+  "verdict": "PASS",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": {
+    "runner": "unittest",
+    "ran": 1105,
+    "passed": 1105,
+    "red": 0,
+    "skipped": 0,
+    "counts": {
+      "core": 1105,
+      "ui": 0
+    }
+  },
+  "problems": [],
+  "finished_utc": "2026-11-23T01:02:28Z",
+  "record": ".saipen/evidence/suite/ec60a408a0ad774d-20261123T010228707148Z.json",
+  "sha256": "e992386f1deb28eeee8850d8c40e9812a22d914926efa65a1daf3e166673dece",
+  "tree_changed_during_run": false,
+  "stdout_tail": null,
+  "stderr_tail": null,
+  "checkpoint": "CHECKPOINTED",
+  "checkpoint_detail": null,
+  "route": "test"
+}

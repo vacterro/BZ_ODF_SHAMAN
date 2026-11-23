@@ -102,6 +102,9 @@ var _max_history: int = 100
 var _compound_depth: int = 0
 var _compound_pushed: bool = false
 
+## Test-only fault injection for atomic graph Move rollback regression.
+static var fault_append_entry_fail_key: String = ""
+
 # Shared document store: the inspector, dependency graph, inheritance resolver
 # and simulation must all see the same in-memory document so edits are live.
 static var _cache: Dictionary = {}
@@ -570,6 +573,40 @@ func restore_factory_state_from(factory_doc: OdfDocument) -> void:
 
 ## Apply byte-exact recovered working bytes in-place (encoding/BOM-aware),
 ## keeping saved reference bytes separate from dirty unsaved working bytes.
+## Byte-exact in-place snapshot restore with undo history preserved. Used when a
+## compound mutation fails after it already changed the document: replaying undo
+## cannot guarantee the original bytes when compound push state differs.
+func restore_snapshot(snap: Dictionary) -> bool:
+	if not bool(snap.get("ok", false)):
+		return false
+	text = str(snap.get("text", ""))
+	encoding = str(snap.get("encoding", encoding))
+	has_bom = bool(snap.get("has_bom", has_bom))
+	saved_text = str(snap.get("saved_text", saved_text))
+	saved_bytes = (snap.get("saved_bytes", PackedByteArray()) as PackedByteArray).duplicate()
+	dirty = bool(snap.get("dirty", dirty))
+	revision = int(snap.get("revision", revision)) + 1
+	_compound_depth = 0
+	_compound_pushed = false
+	if snap.has("undo"):
+		_undo = (snap["undo"] as Array).duplicate()
+	if snap.has("redo"):
+		_redo = (snap["redo"] as Array).duplicate()
+	_parse()
+	changed.emit()
+	undo_state_changed.emit()
+	return true
+
+
+func capture_snapshot() -> Dictionary:
+	return {
+		"ok": true, "text": text, "encoding": encoding, "has_bom": has_bom,
+		"saved_text": saved_text, "saved_bytes": saved_bytes.duplicate(),
+		"dirty": dirty, "revision": revision,
+		"undo": _undo.duplicate(), "redo": _redo.duplicate(),
+	}
+
+
 func apply_recovered_bytes(working_bytes: PackedByteArray, saved_ref_bytes: PackedByteArray = PackedByteArray(),
 		is_dirty: bool = false, is_override: bool = false, ws_rel: String = "", ws_src_md5: String = "",
 		forced_encoding: String = "", forced_has_bom: int = -1) -> bool:
@@ -754,6 +791,8 @@ func set_entry_value(entry, new_raw: String) -> void:
 ## Append a property line at the end of the header's section (before the next
 ## header or EOF). Used by the node graph when a new child reference is added.
 func append_entry(header_name: String, key: String, raw_value: String, header_id: String = ""):
+	if fault_append_entry_fail_key != "" and key.strip_edges().to_lower() == fault_append_entry_fail_key.to_lower():
+		return null
 	var h = null
 	for candidate in header_occurrences:
 		if header_id != "" and candidate.id == header_id:

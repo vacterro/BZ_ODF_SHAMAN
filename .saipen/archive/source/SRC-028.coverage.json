@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-028:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-88 closed with verification evidence in LOG: verify -> PASS [target: T-88] conf: high -- REVIEW re-run verify_t86_recovery_integrity.gd RESULT PASS (T-88 4/4) and canonical suite ALL TESTS PASSED 1106/0; self-audit no finding",
+      "text": "Fix saitest W-007: recover_partial_save_group false RECOVERED on malformed/empty journal targets; validate journal targets before durable verdict",
+      "verification": "the Work this request created reached its own verification gate; see the T-88 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-88"
+    }
+  },
+  "schema_version": 1
+}

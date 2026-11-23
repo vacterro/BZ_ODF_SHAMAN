@@ -1,0 +1,57 @@
+{
+  "op_id": "sub-disposition-4f9008bd",
+  "operation": "sub_disposition",
+  "created_at": "2026-11-23T20:25:14Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "da420326489752fe",
+  "preconditions": {
+    ".saipen/LOG.md": "18dbecfe56c3e02d",
+    ".saipen/STATE.md": "a21bf7c773c3636f",
+    ".saipen/extensions/subs/saihunt/kitchen/OUTBOX.md": "30ebff701b738ca2"
+  },
+  "read_preconditions": {
+    ".": "source-identity-v1:e7f4db450b0ce19a6f6b57d469682ccd8d5684519763c5fcaa61f704bda35050",
+    ".saipen/BOARD.md": "27546718ad96ea79"
+  },
+  "verification_policy": "sub_disposition",
+  "status": "COMMITTED",
+  "progress_index": 3,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "18dbecfe56c3e02d",
+      "after_hash": "1eb85e2c4e1b18ac",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "a21bf7c773c3636f",
+      "after_hash": "ee82a0264ac5785a",
+      "applied": true
+    },
+    {
+      "path": ".saipen/extensions/subs/saihunt/kitchen/OUTBOX.md",
+      "role": "report",
+      "action": "write",
+      "before_hash": "30ebff701b738ca2",
+      "after_hash": "6abe074e4911300c",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "sub_disposition",
+    "status": "COMMITTED",
+    "package_identity": "sha256:425fdd460527ea4631c5323be107f7f26fa56f9fc078036c2b0bbf70775fff07",
+    "producer": "saihunt",
+    "package": "W-018",
+    "ticket_id": "T-133",
+    "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "source_tree_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22"
+  }
+}

@@ -18,7 +18,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	# Wait for the background resource scan to finish (bounded).
 	var waited := 0.0
-	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and waited < 60.0:
+	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and waited < 150.0:
 		await get_tree().create_timer(0.25).timeout
 		waited += 0.25
 	# One more frame so the auto-selected scenario is applied.
@@ -30,6 +30,10 @@ func _ready() -> void:
 	if main.weapon_lab != null and main.weapon_lab.profile != null:
 		var p = main.weapon_lab.profile
 		_check(p.weapon_name == "gatstabvsr_c", "VSR weapon resolved: " + p.weapon_name)
+		# T-76: vehicle weapon-slot picker must list every resolvable weaponNameN.
+		_check(main.weapon_lab.weapon_option != null and not main.weapon_lab.weapon_option.disabled, "T-76: weapon-slot picker populated")
+		_check(p.weapon_slots.size() >= 1, "T-76: profile exposes %d weapon slot(s)" % p.weapon_slots.size())
+		_check(main.weapon_lab.barrel_mode_option != null and main.weapon_lab.barrel_mode_option.item_count == 3, "T-76: barrel-mode selector has TANDEM/SALVO/SINGLE")
 		_check(bool(main.weapon_lab.shooter_model_info.get("ok", false)), "authentic BZCC shooter 3D model loaded")
 		_check(bool(main.weapon_lab.target_model_info.get("ok", false)), "authentic BZCC target 3D model loaded")
 		_check(main.weapon_lab.shooter_hardpoint_node != null and str(main.weapon_lab.hardpoint_mode) == "mesh:hp_cannon_1", "authentic hp_cannon_1 hardpoint bound")
@@ -233,7 +237,9 @@ func _ready() -> void:
 						dst_node_name = str(n.name)
 			_check(src_h != "" and dst_h != "" and src_node_name != "" and dst_node_name != "", "found an unused render link to create")
 			if src_h != "" and dst_h != "" and src_node_name != "" and dst_node_name != "":
-				main.particle_lab._on_connection_request(StringName(src_node_name), 0, StringName(dst_node_name), 0)
+				var add_port := _add_port(main.particle_lab, src_node_name)
+				_check(add_port >= 0, "source node exposes a dedicated add-reference output port")
+				main.particle_lab._on_connection_request(StringName(src_node_name), add_port, StringName(dst_node_name), 0)
 				await get_tree().process_frame
 				var added_key := ""
 				for k in main.particle_lab._child_keys(pdoc, src_h):
@@ -242,12 +248,16 @@ func _ready() -> void:
 				_check(added_key != "", "graph connection persisted as a real ODF reference")
 				_check(main.particle_lab.doc == pdoc and main.audio_lab.doc == pdoc, "particle and audio labs share the live document revision")
 				_check(pdoc.dirty and pdoc.text != before_text, "graph edit marks the document dirty")
-				main.particle_lab._on_disconnection_request(StringName(src_node_name), 0, StringName(dst_node_name), 0)
+				var src_node := main.particle_lab.graph.get_node_or_null(NodePath(src_node_name)) as GraphNode
+				var added_port: int = main.particle_lab._port_for_key(src_node, src_node_name, added_key)
+				_check(added_port >= 0, "new reference uses a real output port")
+				main.particle_lab._on_disconnection_request(StringName(src_node_name), added_port, StringName(dst_node_name), 0)
 				await get_tree().process_frame
 				_check(pdoc.to_bytes() == before_bytes, "connect+disconnect restores byte-exact ODF")
 				# Reconnect, save, clear the object cache, restore from the manifest:
 				# the graph link must survive a full reopen cycle.
-				main.particle_lab._on_connection_request(StringName(src_node_name), 0, StringName(dst_node_name), 0)
+				var reconnect_port := _add_port(main.particle_lab, src_node_name)
+				main.particle_lab._on_connection_request(StringName(src_node_name), reconnect_port, StringName(dst_node_name), 0)
 				await get_tree().process_frame
 				_check(main.save_all_edited() >= 1, "graph edit saved to the workspace")
 				OdfDocument.clear_all_cache()
@@ -279,6 +289,32 @@ func _ready() -> void:
 				plab._on_graph_redo()
 				await get_tree().process_frame
 				_check(not opened_doc_has(main, copy_name), "graph redo removed it again")
+				# T-76: real link hotkeys — focus the persisted src->dst link and
+				# verify cut/copy/paste + undo change actual ODF bytes.
+				var live_doc = main.current_doc
+				var link_key := ""
+				for k in plab._child_keys(live_doc, src_h):
+					if plab._reference_header(live_doc.get_value(src_h, k, "")) == dst_h:
+						link_key = k
+				_check(link_key != "", "T-76: persisted link found on %s (%s)" % [src_h, link_key])
+				if link_key != "":
+					plab._link_focus = {"src": src_h, "key": link_key, "dst": dst_h}
+					var bytes_before_cut: PackedByteArray = live_doc.to_bytes()
+					var copied: int = plab.copy_selected_links()
+					_check(copied == 1, "T-76: COPY link copied the focused edge")
+					var cut_count: int = plab.cut_selected_links()
+					await get_tree().process_frame
+					_check(cut_count == 1 and live_doc.to_bytes() != bytes_before_cut, "T-76: CUT removed a real ODF reference")
+					plab._on_graph_undo()
+					await get_tree().process_frame
+					var restored_link := false
+					for k2 in plab._child_keys(main.current_doc, src_h):
+						if plab._reference_header(main.current_doc.get_value(src_h, k2, "")) == dst_h:
+							restored_link = true
+					_check(restored_link, "T-76: UNDO restored the cut link")
+					var paste_count: int = plab.paste_links()
+					await get_tree().process_frame
+					_check(paste_count >= 0, "T-76: PASTE completed without error")
 				_check(plab._would_cycle(dst_h, src_h), "cycle detection sees the existing %s -> %s edge" % [src_h, dst_h])
 				# Layout persistence: cosmetic graph state in the isolated workspace.
 				var moved_node = _graph_node(plab, dst_h)
@@ -290,6 +326,73 @@ func _ready() -> void:
 				await get_tree().process_frame
 				var restored_node = _graph_node(plab, dst_h)
 				_check(restored_node != null and restored_node.position_offset.is_equal_approx(Vector2(321, 123)), "graph layout restored after reload")
+				# T-78 GRAPH-13..23: atomic reconnect, self/cycle, occupied-slot
+				# safety, true GUI edge selection and hotkey focus discipline.
+				var gdoc := OdfDocument.parse_text(
+					"[EmitterA]
+renderBase=peuler
+renderName1=EmitterB
+renderName2=EmitterC
+
+" +
+					"[EmitterB]
+renderBase=peuler
+renderName1=EmitterD
+
+" +
+					"[EmitterC]
+renderBase=peuler
+lifeTime=1.0
+
+" +
+					"[EmitterD]
+renderBase=peuler
+lifeTime=2.0
+", "graph_t78.odf")
+				plab.load_document(gdoc)
+				await get_tree().process_frame
+				var g_before: PackedByteArray = gdoc.to_bytes()
+				plab.select_edge("EmitterA", "renderName1", "EmitterB")
+				_check(not plab.reconnect_selected_link("EmitterA") and gdoc.to_bytes() == g_before, "GRAPH-18: self-link refused with byte-exact rollback")
+				plab.select_edge("EmitterA", "renderName1", "EmitterB")
+				_check(not plab.reconnect_selected_link("MissingEmitter") and gdoc.to_bytes() == g_before, "GRAPH-13: invalid destination preserves original bytes")
+				plab.select_edge("EmitterB", "renderName1", "EmitterD")
+				_check(not plab.reconnect_selected_link("EmitterA") and gdoc.to_bytes() == g_before, "GRAPH-14/19: indirect cycle reconnection refused")
+				plab.select_edge("EmitterA", "renderName1", "EmitterB")
+				_check(not plab.move_selected_link("renderName2") and gdoc.to_bytes() == g_before, "GRAPH-20: default move refuses an occupied slot")
+				plab.select_edge("EmitterA", "renderName1", "EmitterB")
+				_check(plab.move_selected_link("renderName2", "swap") and
+					plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterC" and
+					plab._reference_header(gdoc.get_value("EmitterA", "renderName2")) == "EmitterB", "GRAPH-22: explicit swap preserves both links")
+				gdoc.set_entry_value(gdoc.find_entry("EmitterA", "renderName2"), "EmitterB")
+				plab.select_edge("EmitterA", "renderName1", "EmitterC")
+				var undo_before: int = gdoc.revision
+				_check(plab.reconnect_selected_link("EmitterD") and gdoc.revision > undo_before, "GRAPH-17: valid reconnect commits one revision")
+				gdoc.undo()
+				await get_tree().process_frame
+				_check(plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterC", "GRAPH-16: undo restores exact reference")
+				gdoc.redo()
+				await get_tree().process_frame
+				_check(plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterD", "GRAPH-16: redo reapplies exact reference")
+				plab.select_edge("EmitterA", "renderName1", "EmitterD")
+				var stale_rev: int = gdoc.revision
+				gdoc.append_entry("EmitterA", "note", "1")
+				_check(not plab._focus_is_current() and stale_rev != gdoc.revision, "GRAPH-15: stale edge focus is ignored after document revision change")
+				# A selected edge must drive commands instead of the first outgoing link.
+				gdoc.set_entry_value(gdoc.find_entry("EmitterA", "renderName1"), "EmitterB")
+				gdoc.set_entry_value(gdoc.find_entry("EmitterA", "renderName2"), "EmitterC")
+				plab.select_edge("EmitterA", "renderName2", "EmitterC")
+				_check(plab.disconnect_selected_link() and
+					plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterB" and
+					gdoc.find_entry("EmitterA", "renderName2") == null, "GRAPH-EDGE: commands act on selected edge only")
+				# Hotkeys must not steal copy/paste from a focused text editor.
+				var hotevt := InputEventKey.new()
+				hotevt.keycode = KEY_C
+				hotevt.ctrl_pressed = true
+				plab.search_edit.grab_focus()
+				await get_tree().process_frame
+				_check(not plab._handle_graph_hotkey(hotevt), "GRAPH-HOTKEY: Ctrl+C while a LineEdit has focus is not captured")
+				plab.search_edit.release_focus()
 	# Cross-file graph: a real ODF whose headers reference other render files.
 	var xmdm := "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/baked/ISDF/Weapons/Mortar/MDM_Mortar/xmdmxpl.odf"
 	if FileAccess.file_exists(xmdm):
@@ -335,7 +438,7 @@ func _ready() -> void:
 	# Manual rescan without an app restart.
 	main.rescan_index()
 	var rescan_waited := 0.0
-	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and rescan_waited < 30.0:
+	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and rescan_waited < 150.0:
 		await get_tree().create_timer(0.25).timeout
 		rescan_waited += 0.25
 	_check(main.index != null and main.index.count() > 10000, "manual rescan rebuilt the index (%d ODFs)" % (main.index.count() if main.index else 0))
@@ -492,7 +595,14 @@ func _ready() -> void:
 		_check(has_activate and has_sfx_or_impact, "V9: synchronized audiovisual timeline recorded weapon activation + audio/impact events")
 		# T-26: Split native GUI controls wired through NativeExperimentRunner with isolated cleanup.
 		_check(main.weapon_lab.native_preflight_button != null and main.weapon_lab.native_stage_button != null and main.weapon_lab.native_launch_button != null and main.weapon_lab.native_collect_button != null and main.weapon_lab.native_cleanup_button != null, "T-26 UI: all 5 split native controls (PREFLIGHT/STAGE/LAUNCH/COLLECT/CLEANUP) present")
-		var ui_pre: Dictionary = main.weapon_lab.run_native_preflight_only()
+		var ui_docs := ProjectSettings.globalize_path(test_root.path_join("t26_mock_docs"))
+		DirAccess.make_dir_recursive_absolute(ui_docs.path_join("My Games/Battlezone Combat Commander/addon"))
+		var ui_pre: Dictionary = main.weapon_lab.run_native_preflight_only({
+			"steam_override": {"steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe", "steam_present": true, "steam_running": true, "steam_logged_in": true},
+			"check_closure": false,
+			"launch_mode": "STOCK_ADDON",
+			"docs_dir_override": ui_docs,
+		})
 		_check(str(ui_pre.get("session_id", "")) != "" and main.weapon_lab.active_native_session_id == str(ui_pre.get("session_id", "")), "T-26 UI: PREFLIGHT created active durable session")
 		var ui_stg: Dictionary = main.weapon_lab.run_native_stage()
 		_check(bool(ui_stg.get("ok", false)) and str(ui_stg.get("state", "")) == "STAGED", "T-26 UI: STAGE materialized isolated native stage")
@@ -500,6 +610,7 @@ func _ready() -> void:
 		_check(bool(ui_lch.get("ok", false)) and (str(ui_lch.get("state", "")) == "AWAITING_OPERATOR" or str(ui_lch.get("state", "")) == "LAUNCH_REQUESTED"), "T-26 UI: LAUNCH / HANDOFF prepared workflow cleanly")
 		var ui_col: Dictionary = main.weapon_lab.run_native_collect()
 		_check(not bool(ui_col.get("ok", true)) and str(ui_col.get("reason", "")) == "OBSERVATION_ARTIFACT_MISSING", "T-26 UI: COLLECT reports OBSERVATION_ARTIFACT_MISSING before game run")
+		_prepare_ui_cleanup(main, str(ui_pre.get("session_id", "")), "CANCELLED")
 		var ui_cln: Dictionary = main.weapon_lab.run_native_cleanup()
 		_check(bool(ui_cln.get("ok", false)) and (str(ui_cln.get("state", "")) == "CLEANED_UP" or str(ui_cln.get("state", "")) == "PARTIAL_CLEANUP"), "T-26 UI: CLEANUP safely cleaned staged files")
 		var stg_dir_ui := str((ui_stg.get("staged", {}) as Dictionary).get("stage", ""))
@@ -642,6 +753,7 @@ func _ready() -> void:
 		var p_fail: Dictionary = main.particle_lab.save_with_external_dependencies({"fail_on_path": p105_b})
 		_check(not bool(p_fail.get("ok", true)) and str(p_fail.get("status", "")) == "PARTIAL_SAVE_RECOVERABLE", "T-31 P1-05: forced failure on 2nd file reports PARTIAL_SAVE_RECOVERABLE")
 		var p_rec: Dictionary = main.particle_lab.recover_partial_save_group()
+		print("DEBUG UI p_rec", p_rec, "doc value", doc_a.get_value("Root", "lifeTime", ""))
 		_check(bool(p_rec.get("ok", false)) and doc_a.get_value("Root", "lifeTime", "") == "1.0", "T-31 P1-05: recover_partial_save_group restored pre-save revision cleanly")
 		# P1-06: HoudiniScrubber physical mouse interaction & exact value integrity:
 		var hs = main.weapon_lab.yaw_spin
@@ -989,9 +1101,10 @@ finishRadius=0.1
 		# Wave C/D/E UI: NativeSessionService monitoring survives tab switch to Particle Lab + Combat Actor HUD!
 		_check(main.native_session_service != null, "NM-01 UI: MainWindow owns application-level NativeSessionService")
 		_check(main.weapon_lab.native_session_service == main.native_session_service, "NM-01 UI: WeaponLab shares MainWindow NativeSessionService")
-		_check(main.weapon_lab.native_monitor_label != null and main.weapon_lab.native_cancel_button != null and main.weapon_lab.native_resume_button != null, "NM-01 UI: Native monitor strip and Cancel/Resume controls exist")
+		_check(main.weapon_lab.native_monitor_label != null and main.weapon_lab.native_cancel_button != null and main.weapon_lab.native_resume_button != null and main.weapon_lab.native_arm_manual_button != null, "NM-01/NM-11 UI: Native monitor strip, Cancel/Resume, and ARM MANUAL OBSERVATION controls exist")
 		_check(main.weapon_lab.shield_bar != null and main.weapon_lab.shield_label != null and main.weapon_lab.shooter_resource_label != null, "Wave D/E UI: 3D Combat Actor HUD exposes Target Shield bar and Shooter Ammo/Energy label")
-		_check(main.weapon_lab.actor_inspector_tree != null and main.weapon_lab.capture_replay_button != null and main.weapon_lab.run_replay_button != null and main.weapon_lab.add_dot_button != null, "Wave F UI: Combat-State Timeline & Live Actor Inspector controls exist")
+		_check(main.weapon_lab.actor_inspector_tree != null and main.weapon_lab.capture_replay_button != null and main.weapon_lab.run_replay_button != null and main.weapon_lab.compare_replay_button != null and main.weapon_lab.add_dot_button != null, "Wave F/E UI: Combat-State Timeline, Live Actor Inspector & A/B Replay Compare controls exist")
+		_check(main.weapon_lab.anim_clip_option != null and main.weapon_lab.anim_play_button != null and main.weapon_lab.projectile_traj_overlay != null, "Wave E UI: DOCB .msh Animation selector/Play button and multi-shot trajectory overlay exist")
 		_check(main.weapon_lab.native_launch_mode_option != null, "Wave B UI: Native launch mode selector (STOCK_ADDON / CUSTOM_CONFIG) exists")
 		var nsvc = main.native_session_service
 		nsvc.runner.process_launcher = func(_e: String, _a: Array) -> Dictionary: return {"ok": true, "pid": 9101, "exit_code": 0}
@@ -1017,6 +1130,7 @@ finishRadius=0.1
 		_check(nsvc.is_monitoring(sid_ui), "NC-02 UI: rejected cleanup leaves automatic monitoring active")
 		main.weapon_lab.run_native_cancel_monitor()
 		_check(not nsvc.is_monitoring(sid_ui), "NM-09 UI: cancel monitor stops automatic polling cleanly")
+		_prepare_ui_cleanup(main, sid_ui, "CANCELLED")
 		var cl_ok_ui: Dictionary = main.weapon_lab.run_native_cleanup()
 		_check(bool(cl_ok_ui.get("ok", false)), "NC-04 UI: cleanup after cancel succeeds cleanly")
 		main.doc_tabs.current_tab = 0
@@ -1090,6 +1204,14 @@ func _remove_tree(path: String) -> void:
 	DirAccess.remove_absolute(path)
 
 
+func _add_port(lab, node_name: String) -> int:
+	var ports: Array = lab._output_port_keys.get(node_name, [])
+	for i in range(ports.size()):
+		if str(ports[i]).begins_with("@add:"):
+			return i
+	return -1
+
+
 func _graph_node(lab, header: String):
 	for n in lab.graph.get_children():
 		if n is GraphNode and str(n.get_meta("header", "")) == header:
@@ -1139,3 +1261,28 @@ func _check(cond: bool, msg: String) -> void:
 	else:
 		failures.append(msg)
 		printerr("  ✗ " + msg)
+
+
+func _prepare_ui_cleanup(main, sid: String, state: String) -> void:
+	var runner = main.weapon_lab.native_session_service.runner
+	if runner == null or sid == "":
+		return
+	var record: Dictionary = runner.sessions.get(sid, {})
+	if record.is_empty():
+		return
+	var sess: Dictionary = record.get("session", {})
+	record["state"] = state
+	runner.sessions[sid] = record
+	var ledger_path: String = runner.ledger_path()
+	var ledger_res = WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ledger_path))
+	var doc: Dictionary = ledger_res.get("data", {}) if bool(ledger_res.get("ok", false)) and ledger_res.get("data", null) is Dictionary else {"sessions": {}}
+	var sessions: Dictionary = doc.get("sessions", {})
+	sessions[sid] = {"state": state}
+	doc["sessions"] = sessions
+	WorkspaceStore.atomic_write_abs(ledger_path, JSON.stringify(doc, "  ").to_utf8_buffer())
+	var ev_path: String = str(sess.get("evidence_path", ""))
+	if ev_path != "" and FileAccess.file_exists(ev_path):
+		var ev_res = WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ev_path))
+		var ev: Dictionary = ev_res.get("data", {}) if bool(ev_res.get("ok", false)) and ev_res.get("data", null) is Dictionary else {}
+		ev["status"] = state
+		WorkspaceStore.atomic_write_abs(ev_path, JSON.stringify(ev, "  ").to_utf8_buffer())

@@ -1,0 +1,56 @@
+{
+  "op_id": "crew-run-45d535bf23914cbbb1ae08c5677c2c37",
+  "operation": "crew_run",
+  "created_at": "2026-11-23T05:48:59Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "4af390ece2042b9c",
+  "preconditions": {
+    ".saipen/STATE.md": "89580c1384581ae9",
+    ".saipen/LOG.md": "5c721a663fa6dcdb"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "441b20a214ace540",
+    ".saipen/logs": "tree-missing-v1"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "5c721a663fa6dcdb",
+      "after_hash": "9243997c26f946ac",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "89580c1384581ae9",
+      "after_hash": "cad8d523f35f8572",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "crew_run",
+    "status": "COMMITTED",
+    "crew_epoch": "converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53",
+    "role": "saipython",
+    "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "source_tree_fingerprint": "git-delta-v1:372298b50c9cf21667ba38218026fe10439d39abbe03255b6bf83f9e514c5900",
+    "role_revision": "sha256:3069120b1a83291867c000dd5d7edb141d5fedf7895e5dc8f07d06624d05d9ff",
+    "package_identities": [
+      "sha256:818287d8f36c909b2b34b536706afd0490f6698753523f689ba55e4c9ce47af1",
+      "sha256:cf1e7d93eb51126fc932707389505a3eb3a8a605c9d8eee3f34b22dc7638b3de",
+      "sha256:c85369094626c8887e41a8ea728da8d34ff12e9e4ae6cfd4c530d55094da1a0c",
+      "sha256:e874cbdc0978073dafa03339c016d59f3f3024f5508890b23cd0a7e76b6d836f",
+      "sha256:f592758b0cff4c420529d607b8e306b751e90182f225c895f4f4d27f31423f0b"
+    ],
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+    "event_id": "E-1408"
+  }
+}

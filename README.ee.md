@@ -1,0 +1,1 @@
+Esimese avaldatud väljalaske versioon **v0.0.1**. BZ_ODF_SHAMAN — visuaalne ODF-i redigeerimise, simulatsiooni ja valideerimise labor Battlezone: Combat Commander jaoks. Täpsemalt vaata [README.md](README.md).

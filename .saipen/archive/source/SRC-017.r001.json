@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-017:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Fix per-vehicle weapon switching (AT Stab/minigun/mortar; minigun tandem-vs-salvo configurable) + node-link manipulation hotkeys (cut/move/reconnect/disconnect)"
+    }
+  },
+  "derived_at": "2026-11-22T12:51:38Z",
+  "derived_from": "SRC-017",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "2e33f0270d47ebb2f5d911f84a2d67cc03b808c4cc84fa45de34c1d95e90eacb"
+}

@@ -1,0 +1,123 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | Started Registering global classes... (10 steps)[39m[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | ResourceIndex[39m[0m
+[   9% ] [90m[1mupdate_scripts_classes[22m | ParticleLab[39m[0m
+[  18% ] [90m[1mupdate_scripts_classes[22m | WeaponLab[39m[0m
+[  27% ] [90m[1mupdate_scripts_classes[22m | CombatScenario[39m[0m
+[  36% ] [90m[1mupdate_scripts_classes[22m | ProjectileSim[39m[0m
+[  45% ] [90m[1mupdate_scripts_classes[22m | WeaponProfile[39m[0m
+[  54% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  63% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  72% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  81% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[92m[ DONE ][39m [1mupdate_scripts_classes[22m
+[0m
+[   0% ] [90m[1msavepack[22m | Started Packing (102 steps)[39m[0m
+[   1% ] [90m[1msavepack[22m | Storing File: res://.godot/imported/favicon.png-c964f8f49dee2757ab431bd2d7896c74.ctex[39m[0m
+[   1% ] [90m[1msavepack[22m | Storing File: res://assets/favicon.png.import[39m[0m
+[   2% ] [90m[1msavepack[22m | Storing File: res://data/coverage_registry.json[39m[0m
+[   4% ] [90m[1msavepack[22m | Storing File: res://data/odf_schema.json[39m[0m
+[   6% ] [90m[1msavepack[22m | Storing File: res://data/particle_schema.json[39m[0m
+[   8% ] [90m[1msavepack[22m | Storing File: res://scripts/core/bz_mesh_reader.gdc[39m[0m
+[  10% ] [90m[1msavepack[22m | Storing File: res://scripts/core/dependency_graph.gdc[39m[0m
+[  11% ] [90m[1msavepack[22m | Storing File: res://scripts/core/mod_loadout.gdc[39m[0m
+[  13% ] [90m[1msavepack[22m | Storing File: res://scripts/core/odf_document.gdc[39m[0m
+[  15% ] [90m[1msavepack[22m | Storing File: res://scripts/core/odf_inheritance.gdc[39m[0m
+[  17% ] [90m[1msavepack[22m | Storing File: res://scripts/core/resource_index.gdc[39m[0m
+[  19% ] [90m[1msavepack[22m | Storing File: res://scripts/core/schema_registry.gdc[39m[0m
+[  21% ] [90m[1msavepack[22m | Storing File: res://scripts/core/wav_reader.gdc[39m[0m
+[  22% ] [90m[1msavepack[22m | Storing File: res://scripts/core/wintage_theme.gdc[39m[0m
+[  24% ] [90m[1msavepack[22m | Storing File: res://scripts/core/workspace_store.gdc[39m[0m
+[  26% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/audio_lab.gdc[39m[0m
+[  28% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/bolt_beam_node.gdc[39m[0m
+[  30% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/effect_burst.gdc[39m[0m
+[  31% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/effect_runtime.gdc[39m[0m
+[  33% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/particle_lab.gdc[39m[0m
+[  34% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/ribbon_trail_node.gdc[39m[0m
+[  36% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/waveform_view.gdc[39m[0m
+[  38% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/weapon_lab.gdc[39m[0m
+[  40% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_experiment_runner.gdc[39m[0m
+[  41% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_experiment_session.gdc[39m[0m
+[  43% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_process_monitor.gdc[39m[0m
+[  45% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_resource_closure.gdc[39m[0m
+[  47% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_session_service.gdc[39m[0m
+[  49% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_test_adapter.gdc[39m[0m
+[  50% ] [90m[1msavepack[22m | Storing File: res://scripts/native/safe_stage_manager.gdc[39m[0m
+[  52% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/combat_actor_state.gdc[39m[0m
+[  54% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/combat_scenario.gdc[39m[0m
+[  56% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/parameter_sweep.gdc[39m[0m
+[  58% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/projectile_sim.gdc[39m[0m
+[  60% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/weapon_profile.gdc[39m[0m
+[  61% ] [90m[1msavepack[22m | Storing File: res://scripts/ui/houdini_scrubber.gdc[39m[0m
+[  63% ] [90m[1msavepack[22m | Storing File: res://scripts/ui/main_window.gdc[39m[0m
+[  65% ] [90m[1msavepack[22m | Storing File: res://themes/golden.json[39m[0m
+[  66% ] [90m[1msavepack[22m | Storing File: res://themes/goldendefault.json[39m[0m
+[  68% ] [90m[1msavepack[22m | Storing File: res://.godot/exported/133200997/export-3070c538c03ee49b7677ff960a3f5195-main.scn[39m[0m
+[  69% ] [90m[1msavepack[22m | Storing File: res://themes/vintagedark.json[39m[0m
+[  71% ] [90m[1msavepack[22m | Storing File: res://themes/vintageclassic.json[39m[0m
+[  73% ] [90m[1msavepack[22m | Storing File: res://themes/solarized.json[39m[0m
+[  75% ] [90m[1msavepack[22m | Storing File: res://themes/oled.json[39m[0m
+[  77% ] [90m[1msavepack[22m | Storing File: res://themes/nord.json[39m[0m
+[  79% ] [90m[1msavepack[22m | Storing File: res://themes/klite.json[39m[0m
+[  80% ] [90m[1msavepack[22m | Storing File: res://themes/goldenvintage.json[39m[0m
+[  82% ] [90m[1msavepack[22m | Storing File: res://.godot/imported/Verdana_m1-Bold.ttf-0d70378e596bcc313960ca893946cb80.fontdata[39m[0m
+[  82% ] [90m[1msavepack[22m | Storing File: res://themes/fonts/Verdana_m1-Bold.ttf.import[39m[0m
+[  84% ] [90m[1msavepack[22m | Storing File: res://.godot/imported/Verdana_m1.ttf-5ed6b5c7060b2652acba59f285b5b6e1.fontdata[39m[0m
+[  84% ] [90m[1msavepack[22m | Storing File: res://themes/fonts/Verdana_m1.ttf.import[39m[0m
+[  86% ] [90m[1msavepack[22m | Storing File: res://themes/antigravity.json[39m[0m
+[  88% ] [90m[1msavepack[22m | Storing File: res://themes/claudecode.json[39m[0m
+[  89% ] [90m[1msavepack[22m | Storing File: res://themes/codenomad.json[39m[0m
+[  91% ] [90m[1msavepack[22m | Storing File: res://themes/custom.json[39m[0m
+[  93% ] [90m[1msavepack[22m | Storing File: res://themes/dracula.json[39m[0m
+[  95% ] [90m[1msavepack[22m | Storing File: res://themes/fpdefault.json[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://themes/freebuff.json[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/bz_mesh_reader.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/dependency_graph.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/mod_loadout.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/odf_document.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/odf_inheritance.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/resource_index.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/schema_registry.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/wav_reader.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/wintage_theme.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/core/workspace_store.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/audio_lab.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/bolt_beam_node.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/effect_burst.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/effect_runtime.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/particle_lab.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/ribbon_trail_node.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/waveform_view.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/lab/weapon_lab.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_experiment_runner.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_experiment_session.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_process_monitor.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_resource_closure.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_session_service.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/native/native_test_adapter.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/native/safe_stage_manager.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/combat_actor_state.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/combat_scenario.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/parameter_sweep.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/projectile_sim.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/sim/weapon_profile.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/ui/houdini_scrubber.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://scripts/ui/main_window.gd.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://main.tscn.remap[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://.godot/global_script_class_cache.cfg[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://assets/favicon.png[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://.godot/uid_cache.bin[39m[0m
+[  97% ] [90m[1msavepack[22m | Storing File: res://project.binary[39m[0m
+[92m[ DONE ][39m [1msavepack[22m
+[0m
+Built: V:\___VAC\__K\__CODE\_MISC\_BZ_ODF_SHAMAN\tools\..\BZ_ODF_SHAMAN.exe (and V:\___VAC\__K\__CODE\_MISC\_BZ_ODF_SHAMAN\tools\..\build\BZ_ODF_SHAMAN.exe)

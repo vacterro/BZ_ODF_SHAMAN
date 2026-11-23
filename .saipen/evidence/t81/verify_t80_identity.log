@@ -1,0 +1,24 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-80 Barrel identity & replay honesty verifier
+  ✓ T-80 fixture: weapon profile resolves
+  ✓ BARREL-05: declared hardpoint order preserved, missing slot not compacted
+  ✓ BARREL-07: missing hardpoint explicitly labelled approximate fallback
+  ✓ VOLLEY-10: resource accounting follows accepted shots
+  ✓ BARREL-09: SALVO ShotIdentity records actual selected hardpoint and index
+  ✓ VOLLEY-09: all accepted aggregate ok/complete
+  ✓ VOLLEY-09: all accepted reports FIRED
+  ✓ VOLLEY-07: partial success state is consistent
+  ✓ VOLLEY-08: all rejected state is REJECTED
+  ✓ RJOB-13: step-limit replay is FAILED
+  ✓ RJOB-15: genuinely complete replay is COMPLETE
+  ✓ RJOB-14: incomplete A/B side yields FAILED job state
+  ✓ RJOB-15: both A/B sides complete yields COMPLETE job state
+  ✓ RJOB-16: fresh job starts from clean state
+  ✓ NATIVE-31/33: stage inventory read-only, missing manifest preserved
+  ✓ NATIVE-33: unresolved stage still on disk and visible in UI
+
+T-80 Verifier: 16 checks, 0 failure(s)
+RESULT: PASS
+WARNING: 1 ObjectDB instance was leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)

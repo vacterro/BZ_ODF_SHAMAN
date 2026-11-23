@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-031:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-122 closed with verification evidence in LOG: verify -> PASS [target: T-122] conf: high -- saipen test suite run T-122 PASS (tree clean); tools/run_tests.cmd: core 1106/1106, T-122 coherence 28/28, UI smoke 0 failures; focused T-121 trust 34/34, crash 37/37, T-86 integrity 75/75, T-73 native 62/62; Windows build SHA256 f0a4d04d69ac48fc9429bdcbb961d410ce04ec9ecb8097e9d1b561e17375a3ef",
+      "text": "Mode 2 autonomous night shift: repair recovery current-revision guard, group-id validation, cache sync, native cleanup intent consistency and completed-intent filtering, physical ODF diff; verify and advance product",
+      "verification": "the Work this request created reached its own verification gate; see the T-122 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-122"
+    }
+  },
+  "schema_version": 1
+}

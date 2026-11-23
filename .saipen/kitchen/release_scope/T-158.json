@@ -1,0 +1,13 @@
+{
+  "op_id": "scope-9b97b4cbe39740208e4b5382b8fb11a5",
+  "paths": {
+    ".gitignore": "3a766ef9c3134b770eb3d4aa3899152a432fe580909171287c817fe1dd7241e9"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-23T20:55:53Z",
+  "schema_version": 2,
+  "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+  "source_tree_fingerprint": "git-delta-v1:594f1818a66f6cc17f8273e563d32d40aafcae5f5c0baeac31982b7b352308a1",
+  "ticket": "T-158"
+}

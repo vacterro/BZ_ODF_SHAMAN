@@ -17,6 +17,9 @@ const REASON_STATE_PERSIST_FAILED := "STATE_PERSIST_FAILED"
 const STATE_RECOVERY_PENDING := "RECOVERY_PENDING"
 const STATUS_MONITOR_STATE_SAVED := "MONITOR_STATE_SAVED"
 const STATUS_MONITOR_PERSIST_FAILED := "MONITOR_PERSIST_FAILED"
+const STATUS_CANCEL_REQUESTED := "CANCEL_REQUESTED"
+const STATUS_CANCELLATION_COMMITTED := "CANCELLATION_COMMITTED"
+const STATUS_CANCELLATION_PERSIST_FAILED := "CANCELLATION_PERSIST_FAILED"
 const REASON_RESOURCE_CLOSURE_INCOMPLETE := "RESOURCE_CLOSURE_INCOMPLETE"
 const NativeAdapterScript = preload("res://scripts/native/native_test_adapter.gd")
 const NativeSessionScript = preload("res://scripts/native/native_experiment_session.gd")
@@ -66,6 +69,8 @@ var fault_fail_ledger_write := false
 var fault_fail_operator_instructions_write := false
 var fault_fail_evidence_write := false
 var fault_fail_monitor_persist := false
+## Test-only fault hook for the durable cleanup-intent finalization step.
+var fault_fail_cleanup_intent_final_write := false
 
 
 static func ledger_dir() -> String:
@@ -280,13 +285,19 @@ func recover_sessions() -> Dictionary:
 		entry["can_cleanup"] = stage_exists and manifest_exists
 		monitors.erase(sid)
 
-		if str(entry.get("reason", "")) == REASON_STATE_PERSIST_FAILED or prev_state == STATE_RECOVERY_PENDING:
+		if str(entry.get("reason", "")) in [REASON_STATE_PERSIST_FAILED, STATUS_CANCELLATION_PERSIST_FAILED] or str(entry.get("cancel_status", "")) == STATUS_CANCELLATION_PERSIST_FAILED or prev_state == STATE_RECOVERY_PENDING:
 			entry["state"] = STATE_RECOVERY_PENDING
-			entry["reason"] = REASON_STATE_PERSIST_FAILED
+			if str(entry.get("cancel_status", "")) == STATUS_CANCELLATION_PERSIST_FAILED or str(entry.get("reason", "")) == STATUS_CANCELLATION_PERSIST_FAILED:
+				entry["reason"] = STATUS_CANCELLATION_PERSIST_FAILED
+				entry["cancel_status"] = STATUS_CANCELLATION_PERSIST_FAILED
+				entry["recoverable"] = true
+				entry["recovery_status"] = STATUS_CANCELLATION_PERSIST_FAILED
+			else:
+				entry["reason"] = REASON_STATE_PERSIST_FAILED
+				entry["recovery_status"] = "STATE_PERSIST_FAILED"
 			entry["recovery_pending"] = true
-			entry["recovery_status"] = "STATE_PERSIST_FAILED"
-			sess_obj.add_checkpoint(STATE_RECOVERY_PENDING, "Recovered checked transition that failed persistence")
-		elif prev_state in ["STAGED", "LAUNCH_REQUESTED", "AWAITING_OPERATOR", "GAME_PROCESS_DETECTED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED", "STEAM_PROCESS_STARTED", "GAME_STARTED", "MISSION_LOADED"]:
+			sess_obj.add_checkpoint(STATE_RECOVERY_PENDING, "Recovered checked transition that failed persistence (%s)" % str(entry.get("reason", "")))
+		elif prev_state in ["STAGED", "LAUNCH_REQUESTED", "AWAITING_OPERATOR", "MONITOR_ARMED", "GAME_PROCESS_CANDIDATE", "GAME_PROCESS_DETECTED", "GAME_PROCESS_VERIFIED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED", "OBSERVATION_IMPORTED", "STEAM_PROCESS_STARTED", "GAME_STARTED", "MISSION_LOADED"]:
 			if not (stage_exists and manifest_exists):
 				missing_stage += 1
 				entry["recovery_status"] = "STAGE_MISSING"
@@ -676,25 +687,48 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 			"life_span": profile.life_span if profile != null else 0.0,
 		}
 
-	var mission_base := str(options.get("mission_base", NativeAdapterScript.DEFAULT_MISSION_BASE))
+	var explicit_mission_base := str(options.get("mission_base", "")).strip_edges()
+	var mission_base := explicit_mission_base if explicit_mission_base != "" else NativeAdapterScript.DEFAULT_MISSION_BASE
 	var terrain_name := str(options.get("terrain_name", NativeAdapterScript.DEFAULT_TERRAIN_NAME))
 	var sess = NativeAdapterScript.create_session(stage_root, scenario, disc, mission_base, terrain_name)
+	# P1-NATIVE-02 (SA-01..SA-04): In STOCK_ADDON mode, derive a unique BZCC-safe
+	# mission basename and session-scoped mount marker ODF unless caller explicitly
+	# supplied a mission_base (which is still validated and collision-checked).
+	if launch_mode == "STOCK_ADDON":
+		if explicit_mission_base == "":
+			mission_base = NativeAdapterScript.derive_session_mission_basename(str(sess.session_id), str(sess.launch_nonce))
+			sess.mission_basename = mission_base
+			var assets_dir_sa := WorkspaceStore.canonical(stage_root).path_join("assets")
+			sess.bzn_path = assets_dir_sa.path_join("Missions/%s.bzn" % mission_base)
+			sess.lua_path = assets_dir_sa.path_join("Missions/%s.lua" % mission_base)
+			sess.mount_plan["mission_basename"] = mission_base
+			sess.mount_plan["mission_bzn"] = mission_base + ".bzn"
+			sess.mount_plan["mission_lua"] = mission_base + ".lua"
+		sess.marker_odf_filename = NativeAdapterScript.derive_session_marker_odf(str(sess.session_id), str(sess.launch_nonce), "STOCK_ADDON")
+		sess.mount_plan["marker_odf_filename"] = sess.marker_odf_filename
+	var mbase_check: Dictionary = NativeAdapterScript.validate_mission_basename(mission_base)
 	var cfg_override := str(options.get("config_path_override", "")).strip_edges()
 	if cfg_override != "":
 		sess.config_path = WorkspaceStore.canonical(cfg_override)
 		sess.mount_plan["bzcc_config_path"] = sess.config_path
 		sess.mount_plan["bzcc_config_win"] = sess.config_path.replace("/", "\\")
+	var addon_plan: Dictionary = {}
 	if launch_mode == "STOCK_ADDON":
-		var addon_plan := NativeAdapterScript.build_stock_addon_stage_plan(sess.stage_id, sess.session_id, mission_base, str(options.get("docs_dir_override", "")))
+		addon_plan = NativeAdapterScript.build_stock_addon_stage_plan(sess.stage_id, sess.session_id, mission_base, str(options.get("docs_dir_override", "")))
 		sess.config_path = ""
 		sess.observation_filename = str(addon_plan.get("observation_filename", sess.observation_filename))
 		sess.observation_expected_path = str(addon_plan.get("observation_expected_path", sess.observation_expected_path))
 		sess.mount_plan["launch_mode"] = "STOCK_ADDON"
+		sess.mount_plan["addon_base"] = str(addon_plan.get("addon_base", ""))
 		sess.mount_plan["bzcc_writable_profile_dir"] = str(addon_plan.get("bzcc_writable_profile_dir", ""))
 		sess.mount_plan["bzcc_logs_dir"] = str(addon_plan.get("bzcc_logs_dir", ""))
 		sess.mount_plan["startup_log_path"] = str(addon_plan.get("startup_log_path", ""))
 		sess.mount_plan["observation_filename"] = sess.observation_filename
 		sess.mount_plan["observation_expected_path"] = sess.observation_expected_path
+		sess.mount_plan["mission_basename"] = mission_base
+		sess.mount_plan["mission_bzn"] = mission_base + ".bzn"
+		sess.mount_plan["mission_lua"] = mission_base + ".lua"
+		sess.mount_plan["marker_odf_filename"] = sess.marker_odf_filename
 
 	var extra_odfs: Dictionary = {}
 	if options.has("staged_odfs") and options.staged_odfs is Dictionary:
@@ -759,6 +793,96 @@ func preflight(profile: WeaponProfile, index: ResourceIndex = null, options: Dic
 		pre["stage_eligible"] = false
 		pre["launch_ready"] = false
 		pre["launch_eligible"] = false
+
+	# P1-NATIVE-02 & P1-NATIVE-03 (SA-01..SA-09): Validate mission basename safety,
+	# active-session mission name uniqueness, and shared @mydocsdir\addon collisions.
+	if not bool(mbase_check.get("ok", true)):
+		pre["ok"] = false
+		pre["structurally_valid"] = false
+		pre["stage_eligible"] = false
+		pre["launch_ready"] = false
+		pre["launch_eligible"] = false
+		pre["status"] = "FAILED"
+		pre["reason"] = str(mbase_check.get("reason", "INVALID_MISSION_BASENAME"))
+		var mi_issues: Array = pre.get("issues", [])
+		mi_issues.append(str(mbase_check.get("error", "invalid mission basename")))
+		pre["issues"] = mi_issues
+
+	var active_mission_conflict_sid := ""
+	var mbase_lc := mission_base.to_lower()
+	for existing_sid in sessions:
+		if str(existing_sid) == str(sess.session_id):
+			continue
+		var erec: Dictionary = sessions[existing_sid]
+		var est := str(erec.get("state", ""))
+		if est in ["CLEANED_UP", "CANCELLED", "FAILED", "TIMEOUT", "COMPARISON_COMPLETE", "NATIVE_VERIFIED"]:
+			continue
+		var esess: Dictionary = erec.get("session", {}) if erec.get("session", {}) is Dictionary else {}
+		if str(esess.get("mission_basename", "")).to_lower() == mbase_lc:
+			active_mission_conflict_sid = str(existing_sid)
+			break
+
+	var addon_conflict_report: Dictionary = {}
+	if launch_mode == "STOCK_ADDON":
+		var addon_dir_scan := str(addon_plan.get("addon_base", str(disc.get("addon_root", ""))))
+		var loadout_info := {
+			"active_loadout_profile_id": str(index.active_loadout_profile_id) if index != null else "",
+			"active_packages": index.active_packages.duplicate() if index != null else options.get("active_packages", []),
+		}
+		addon_conflict_report = NativeAdapterScript.scan_addon_mount_conflicts(
+			addon_dir_scan, stage_root, files,
+			pre.get("resource_closure", {}) if pre.get("resource_closure", {}) is Dictionary else {},
+			loadout_info
+		)
+		if active_mission_conflict_sid != "":
+			var mc_list: Array = addon_conflict_report.get("conflicts", [])
+			mc_list.append({
+				"code": "MISSION_NAME_COLLISION",
+				"resource": mission_base + ".bzn",
+				"target_kind": "mission",
+				"own_path": "assets/Missions/%s.bzn" % mission_base,
+				"conflicting_path": "session:" + active_mission_conflict_sid,
+				"source_kind": "active_shaman_session",
+				"stage_dir": active_mission_conflict_sid,
+				"safe_resolutions": ["Use auto-derived unique session mission basename or clean up session " + active_mission_conflict_sid],
+			})
+			addon_conflict_report["conflicts"] = mc_list
+			addon_conflict_report["ok"] = false
+			addon_conflict_report["verification_allowed"] = false
+			addon_conflict_report["reason"] = "MISSION_NAME_COLLISION"
+		pre["addon_conflict_report"] = addon_conflict_report
+		if not bool(addon_conflict_report.get("ok", true)):
+			var creason := str(addon_conflict_report.get("reason", "ADDON_FOREIGN_ODF_COLLISION"))
+			pre["launch_ready"] = false
+			pre["launch_eligible"] = false
+			pre["addon_isolated"] = false
+			if creason == "MISSION_NAME_COLLISION":
+				pre["stage_eligible"] = false
+				pre["status"] = "FAILED"
+			else:
+				if str(pre.get("status", "")) == "STRUCTURALLY_VALID":
+					pre["status"] = "BLOCKED"
+			pre["reason"] = creason
+			var pre_blks: Array = pre.get("blockers", [])
+			pre_blks.append("STOCK_ADDON mount conflict (%s): %d conflicting file(s) in %s" % [creason, (addon_conflict_report.get("conflicts", []) as Array).size(), addon_dir_scan])
+			pre["blockers"] = pre_blks
+			if pre.get("gates", null) is Dictionary:
+				(pre["gates"] as Dictionary)["LAUNCH_ELIGIBLE"] = false
+				(pre["gates"] as Dictionary)["ADDON_ISOLATED"] = false
+				if creason == "MISSION_NAME_COLLISION":
+					(pre["gates"] as Dictionary)["STAGE_ELIGIBLE"] = false
+		else:
+			pre["addon_isolated"] = true
+			if pre.get("gates", null) is Dictionary:
+				(pre["gates"] as Dictionary)["ADDON_ISOLATED"] = true
+	elif active_mission_conflict_sid != "":
+		pre["launch_ready"] = false
+		pre["launch_eligible"] = false
+		pre["reason"] = "MISSION_NAME_COLLISION"
+		var pre_blks2: Array = pre.get("blockers", [])
+		pre_blks2.append("Active session %s already uses mission basename '%s'" % [active_mission_conflict_sid, mission_base])
+		pre["blockers"] = pre_blks2
+
 	var structurally_valid := bool(pre.get("structurally_valid", false))
 	var resource_closure_valid := bool(pre.get("resource_closure_valid", true))
 	var preflight_passed := structurally_valid and resource_closure_valid
@@ -1365,6 +1489,27 @@ func launch(session_id: String, options: Dictionary = {}) -> Dictionary:
 		var instr_res: Dictionary = {"ok": false, "error": "injected operator_instructions.txt write failure"} if fault_fail_operator_instructions_write else WorkspaceStore.atomic_write_abs(instr_path, "\n".join(instr_lines).to_utf8_buffer())
 		if not bool(instr_res.get("ok", false)):
 			return _fail_transition(session_id, record, "AWAITING_OPERATOR", "operator_instructions.txt write failed")
+		# The instructions file is SHAMAN's own launch artifact: register it in
+		# the stage manifest so hash-verified cleanup owns it instead of
+		# classifying it as a foreign survivor (T-26 route).
+		var instr_manifest_path := str(sess.stage_root).path_join("stage_manifest.json")
+		if FileAccess.file_exists(instr_manifest_path):
+			var im_res := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(instr_manifest_path))
+			if bool(im_res.get("ok", false)) and (im_res.get("data", null) is Dictionary):
+				var im: Dictionary = im_res.get("data", {})
+				var im_files: Array = im.get("files", []) if im.get("files", []) is Array else []
+				var already := false
+				for it in im_files:
+					if it is Dictionary and str((it as Dictionary).get("rel", "")) == "operator_instructions.txt":
+						already = true
+				if not already:
+					im_files.append({
+						"rel": "operator_instructions.txt",
+						"md5": WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(instr_path)),
+						"bytes": FileAccess.get_file_as_bytes(instr_path).size(),
+					})
+					im["files"] = im_files
+					WorkspaceStore.atomic_write_abs(instr_manifest_path, JSON.stringify(im, "  ").to_utf8_buffer())
 		sess.add_checkpoint("AWAITING_OPERATOR", "Operator manual handoff written to " + instr_path)
 		record["state"] = "AWAITING_OPERATOR"
 		record["evidence_state"] = "LAUNCH_REQUESTED"
@@ -1870,12 +2015,13 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 		r_to["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
 		return r_to
 
-	if monitor.state == "STEAM_PROCESS_STARTED":
+	if monitor.state in ["STEAM_PROCESS_STARTED", "MONITOR_ARMED"]:
 		var det: Dictionary = monitor.detect_game(process_inspector, game_process_detector)
 		if bool(det.get("detected", false)):
 			var record0: Dictionary = sessions.get(session_id, {})
-			if not _persist_monitor_state(session_id, monitor, record0, "GAME_PROCESS_DETECTED"):
-				var failed := _fail_transition(session_id, record0, "GAME_PROCESS_DETECTED", "checked transition persist failed")
+			var next_proc_state := str(monitor.state)
+			if not _persist_monitor_state(session_id, monitor, record0, next_proc_state):
+				var failed := _fail_transition(session_id, record0, next_proc_state, "checked transition persist failed")
 				failed["session_id"] = session_id
 				return failed
 			var ms_g := _save_monitors()
@@ -1885,7 +2031,7 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 			r_g["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
 			return r_g
 
-	elif monitor.state in ["GAME_PROCESS_DETECTED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED"]:
+	elif monitor.state in ["GAME_PROCESS_DETECTED", "GAME_PROCESS_VERIFIED", "GAME_PROCESS_CANDIDATE", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED"]:
 		var sess = NativeSessionScript.from_dict((sessions.get(session_id, {}) as Dictionary).get("session", {}))
 		if sess == null:
 			return {"ok": false, "state": "INVALID_SESSION", "reason": "INVALID_SESSION", "active": false}
@@ -1899,6 +2045,22 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 				failed1["session_id"] = session_id
 				return failed1
 
+		# P1-NATIVE-04 (NM-13..NM-16): For armed manual sessions, ONLY a verified
+		# battlezone2.exe process (exe path + MD5 match) + session-bound mission &
+		# marker probe may attest trusted execution. An unverified candidate PID
+		# (GAME_PROCESS_CANDIDATE) NEVER earns trusted execution or NATIVE_VERIFIED!
+		if bool(monitor.manual_armed) and bool(monitor.game_exe_verified) and bool(monitor.mission_observed) and bool(monitor.resource_probe_confirmed):
+			var tr := NativeAdapterScript.get_trusted_session(session_id)
+			if not tr.is_empty() and not bool(tr.get("execution_confirmed", false)):
+				var rec_m: Dictionary = sessions.get(session_id, {})
+				var lcmd_m: Dictionary = (rec_m.get("launch", {}) as Dictionary).get("command", {})
+				var args_m: Array = lcmd_m.get("game_args", [str(sess.mission_basename) + ".bzn"])
+				NativeAdapterScript.confirm_trusted_execution(
+					session_id, int(monitor.game_pid), Time.get_datetime_string_from_system(),
+					"OPERATOR_MANUAL", args_m, 0, str(monitor.mission_loaded_at),
+					str(probe.get("startup_log_path", "")), true
+				)
+
 		# P1-NATIVE-04: Automatically resolve session-bound expected observation
 		# path when caller did not supply an explicit override.
 		var resolved_obs_path := observation_path.strip_edges()
@@ -1911,10 +2073,13 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 			out["observation_path"] = resolved_obs_path
 			out["observation_collected"] = bool(obs_res.get("ok", false))
 			out["comparison_complete"] = bool(obs_res.get("comparison_complete", obs_res.get("ok", false)))
-			out["verified"] = bool(obs_res.get("verified", false))
+			var allow_verified := bool(obs_res.get("verified", false)) and (not bool(monitor.manual_armed) or bool(monitor.game_exe_verified))
+			out["verified"] = allow_verified
 			out["state"] = str(obs_res.get("state", monitor.state))
+			if not allow_verified and out["state"] == "NATIVE_VERIFIED":
+				out["state"] = "COMPARISON_COMPLETE"
 			out["reason"] = str(obs_res.get("reason", out.get("reason", "")))
-			out["native_verified"] = bool(obs_res.get("verified", false))
+			out["native_verified"] = allow_verified
 			if bool(obs_res.get("persist_failed", false)):
 				out["persist_failed"] = true
 				out["recovery_pending"] = true
@@ -1949,6 +2114,124 @@ func poll_monitor(session_id: String, now_s: float = -1.0, observation_path: Str
 	return r_idle
 
 
+## P1-NATIVE-04 (NM-11..NM-14): Arm non-blocking manual observation before an
+## operator launches BZCC via Steam. Captures preexisting game PIDs, writes
+## operator instructions, persists MONITOR_ARMED across restarts, and NEVER
+## falsely claims the game launched or NATIVE_VERIFIED on arming alone.
+func arm_manual_observation(session_id: String, options: Dictionary = {}) -> Dictionary:
+	if not sessions.has(session_id):
+		return {"ok": false, "state": "REJECTED", "reason": "UNKNOWN_SESSION", "active": false}
+	var record: Dictionary = sessions[session_id]
+	var sess = NativeSessionScript.from_dict(record.get("session", {}))
+	if sess == null:
+		return {"ok": false, "state": "REJECTED", "reason": "INVALID_SESSION", "active": false}
+	if str(sess.stage_manifest_path) == "" or not FileAccess.file_exists(str(sess.stage_manifest_path)):
+		return {"ok": false, "state": "REJECTED", "reason": "NOT_STAGED", "active": false, "error": "stage the experiment before arming manual observation"}
+	var stg_check := _verify_staged_integrity_before_launch(sess)
+	if not bool(stg_check.get("ok", false)):
+		return {"ok": false, "state": "REJECTED", "reason": str(stg_check.get("reason", "STAGE_MODIFIED_AFTER_PREFLIGHT")), "active": false}
+
+	# Ensure durable operator handoff instructions exist (AWAITING_OPERATOR).
+	var handoff_res: Dictionary = {}
+	if str(record.get("state", "")) != "AWAITING_OPERATOR" and str((record.get("launch", {}) as Dictionary).get("instructions_path", "")) == "":
+		var h_opts := options.duplicate(true)
+		h_opts["manual_handoff"] = true
+		h_opts["execute_process"] = false
+		handoff_res = launch(session_id, h_opts)
+		if not bool(handoff_res.get("ok", false)):
+			return handoff_res
+		record = sessions[session_id]
+		sess = NativeSessionScript.from_dict(record.get("session", {}))
+
+	var disc: Dictionary = record.get("discovery", {})
+	var preexisting: Array = (options.get("preexisting_game_pids", []) as Array).duplicate(true) if (options.has("preexisting_game_pids") and options.get("preexisting_game_pids", []) is Array) else _capture_preexisting_game_pids()
+	var stg_arg := {
+		"stage": str(sess.stage_root),
+		"stage_id": str(sess.stage_id),
+		"stage_manifest": str(sess.stage_manifest_path),
+		"staged": (record.get("evidence", {}) as Dictionary).get("staged", []),
+		"evidence": record.get("evidence", {}),
+	}
+	var receipt: Dictionary = NativeAdapterScript.begin_trusted_session(stg_arg, disc, sess.scenario, "OPERATOR_MANUAL", sess)
+	var mon_opts := options.duplicate(true)
+	mon_opts["preexisting_game_pids"] = preexisting
+	var monitor = ProcessMonitorScript.create(session_id, disc, mon_opts, preexisting)
+	monitor.state = ProcessMonitorScript.STATE_MONITOR_ARMED
+	monitor.manual_armed = true
+	monitor.arm_source = "OPERATOR_MANUAL"
+	monitor.active = true
+	monitor.started_at_s = float(mon_opts.get("monitor_started_at_s", Time.get_unix_time_from_system()))
+	monitor.relative_clock = mon_opts.has("monitor_started_at_s") or (monitor.started_at_s == 0.0)
+	record["monitor"] = monitor.to_dict()
+	record["state"] = "MONITOR_ARMED"
+	record["evidence_state"] = "MONITOR_ARMED"
+	record["launch_route"] = "OPERATOR_MANUAL"
+	record["manual_armed"] = true
+	record["updated_at"] = Time.get_datetime_string_from_system()
+	if record.get("launch", null) is Dictionary:
+		(record["launch"] as Dictionary)["receipt"] = receipt
+		(record["launch"] as Dictionary)["manual_armed"] = true
+	var commit := _commit_transition(session_id, record, "MONITOR_ARMED", "Manual observation armed before operator Steam launch")
+	if not bool(commit.get("ok", false)):
+		commit["session_id"] = session_id
+		commit["active"] = false
+		return commit
+	monitors[session_id] = monitor
+	var ms := _save_monitors()
+	if not bool(ms.get("ok", false)):
+		return _fail_monitor_persist(session_id, monitor, ms)
+	return {
+		"ok": true,
+		"session_id": session_id,
+		"state": "MONITOR_ARMED",
+		"active": true,
+		"manual_armed": true,
+		"game_launched": false,
+		"verified": false,
+		"preexisting_game_pids": preexisting.duplicate(true),
+		"instructions_path": str((record.get("launch", {}) as Dictionary).get("instructions_path", "")),
+		"command": (record.get("launch", {}) as Dictionary).get("command", {}),
+		"observation_expected_path": str(sess.observation_expected_path),
+		"monitor_persist_status": STATUS_MONITOR_STATE_SAVED,
+	}
+
+
+## P1-NATIVE-04 (NM-15): Explicitly import an operator-supplied observation JSON
+## without live verified process attestation. Records OBSERVATION_IMPORTED ->
+## COMPARISON_COMPLETE with unattested=true, verified=false (NEVER NATIVE_VERIFIED).
+func import_manual_observation(session_id: String, observation_path: String) -> Dictionary:
+	if not sessions.has(session_id):
+		return {"ok": false, "reason": "UNKNOWN_SESSION", "verified": false, "unattested": true}
+	var record: Dictionary = sessions[session_id]
+	var sess = NativeSessionScript.from_dict(record.get("session", {}))
+	if sess == null:
+		return {"ok": false, "reason": "INVALID_SESSION", "verified": false, "unattested": true}
+	# Ensure manual import NEVER claims in-process execution attestation.
+	var prev_trusted := NativeAdapterScript.get_trusted_session(session_id)
+	if not prev_trusted.is_empty():
+		NativeAdapterScript._trusted_sessions.erase(session_id)
+	sess.add_checkpoint("OBSERVATION_IMPORTED", "Manual observation imported from " + observation_path.get_file())
+	record["session"] = sess.to_dict()
+	sessions[session_id] = record
+	var res := collect_observation(session_id, observation_path)
+	res["imported"] = bool(res.get("ok", false))
+	res["unattested"] = true
+	res["verified"] = false
+	if str(res.get("state", "")) == "NATIVE_VERIFIED":
+		res["state"] = "COMPARISON_COMPLETE"
+	if monitors.has(session_id):
+		var mon = monitors[session_id]
+		mon.observation_imported = true
+		mon.observation_collected = bool(res.get("ok", false))
+		mon.comparison_complete = bool(res.get("ok", false))
+		mon.native_verified = false
+		if bool(res.get("ok", false)):
+			mon.state = ProcessMonitorScript.STATE_COMPARISON
+			mon.active = false
+			_save_monitors()
+	return res
+
+
 func resume_monitor(session_id: String) -> Dictionary:
 	var path := ledger_dir().path_join("process_monitors.json")
 	if FileAccess.file_exists(path):
@@ -1966,35 +2249,381 @@ func resume_monitor(session_id: String) -> Dictionary:
 					if not sessions.has(session_id):
 						recover_sessions()
 					return monitor.result()
+	# Fallback to monitor snapshot persisted inside the session record (e.g. after
+	# process_monitors.json failed to write during cancellation — NC-11 / NC-12).
+	if sessions.has(session_id):
+		var rec_m = (sessions[session_id] as Dictionary).get("monitor", {})
+		if rec_m is Dictionary and not (rec_m as Dictionary).is_empty():
+			var monitor2 = ProcessMonitorScript.from_dict(rec_m)
+			if monitor2 != null:
+				var normalized2: Array = []
+				for p2 in monitor2.preexisting_game_pids:
+					normalized2.append(int(p2))
+				monitor2.preexisting_game_pids = normalized2
+				monitors[session_id] = monitor2
+				return monitor2.result()
 	if monitors.has(session_id):
 		return (monitors[session_id] as RefCounted).result()
 	return {"ok": false, "state": "NO_MONITOR_TO_RESUME", "reason": "NO_MONITOR_TO_RESUME", "active": false}
 
 
+func _save_monitors_snapshot(override_sid: String = "", override_dict: Dictionary = {}) -> Dictionary:
+	if sessions.is_empty():
+		return {"ok": true, "status": STATUS_MONITOR_STATE_SAVED, "recovery_pending": false, "error": ""}
+	var doc := {"schema": LEDGER_SCHEMA, "updated": Time.get_datetime_string_from_system(), "monitors": {}}
+	for sid in monitors:
+		if override_sid != "" and str(sid) == override_sid and not override_dict.is_empty():
+			doc["monitors"][sid] = override_dict.duplicate(true)
+		else:
+			doc["monitors"][sid] = (monitors[sid] as RefCounted).to_dict()
+	var wres: Dictionary = {"ok": false, "error": "injected process_monitors.json write failure"} if fault_fail_monitor_persist else WorkspaceStore.atomic_write_abs(
+		ledger_dir().path_join("process_monitors.json"), JSON.stringify(doc, "  ").to_utf8_buffer()
+	)
+	if not bool(wres.get("ok", false)):
+		return {
+			"ok": false,
+			"status": STATUS_MONITOR_PERSIST_FAILED,
+			"reason": STATUS_MONITOR_PERSIST_FAILED,
+			"recovery_pending": true,
+			"state": STATE_RECOVERY_PENDING,
+			"persist_failed": true,
+			"error": str(wres.get("error", "process_monitors.json write failed")),
+		}
+	return {"ok": true, "status": STATUS_MONITOR_STATE_SAVED, "recovery_pending": false, "error": ""}
+
+
+## P1-NATIVE-01 (NC-08..NC-12): Checked cancellation.
+## NEVER mutates the live monitor to CANCELLED before BOTH session-ledger
+## persistence AND process_monitors.json persistence succeed!
+## On any persistence failure, keeps the live monitor active and recoverable
+## with cancel_status=CANCELLATION_PERSIST_FAILED and persists a RECOVERY_PENDING
+## recovery record so restart reconciles deterministically.
 func cancel_monitor(session_id: String) -> Dictionary:
 	if not monitors.has(session_id):
 		return {"ok": false, "state": "NO_ACTIVE_MONITOR", "reason": "NO_ACTIVE_MONITOR", "active": false}
 	var monitor = monitors[session_id]
-	monitor.cancel()
-	var record: Dictionary = sessions.get(session_id, {})
+	var prev_mon_dict: Dictionary = monitor.to_dict()
+	var cand_mon_dict: Dictionary = prev_mon_dict.duplicate(true)
+	cand_mon_dict["state"] = ProcessMonitorScript.STATE_CANCELLED
+	cand_mon_dict["reason"] = "MONITOR_CANCELLED"
+	cand_mon_dict["cancel_status"] = STATUS_CANCELLATION_COMMITTED
+	cand_mon_dict["recoverable"] = false
+	cand_mon_dict["active"] = false
+
+	var record: Dictionary = (sessions.get(session_id, {}) as Dictionary).duplicate(true)
 	if not record.is_empty():
-		record["monitor"] = monitor.to_dict()
+		record["cancel_status"] = STATUS_CANCEL_REQUESTED
+		record["monitor"] = cand_mon_dict.duplicate(true)
 	var commit := _commit_transition(session_id, record, "CANCELLED", "Monitor cancelled by operator")
 	if not bool(commit.get("ok", false)):
-		commit["session_id"] = session_id
-		return commit
-	var ms := _save_monitors()
+		var cerr := str(commit.get("error", "checked cancel ledger persist failed"))
+		monitor.active = true
+		monitor.recoverable = true
+		monitor.cancel_status = STATUS_CANCELLATION_PERSIST_FAILED
+		monitor.reason = STATUS_CANCELLATION_PERSIST_FAILED
+		monitor.last_error = cerr
+		var rec_fail: Dictionary = (sessions.get(session_id, record) as Dictionary).duplicate(true)
+		rec_fail["state"] = STATE_RECOVERY_PENDING
+		rec_fail["reason"] = STATUS_CANCELLATION_PERSIST_FAILED
+		rec_fail["cancel_status"] = STATUS_CANCELLATION_PERSIST_FAILED
+		rec_fail["recoverable"] = true
+		rec_fail["recovery_pending"] = true
+		rec_fail["monitor"] = monitor.to_dict()
+		sessions[session_id] = rec_fail
+		WorkspaceStore.atomic_write_abs(_session_file(session_id), JSON.stringify(rec_fail, "  ").to_utf8_buffer())
+		return {
+			"ok": false,
+			"session_id": session_id,
+			"state": STATE_RECOVERY_PENDING,
+			"monitor_state": str(monitor.state),
+			"cancel_status": STATUS_CANCELLATION_PERSIST_FAILED,
+			"reason": STATUS_CANCELLATION_PERSIST_FAILED,
+			"recoverable": true,
+			"recovery_pending": true,
+			"active": true,
+			"persist_failed": true,
+			"error": cerr,
+		}
+
+	var ms := _save_monitors_snapshot(session_id, cand_mon_dict)
 	if not bool(ms.get("ok", false)):
-		return _fail_monitor_persist(session_id, monitor, ms)
+		var merr := str(ms.get("error", "process_monitors.json write failed during cancellation"))
+		monitor.active = true
+		monitor.recoverable = true
+		monitor.cancel_status = STATUS_CANCELLATION_PERSIST_FAILED
+		monitor.reason = STATUS_CANCELLATION_PERSIST_FAILED
+		monitor.last_error = merr
+		var rec_mfail: Dictionary = (sessions.get(session_id, record) as Dictionary).duplicate(true)
+		rec_mfail["state"] = STATE_RECOVERY_PENDING
+		rec_mfail["evidence_state"] = STATE_RECOVERY_PENDING
+		rec_mfail["reason"] = STATUS_CANCELLATION_PERSIST_FAILED
+		rec_mfail["cancel_status"] = STATUS_CANCELLATION_PERSIST_FAILED
+		rec_mfail["recoverable"] = true
+		rec_mfail["recovery_pending"] = true
+		rec_mfail["monitor_persist_status"] = STATUS_MONITOR_PERSIST_FAILED
+		rec_mfail["monitor"] = monitor.to_dict()
+		rec_mfail["last_error"] = merr
+		var sess_mf = NativeSessionScript.from_dict(rec_mfail.get("session", {}))
+		if sess_mf != null:
+			sess_mf.add_checkpoint(STATE_RECOVERY_PENDING, "Cancellation monitor persist failed: " + merr)
+			rec_mfail["session"] = sess_mf.to_dict()
+		sessions[session_id] = rec_mfail
+		_persist_session(session_id, rec_mfail)
+		return {
+			"ok": false,
+			"session_id": session_id,
+			"state": STATE_RECOVERY_PENDING,
+			"monitor_state": str(monitor.state),
+			"status": STATUS_MONITOR_PERSIST_FAILED,
+			"cancel_status": STATUS_CANCELLATION_PERSIST_FAILED,
+			"reason": STATUS_CANCELLATION_PERSIST_FAILED,
+			"recoverable": true,
+			"recovery_pending": true,
+			"active": true,
+			"persist_failed": true,
+			"error": merr,
+		}
+
+	# Both session ledger and process_monitors.json persisted cleanly: commit live monitor state!
+	monitor.cancel()
+	if sessions.has(session_id):
+		var rec_ok: Dictionary = sessions[session_id]
+		rec_ok["cancel_status"] = STATUS_CANCELLATION_COMMITTED
+		rec_ok["recoverable"] = false
+		rec_ok["recovery_pending"] = false
+		rec_ok["monitor"] = monitor.to_dict()
+		sessions[session_id] = rec_ok
 	var out: Dictionary = monitor.result()
+	out["cancel_status"] = STATUS_CANCELLATION_COMMITTED
+	out["recoverable"] = false
 	out["monitor_persist_status"] = STATUS_MONITOR_STATE_SAVED
 	return out
 
 
+## One lifecycle contract for both cleanup entrypoints. The durable cleanup
+## result is classified from the cleanup outcome, never from `partial` alone.
+func cleanup_outcome(cl: Dictionary) -> Dictionary:
+	var is_partial := bool(cl.get("partial", false))
+	var ok := bool(cl.get("ok", false))
+	if not ok:
+		return {"state": "FAILED" if not is_partial else "PARTIAL_CLEANUP",
+			"intent_state": "CLEANUP_FAILED" if not is_partial else "CLEANUP_FAILED_PARTIAL_RECOVERY",
+			"status": str(cl.get("status", "CLEANUP_FAILED"))}
+	if is_partial:
+		return {"state": "PARTIAL_CLEANUP",
+			"intent_state": "CLEANUP_PARTIAL_FOREIGN_FILES_PRESERVED",
+			"status": str(cl.get("status", "PARTIAL_CLEANUP"))}
+	return {"state": "CLEANED_UP", "intent_state": "CLEANUP_COMPLETE",
+		"status": str(cl.get("status", "CLEAN"))}
+
+
+func _durable_session_state(session_id: String) -> String:
+	var rec := _durable_session_record(session_id)
+	return str(rec.get("state", "")) if not rec.is_empty() else ""
+
+
+## The ledger record is the durable authority for cleanup identity and result.
+func _durable_session_record(session_id: String) -> Dictionary:
+	var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ledger_path()))
+	if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
+		return {}
+	var root: Dictionary = jres.get("data", {})
+	var items = root.get("sessions", null)
+	if not (items is Dictionary):
+		items = root.get("ledger", null)
+	if not (items is Dictionary) or not (items as Dictionary).has(session_id):
+		return {}
+	var rec = (items as Dictionary).get(session_id, null)
+	return rec if rec is Dictionary else {}
+
+
+## True only when a prior verified cleanup has removed every manifest-owned
+## file. Missing manifest + empty stage is NOT proof: the durable ledger must
+## also carry an ok=true, non-partial cleanup result with a matching identity.
+func _verified_prior_cleanup(session_id: String, sess) -> bool:
+	var rec := _durable_session_record(session_id)
+	if rec.is_empty():
+		return false
+	var sid := str(rec.get("session_id", ""))
+	if sid != "" and sid != session_id:
+		return false
+	var stage_id := str((rec.get("session", {}) as Dictionary).get("stage_id", ""))
+	if stage_id != "" and sess != null and str(sess.stage_id) != "" and stage_id != str(sess.stage_id):
+		return false
+	var cl = rec.get("cleanup", null)
+	if not (cl is Dictionary):
+		return false
+	var cleanup: Dictionary = cl
+	if not bool(cleanup.get("ok", false)) or bool(cleanup.get("partial", false)):
+		return false
+	return true
+
+
+## Positive finalization evidence. A receipt counts only if it names this
+## session/stage and reports owned files removed; a clean stage satisfies the
+## inventory only when prior cleanup was verified in the durable ledger.
+func _finalization_evidence(session_id: String, sess) -> Dictionary:
+	var stage_root := str(sess.stage_root)
+	var result := {"ok": false, "reason": "FINALIZATION_EVIDENCE_INSUFFICIENT",
+		"ownership_verified": false, "receipt_verified": false,
+		"stage_contents_unclassified": false, "remaining_owned_files": -1}
+	var receipt_path := stage_root.path_join("stage_cleanup_receipt.json")
+	var prior := _verified_prior_cleanup(session_id, sess)
+	if FileAccess.file_exists(receipt_path):
+		var rres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(receipt_path))
+		if bool(rres.get("ok", false)) and (rres.get("data", null) is Dictionary):
+			var receipt: Dictionary = rres.get("data", {})
+			var r_sid := str(receipt.get("session_id", ""))
+			var r_stage := str(receipt.get("stage_root", ""))
+			var r_stage_id := str(receipt.get("stage_id", ""))
+			var identity_ok := (r_sid == session_id and
+				(r_stage == "" or WorkspaceStore.canonical(r_stage) == WorkspaceStore.canonical(stage_root)) and
+				(r_stage_id == "" or str(sess.stage_id) == "" or r_stage_id == str(sess.stage_id)))
+			if identity_ok and str(receipt.get("status", "")).begins_with("OWNED_FILES_REMOVED"):
+				result["receipt_verified"] = true
+				result["ownership_verified"] = true
+	if bool(result["receipt_verified"]):
+		result["ok"] = true
+		result["reason"] = ""
+		result["remaining_owned_files"] = 0
+		return result
+	if not DirAccess.dir_exists_absolute(stage_root):
+		if prior:
+			result["ok"] = true
+			result["reason"] = ""
+			result["ownership_verified"] = true
+			result["remaining_owned_files"] = 0
+		return result
+	var existing: Array[String] = []
+	SafeStageScript._list_existing_rel_files(stage_root, stage_root, existing)
+	var metadata := [SafeStageScript.MANIFEST_NAME, "native_evidence.json",
+		"stage_provenance.json", "stage_cleanup_receipt.json"]
+	var substantive: Array[String] = []
+	for rel in existing:
+		if not metadata.has(rel) and not rel.begins_with(SafeStageScript.BACKUP_SUBDIR + "/"):
+			substantive.append(rel)
+	result["remaining_owned_files"] = substantive.size()
+	result["stage_contents_unclassified"] = true
+	if substantive.is_empty() and prior:
+		result["ok"] = true
+		result["reason"] = ""
+		result["ownership_verified"] = true
+		result["stage_contents_unclassified"] = false
+	return result
+
+
+## Shared authorization gate. A PREPARED intent is not permission to delete:
+## every retry must re-prove session identity, stage identity, ledger, monitor
+## quiescence and authoritative stage ownership/hashes.
+func _authorize_cleanup(session_id: String, record: Dictionary, sess,
+		intent: Dictionary = {}, finalization_retry: bool = false) -> Dictionary:
+	# P0-NATIVE-01: the requested ID, the session record, the session object and
+	# the stage evidence must all describe one owner. Empty fields never waive
+	# the check, and the same gate covers normal and terminal cleanup.
+	var record_sid := str(record.get("session_id", ""))
+	var object_sid := str(sess.session_id) if sess != null else ""
+	if session_id == "" or record_sid != "" and record_sid != session_id or \
+			object_sid != session_id:
+		return {"ok": false, "reason": "CLEANUP_SESSION_IDENTITY_MISMATCH"}
+	var stage_root := str(sess.stage_root)
+	if stage_root == "":
+		return {"ok": false, "reason": "CLEANUP_STAGE_ROOT_MISSING"}
+	if str(sess.stage_id) == "":
+		return {"ok": false, "reason": "CLEANUP_STAGE_ID_MISSING"}
+	if not intent.is_empty():
+		# INT-01..06: a terminal retry requires a complete, matched identity.
+		# Missing fields never waive the check.
+		var intent_sid := str(intent.get("session_id", ""))
+		var intent_root := str(intent.get("stage_root", ""))
+		if intent_sid == "" or intent_sid != session_id:
+			return {"ok": false, "reason": "CLEANUP_INTENT_SESSION_IDENTITY_REQUIRED"}
+		if intent_root == "" or WorkspaceStore.canonical(intent_root) != WorkspaceStore.canonical(stage_root):
+			return {"ok": false, "reason": "CLEANUP_INTENT_STAGE_ROOT_REQUIRED"}
+		if int(intent.get("schema", 0)) != 1:
+			return {"ok": false, "reason": "CLEANUP_INTENT_SCHEMA_UNSUPPORTED"}
+	if not intent.is_empty() and \
+			str(intent.get("state", "")) not in ["CLEANUP_PREPARED", "CLEANUP_FINALIZATION_PENDING"]:
+		return {"ok": false, "reason": "CLEANUP_INTENT_NOT_RESUMABLE"}
+	if _is_session_active_for_cleanup(session_id, record):
+		return {"ok": false, "reason": "ACTIVE_EXPERIMENT_CANNOT_CLEANUP",
+			"state": str(record.get("state", "ACTIVE"))}
+	# A finalization retry has already passed the destructive step. The stage
+	# manifest is gone by design; allow only a durable, quiescent finalization
+	# state to complete the intent without repeating any deletion.
+	if finalization_retry and not FileAccess.file_exists(str(sess.stage_root).path_join(SafeStageScript.MANIFEST_NAME)):
+		var durable_state := _durable_session_state(session_id)
+		if durable_state != "CLEANUP_FINALIZATION_PENDING":
+			return {"ok": false, "reason": "FINALIZATION_RETRY_NOT_DURABLE"}
+		var mon := SafeStageScript._active_monitor_for_session(ledger_path(), session_id)
+		if bool(mon.get("active", false)):
+			return {"ok": false, "reason": "ACTIVE_MONITOR"}
+		# P0-NATIVE-02: absent manifest alone proves nothing. Require a verified
+		# receipt or a durable ok=true/non-partial result plus a clean inventory.
+		var evidence := _finalization_evidence(session_id, sess)
+		if not bool(evidence.get("ok", false)):
+			return {"ok": false, "reason": str(evidence.get("reason", "FINALIZATION_EVIDENCE_INSUFFICIENT")),
+				"finalization_only": false, "evidence": evidence}
+		return {"ok": true, "finalization_only": true, "evidence": evidence,
+			"reconciliation": {"never_launched_dry_run": false}}
+	var reconciliation: Dictionary = SafeStageScript.reconcile_stage(str(sess.stage_root), ledger_path())
+	var recon_action := str(reconciliation.get("action", ""))
+	# P0-NATIVE-01: reconciliation derives owner from stage evidence. That owner
+	# must equal the requested session, and the manifest stage ID must equal the
+	# session object's immutable stage ID.
+	var recon_sid := str(reconciliation.get("session_id", ""))
+	var recon_stage_id := str(reconciliation.get("stage_id", ""))
+	if recon_sid == "" or recon_sid != session_id or \
+			(recon_stage_id != "" and recon_stage_id != str(sess.stage_id)):
+		return {"ok": false, "reason": "CLEANUP_STAGE_OWNER_MISMATCH",
+			"requested_session_id": session_id,
+			"stage_owner_session_id": recon_sid,
+			"stage_id": recon_stage_id}
+	if not (recon_action == "CLEANUP_ELIGIBLE" or recon_action == "CLEANUP_ELIGIBLE_DRY_RUN") \
+			or not bool(reconciliation.get("cleanup_allowed", false)):
+		return {"ok": false,
+			"reason": str(reconciliation.get("reason", "STAGE_CLEANUP_NOT_AUTHORIZED")),
+			"recovery_pending": bool(reconciliation.get("recovery_pending", false)),
+			"ledger_status": str(reconciliation.get("ledger_status", "")),
+			"monitor_status": str(reconciliation.get("monitor_status", ""))}
+	reconciliation["never_launched_dry_run"] = recon_action == "CLEANUP_ELIGIBLE_DRY_RUN" and \
+		bool(reconciliation.get("never_launched", false))
+	return {"ok": true, "reconciliation": reconciliation}
+
+
+## Persist, read back and verify the final durable intent. A failed final write
+## is never reported as confirmed durable completion.
+func _finalize_cleanup_intent(intent_path: String, session_id: String,
+		stage_root: String, outcome: Dictionary, cl: Dictionary,
+		never_launched_dry_run: bool) -> bool:
+	if fault_fail_cleanup_intent_final_write:
+		return false
+	var payload := JSON.stringify({
+		"schema": 1, "session_id": session_id, "stage_root": stage_root,
+		"state": str(outcome.get("intent_state", "CLEANUP_FAILED")),
+		"cleanup": cl, "cleanup_status": str(outcome.get("status", "")),
+		"never_launched_dry_run": never_launched_dry_run,
+		"completed_at": Time.get_datetime_string_from_system(),
+	}, "  ").to_utf8_buffer()
+	var write := WorkspaceStore.atomic_write_abs(intent_path, payload)
+	if not bool(write.get("ok", false)) or not FileAccess.file_exists(intent_path):
+		return false
+	if WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(intent_path)) != WorkspaceStore._md5_bytes(payload):
+		return false
+	var parsed := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(intent_path))
+	if not bool(parsed.get("ok", false)) or not (parsed.get("data", null) is Dictionary):
+		return false
+	var disk: Dictionary = parsed.get("data", {})
+	return str(disk.get("state", "")) == str(outcome.get("intent_state", "")) and \
+		str(disk.get("session_id", "")) == session_id and \
+		WorkspaceStore.canonical(str(disk.get("stage_root", ""))) == WorkspaceStore.canonical(stage_root)
+
+
 func _is_session_active_for_cleanup(session_id: String, record: Dictionary) -> bool:
 	var rec_state := str(record.get("state", ""))
-	if rec_state in ["COMPARISON_COMPLETE", "NATIVE_VERIFIED", "CANCELLED", "TIMEOUT", "FAILED", "RECOVERY_PENDING", "CLEANED_UP", "PARTIAL_CLEANUP"]:
-		return false
+	# Recovery-pending, failed and partial-cleanup states are not proof that the
+	# game process is quiesced. Never infer cleanup eligibility from them alone.
+	if rec_state in ["RECOVERY_PENDING", "FAILED", "PARTIAL_CLEANUP"]:
+		return true
 	if monitors.has(session_id):
 		var mon = monitors[session_id]
 		if mon != null and bool(mon.active) and not mon.is_terminal():
@@ -2002,10 +2631,14 @@ func _is_session_active_for_cleanup(session_id: String, record: Dictionary) -> b
 	var mon_dict: Dictionary = record.get("monitor", {}) if record.get("monitor", {}) is Dictionary else {}
 	if not mon_dict.is_empty():
 		var m_active := bool(mon_dict.get("active", false))
-		var m_state := str(mon_dict.get("state", ""))
-		if m_active and not (m_state in ProcessMonitorScript.TERMINAL_STATES):
+		var m_recoverable := bool(mon_dict.get("recoverable", false))
+		var m_state := str(mon_dict.get("state", "")).to_upper()
+		var m_terminal := m_state in ProcessMonitorScript.TERMINAL_STATES
+		if m_active or m_recoverable or not m_terminal:
 			return true
-	if rec_state in ["STEAM_PROCESS_STARTED", "GAME_PROCESS_DETECTED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED"]:
+		if str(mon_dict.get("cancel_status", "")) == STATUS_CANCEL_REQUESTED:
+			return true
+	if rec_state in ["STEAM_PROCESS_STARTED", "MONITOR_ARMED", "GAME_PROCESS_CANDIDATE", "GAME_PROCESS_DETECTED", "GAME_PROCESS_VERIFIED", "MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED"]:
 		return true
 	return false
 
@@ -2021,17 +2654,37 @@ func cleanup_stage(session_id: String) -> Dictionary:
 	var sess = NativeSessionScript.from_dict(record.get("session", {}))
 	if sess == null:
 		return {"ok": false, "reason": "INVALID_SESSION", "error": "cannot deserialize session"}
-	if _is_session_active_for_cleanup(session_id, record):
-		var cur_state := str(record.get("state", "ACTIVE"))
+	var auth: Dictionary = _authorize_cleanup(session_id, record, sess)
+	if not bool(auth.get("ok", false)):
+		var auth_reason := str(auth.get("reason", "STAGE_CLEANUP_NOT_AUTHORIZED"))
+		var active_rejection := auth_reason == "ACTIVE_EXPERIMENT_CANNOT_CLEANUP"
 		return {
 			"ok": false,
-			"state": cur_state,
-			"reason": "ACTIVE_EXPERIMENT_CANNOT_CLEANUP",
+			"state": str(auth.get("state", record.get("state", "ACTIVE"))),
+			"reason": auth_reason,
 			"cleanup_rejected": true,
-			"active_monitor": true,
+			"active_monitor": active_rejection,
+			"recovery_pending": bool(auth.get("recovery_pending", false)),
+			"ledger_status": str(auth.get("ledger_status", "")),
+			"monitor_status": str(auth.get("monitor_status", "")),
 			"session_id": session_id,
-			"error": "ACTIVE_EXPERIMENT_CANNOT_CLEANUP: cancel or finish active native experiment before cleaning stage",
+			"error": auth_reason + ": authoritative cleanup gate refused cleanup",
 		}
+	var reconciliation: Dictionary = auth.get("reconciliation", {})
+	var never_launched_dry_run := bool(reconciliation.get("never_launched_dry_run", false))
+	# Durable cleanup intent is written and read back BEFORE any file removal.
+	var intent_path := ledger_dir().path_join(session_id.replace("/", "_").replace("\\", "_") + ".cleanup_intent.json")
+	var intent_payload := JSON.stringify({
+		"schema": 1, "session_id": session_id, "stage_root": str(sess.stage_root),
+		"state": "CLEANUP_PREPARED", "reconciliation": reconciliation,
+		"prepared_at": Time.get_datetime_string_from_system(),
+	}, "  ").to_utf8_buffer()
+	var intent_write := WorkspaceStore.atomic_write_abs(intent_path, intent_payload)
+	if not bool(intent_write.get("ok", false)) or not FileAccess.file_exists(intent_path) or \
+			WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(intent_path)) != WorkspaceStore._md5_bytes(intent_payload):
+		return {"ok": false, "state": "RECOVERY_PENDING", "reason": "CLEANUP_INTENT_PERSIST_FAILED",
+			"cleanup_rejected": true, "recovery_pending": true, "session_id": session_id,
+			"error": "durable cleanup intent could not be verified; no files were removed"}
 	# NC-07: Retain durable evidence artifact outside disposable stage root before cleanup.
 	var retained_evidence_path := ""
 	var ev_src := str(sess.evidence_path)
@@ -2063,7 +2716,9 @@ func cleanup_stage(session_id: String) -> Dictionary:
 		if addon_parent != "" and addon_parent.to_lower().ends_with("/addon"):
 			SafeStageScript.register_owned_base(addon_parent, extra_prot)
 	var cl: Dictionary = SafeStageScript.cleanup(str(sess.stage_root), extra_prot)
-	var new_state := "CLEANED_UP" if (bool(cl.get("ok", false)) and not bool(cl.get("partial", false))) else ("PARTIAL_CLEANUP" if bool(cl.get("partial", false)) else "FAILED")
+	var outcome := cleanup_outcome(cl)
+	var new_state := str(outcome.get("state", "FAILED"))
+	var terminal_intent_state := str(outcome.get("intent_state", "CLEANUP_FAILED"))
 	sess.add_checkpoint(new_state, "Stage cleanup: status=%s removed=%d" % [str(cl.get("status", "")), int(cl.get("removed", 0))])
 	record["state"] = new_state
 	record["cleanup"] = cl
@@ -2072,13 +2727,341 @@ func cleanup_stage(session_id: String) -> Dictionary:
 	_pending_files.erase(session_id)
 	var cleanup_commit := _commit_transition(session_id, record, new_state, "Stage cleanup completed")
 	if not bool(cleanup_commit.get("ok", false)):
+		WorkspaceStore.atomic_write_abs(intent_path, JSON.stringify({
+			"schema": 1, "session_id": session_id, "stage_root": str(sess.stage_root),
+			"state": "CLEANUP_RECOVERY_PENDING", "cleanup": cl,
+			"completed_at": Time.get_datetime_string_from_system(),
+		}, "  ").to_utf8_buffer())
 		cleanup_commit["session_id"] = session_id
 		cleanup_commit["cleanup"] = cl
+		cleanup_commit["cleanup_intent"] = "CLEANUP_RECOVERY_PENDING"
 		return cleanup_commit
+	var intent_finalized := _finalize_cleanup_intent(intent_path, session_id,
+		str(sess.stage_root), outcome, cl, never_launched_dry_run)
+	# P1-NATIVE-03: the final durable intent write must be read back and
+	# verified. Files removed + ledger committed + unverifiable intent is NOT
+	# a complete durable cleanup; report the honest intermediate state.
+	if not intent_finalized:
+		var pending_record := record.duplicate(true)
+		pending_record["state"] = "CLEANUP_FINALIZATION_PENDING"
+		var fin_transition := _commit_transition(session_id, pending_record,
+			"CLEANUP_FINALIZATION_PENDING", "Cleanup done; final intent write could not be verified")
+		return {
+			"ok": false,
+			"state": "CLEANUP_FINALIZATION_PENDING" if bool(fin_transition.get("ok", false)) else new_state,
+			"cleanup": cl,
+			"files_cleanup_ok": bool(cl.get("ok", false)),
+			"ledger_commit_ok": true,
+			"intent_finalized": false,
+			"durable_complete": false,
+			"recovery_required": true,
+			"retained_evidence_path": retained_evidence_path,
+			"session_id": session_id,
+			"cleanup_intent": "CLEANUP_FINALIZATION_PENDING",
+			"reason": "CLEANUP_INTENT_FINALIZATION_UNVERIFIED",
+			"error": "stage files removed and ledger committed, but the durable cleanup intent could not be verified after write",
+		}
+	var durable := bool(cl.get("ok", false)) and intent_finalized
 	return {
-		"ok": bool(cl.get("ok", false)),
+		"ok": durable,
 		"state": new_state,
 		"cleanup": cl,
+		"files_cleanup_ok": bool(cl.get("ok", false)),
+		"ledger_commit_ok": true,
+		"intent_finalized": intent_finalized,
+		"durable_complete": durable,
+		"recovery_required": not durable,
 		"retained_evidence_path": retained_evidence_path,
 		"session_id": session_id,
+		"cleanup_intent": terminal_intent_state + ("_VERIFIED" if intent_finalized else ""),
+		"never_launched_dry_run": never_launched_dry_run,
 	}
+
+
+## T-122: finalize a cleanup whose durable intent is already prepared.
+## Distinct from cleanup_stage() so an interrupted/restarted cleanup can be
+## completed without re-arming a fresh intent or bypassing reconciliation.
+func cleanup_stage_terminal(session_id: String) -> Dictionary:
+	if not sessions.has(session_id):
+		return {"ok": false, "reason": "UNKNOWN_SESSION", "session_id": session_id}
+	var record: Dictionary = sessions[session_id]
+	var sess = NativeSessionScript.from_dict(record.get("session", {}))
+	if sess == null:
+		return {"ok": false, "reason": "INVALID_SESSION", "session_id": session_id}
+	var intent_path := ledger_dir().path_join(session_id.replace("/", "_").replace("\\", "_") + ".cleanup_intent.json")
+	if not FileAccess.file_exists(intent_path):
+		return {"ok": false, "reason": "CLEANUP_INTENT_MISSING", "session_id": session_id}
+	var intent_res := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(intent_path))
+	if not bool(intent_res.get("ok", false)) or not (intent_res.get("data", null) is Dictionary):
+		return {"ok": false, "reason": "CLEANUP_INTENT_NOT_PREPARED", "session_id": session_id}
+	var intent: Dictionary = intent_res.get("data", {})
+	var finalization_retry := str(intent.get("state", "")) == "CLEANUP_FINALIZATION_PENDING" or \
+		_durable_session_state(session_id) == "CLEANUP_FINALIZATION_PENDING"
+	if finalization_retry:
+		intent["state"] = "CLEANUP_PREPARED"
+	var auth: Dictionary = _authorize_cleanup(session_id, record, sess, intent, finalization_retry)
+	if not bool(auth.get("ok", false)):
+		return {"ok": false, "reason": str(auth.get("reason", "STAGE_CLEANUP_NOT_AUTHORIZED")),
+			"cleanup_rejected": true, "session_id": session_id,
+			"recovery_pending": bool(auth.get("recovery_pending", false))}
+	var is_stock_addon := str(record.get("launch_mode", "")) == "STOCK_ADDON"
+	var stage_leaf := WorkspaceStore.canonical(str(sess.stage_root)).get_file()
+	var extra_prot: Array[String] = NativeAdapterScript._extra_protected_from_discovery(
+		record.get("discovery", {}), is_stock_addon and stage_leaf.begins_with("SHAMAN_"))
+	var cl: Dictionary
+	var outcome: Dictionary
+	var new_state := ""
+	var terminal_intent_state := ""
+	if bool(auth.get("finalization_only", false)):
+		outcome = {"state": "CLEANED_UP", "intent_state": "CLEANUP_COMPLETE",
+			"status": "ALREADY_CLEANED"}
+		new_state = "CLEANED_UP"
+		terminal_intent_state = "CLEANUP_COMPLETE"
+		cl = {"ok": true, "partial": false, "status": "ALREADY_CLEANED",
+			"removed": 0, "reused_prior_cleanup": true}
+	else:
+		cl = SafeStageScript.cleanup(str(sess.stage_root), extra_prot)
+		outcome = cleanup_outcome(cl)
+		new_state = str(outcome.get("state", "FAILED"))
+		terminal_intent_state = str(outcome.get("intent_state", "CLEANUP_FAILED"))
+	record["state"] = new_state
+	record["cleanup"] = cl
+	record["session"] = sess.to_dict()
+	record["updated_at"] = Time.get_datetime_string_from_system()
+	_pending_files.erase(session_id)
+	var commit := _commit_transition(session_id, record, new_state, "Terminal cleanup finalized")
+	if not bool(commit.get("ok", false)):
+		return {"ok": false, "reason": "STATE_PERSIST_FAILED", "session_id": session_id,
+			"cleanup_intent": "CLEANUP_RECOVERY_PENDING", "cleanup": cl}
+	var reconciliation: Dictionary = auth.get("reconciliation", {})
+	var intent_finalized := _finalize_cleanup_intent(intent_path, session_id,
+		str(sess.stage_root), outcome, cl, bool(reconciliation.get("never_launched_dry_run", false)))
+	if not intent_finalized:
+		var pending_record := record.duplicate(true)
+		pending_record["state"] = "CLEANUP_FINALIZATION_PENDING"
+		var fin_transition := _commit_transition(session_id, pending_record,
+			"CLEANUP_FINALIZATION_PENDING", "Terminal cleanup done; final intent write could not be verified")
+		return {"ok": false,
+			"state": "CLEANUP_FINALIZATION_PENDING" if bool(fin_transition.get("ok", false)) else new_state,
+			"cleanup_intent": "CLEANUP_FINALIZATION_PENDING", "cleanup": cl,
+			"files_cleanup_ok": bool(cl.get("ok", false)), "ledger_commit_ok": true,
+			"intent_finalized": false, "durable_complete": false, "recovery_required": true,
+			"reason": "CLEANUP_INTENT_FINALIZATION_UNVERIFIED", "session_id": session_id}
+	var durable := bool(cl.get("ok", false)) and intent_finalized
+	return {"ok": durable, "state": new_state,
+		"cleanup_intent": terminal_intent_state, "cleanup": cl,
+		"files_cleanup_ok": bool(cl.get("ok", false)), "ledger_commit_ok": true,
+		"intent_finalized": intent_finalized, "durable_complete": durable,
+		"recovery_required": not durable, "session_id": session_id}
+
+
+## P1-NATIVE-04: read-only startup discovery of incomplete cleanup intents.
+## Scans every persisted *.cleanup_intent.json beside the session ledger and
+## classifies it against the durable ledger, monitor state, stage manifest and
+## remaining files. This method NEVER deletes or writes anything: it reports
+## incomplete cleanup state so the UI can surface it and a human can permit a
+## safe retry. Destructive startup cleanup is forbidden by design.
+func discover_cleanup_intents(include_completed: bool = false) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var dir := DirAccess.open(ledger_dir())
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var n := dir.get_next()
+	while n != "":
+		if n.ends_with(".cleanup_intent.json"):
+			var intent_path := ledger_dir().path_join(n)
+			var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(intent_path))
+			var entry: Dictionary = {
+				"intent_path": intent_path,
+				"intent_file": n,
+				"schema_ok": false,
+				"intent_state": "UNREADABLE",
+				"session_id": "",
+				"stage_root": "",
+				"ledger_status": "NOT_CHECKED",
+				"monitor_status": "NOT_CHECKED",
+				"stage_status": "NOT_CHECKED",
+				"remaining_owned_files": 0,
+				"ownership_verified": false,
+				"receipt_verified": false,
+				"manifest_present": false,
+				"stage_contents_unclassified": false,
+				"unknown_files": [],
+				"resolution": "UNKNOWN",
+				"requires_attention": true,
+				"terminal": false,
+				"verified_complete": false,
+				"drift_reasons": [],
+			}
+			if bool(jres.get("ok", false)) and (jres.get("data", null) is Dictionary):
+				var intent: Dictionary = jres.get("data", {})
+				entry["schema_ok"] = int(intent.get("schema", 0)) == 1
+				entry["intent_state"] = str(intent.get("state", "UNKNOWN"))
+				entry["session_id"] = str(intent.get("session_id", ""))
+				entry["stage_root"] = str(intent.get("stage_root", ""))
+			if not entry["schema_ok"]:
+				entry["resolution"] = "INTENT_INVALID_SCHEMA"
+				out.append(entry)
+				n = dir.get_next()
+				continue
+			var sid := str(entry["session_id"])
+			# 1-2: validate session identity against the durable ledger.
+			var ledger_file := ledger_path()
+			var ledger_state := ""
+			if not FileAccess.file_exists(ledger_file):
+				entry["ledger_status"] = "LEDGER_NOT_FOUND"
+			else:
+				var lres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ledger_file))
+				if not bool(lres.get("ok", false)) or not (lres.get("data", null) is Dictionary):
+					entry["ledger_status"] = "LEDGER_CORRUPT"
+				else:
+					var items = (lres.get("data", {}) as Dictionary).get("sessions", null)
+					var ledger_items = (lres.get("data", {}) as Dictionary).get("ledger", null)
+					if not (items is Dictionary) and ledger_items is Dictionary:
+						items = ledger_items
+					if not (items is Dictionary):
+						entry["ledger_status"] = "LEDGER_CORRUPT"
+					elif not (items as Dictionary).has(sid):
+						entry["ledger_status"] = "SESSION_NOT_IN_LEDGER"
+					else:
+						var rec = (items as Dictionary).get(sid, {})
+						if rec is Dictionary and str((rec as Dictionary).get("state", "")) != "":
+							ledger_state = str((rec as Dictionary).get("state", "")).to_upper()
+							entry["ledger_status"] = "MATCH"
+						else:
+							entry["ledger_status"] = "RECORD_NO_STATE"
+			# 5: reconcile monitor state read-only.
+			var monitor := SafeStageScript._active_monitor_for_session(ledger_file, sid)
+			entry["monitor_status"] = str(monitor.get("status", "NOT_FOUND"))
+			# 6: inventory remaining files under the recorded stage root.
+			var stage_root := str(entry["stage_root"])
+			var remaining_owned := 0
+			var unknown: Array[String] = []
+			if stage_root == "" or not DirAccess.dir_exists_absolute(stage_root):
+				entry["stage_status"] = "STAGE_MISSING"
+				# A vanished stage is only benign when the durable ledger proves
+				# a prior complete cleanup; otherwise keep it unresolved.
+				var missing_rec := _durable_session_record(sid)
+				var missing_cl = missing_rec.get("cleanup", null)
+				var ledger_confirms := str(missing_rec.get("state", "")).to_upper() == "CLEANED_UP" and \
+					missing_cl is Dictionary and bool((missing_cl as Dictionary).get("ok", false)) and \
+					not bool((missing_cl as Dictionary).get("partial", false))
+				if str(entry["intent_state"]) == "CLEANUP_COMPLETE" and \
+						str(entry.get("ledger_status", "")) == "MATCH" and \
+						ledger_state == "CLEANED_UP":
+					ledger_confirms = true
+				if ledger_confirms:
+					entry["ownership_verified"] = true
+					entry["stage_contents_unclassified"] = false
+			else:
+				var inspection := SafeStageScript.inspect_stage(stage_root)
+				entry["stage_status"] = str(inspection.get("reason", "STAGE_PRESENT"))
+				var manifest_path := stage_root.path_join(SafeStageScript.MANIFEST_NAME)
+				entry["manifest_present"] = FileAccess.file_exists(manifest_path)
+				if entry["manifest_present"]:
+					var mres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(manifest_path))
+					if bool(mres.get("ok", false)) and (mres.get("data", null) is Dictionary):
+						var manifest: Dictionary = mres.get("data", {})
+						entry["ownership_verified"] = str(manifest.get("stage_id", "")) != "" and \
+							str(inspection.get("session_id", "")) == sid
+						var declared := {}
+						for f in manifest.get("files", []):
+							if f is Dictionary:
+								var rel := str((f as Dictionary).get("rel", ""))
+								declared[rel] = true
+								if FileAccess.file_exists(stage_root.path_join(rel)):
+									remaining_owned += 1
+						var existing: Array[String] = []
+						SafeStageScript._list_existing_rel_files(stage_root, stage_root, existing)
+						for rel in existing:
+							if not declared.has(rel) and rel != SafeStageScript.MANIFEST_NAME \
+									and rel != "native_evidence.json" and rel != "stage_provenance.json" \
+									and rel != "stage_cleanup_receipt.json" \
+									and not rel.begins_with(SafeStageScript.BACKUP_SUBDIR + "/"):
+								unknown.append(rel)
+				else:
+					# Missing manifest: ownership must come from a verified receipt
+					# bound to this session and stage, never from an empty inventory.
+					var receipt_path := stage_root.path_join("stage_cleanup_receipt.json")
+					entry["stage_contents_unclassified"] = true
+					if FileAccess.file_exists(receipt_path):
+						entry["stage_status"] = "RECEIPT_PRESENT"
+						var rres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(receipt_path))
+						if bool(rres.get("ok", false)) and (rres.get("data", null) is Dictionary):
+							var rcp: Dictionary = rres.get("data", {})
+							var r_sid := str(rcp.get("session_id", ""))
+							var r_stage := str(rcp.get("stage_root", ""))
+							var identity_ok := r_sid == sid and \
+								(r_stage == "" or WorkspaceStore.canonical(r_stage) == WorkspaceStore.canonical(stage_root))
+							if identity_ok and str(rcp.get("status", "")).begins_with("OWNED_FILES_REMOVED"):
+								entry["receipt_verified"] = true
+								entry["ownership_verified"] = true
+								entry["stage_contents_unclassified"] = false
+							var foreign = rcp.get("foreign_files_preserved", [])
+							if foreign is Array:
+								for f in foreign:
+									unknown.append(str(f))
+			entry["remaining_owned_files"] = remaining_owned
+			entry["unknown_files"] = unknown
+			# 7-8: classify without mutating anything. A terminal-looking string
+			# is a claim, not proof; verify it against the durable state first.
+			var intent_state := str(entry["intent_state"])
+			var terminal := intent_state in ["CLEANUP_COMPLETE", "CLEANUP_PARTIAL_FOREIGN_FILES_PRESERVED"]
+			var drift: Array[String] = []
+			if terminal:
+				# Strict intent-to-ledger correspondence. Native experiment
+				# terminal states are not cleanup proof.
+				var required_ledger := ""
+				match intent_state:
+					"CLEANUP_COMPLETE":
+						required_ledger = "CLEANED_UP"
+					"CLEANUP_PARTIAL_FOREIGN_FILES_PRESERVED":
+						required_ledger = "PARTIAL_CLEANUP"
+				if ledger_state == "":
+					drift.append("LEDGER_UNRESOLVED")
+				elif ledger_state != required_ledger:
+					drift.append("LEDGER_DISAGREES")
+				if remaining_owned > 0:
+					drift.append("OWNED_FILES_REMAIN")
+				if not bool(entry["ownership_verified"]):
+					drift.append("OWNERSHIP_UNVERIFIED" if not bool(entry["stage_contents_unclassified"]) \
+						else "STAGE_CONTENTS_UNCLASSIFIED")
+				if intent_state == "CLEANUP_COMPLETE" and not entry["manifest_present"] and \
+						not bool(entry["receipt_verified"]) and \
+						str(entry.get("stage_status", "")) != "STAGE_MISSING":
+					drift.append("CLEANUP_RECEIPT_MISSING")
+				if bool(monitor.get("active", false)):
+					drift.append("ACTIVE_MONITOR")
+				entry["drift_reasons"] = drift
+			entry["terminal"] = terminal
+			entry["verified_complete"] = terminal and drift.is_empty()
+			entry["requires_attention"] = (not terminal) or not drift.is_empty()
+			if terminal:
+				if not drift.is_empty():
+					entry["resolution"] = "CLEANUP_STATE_DRIFT"
+					out.append(entry)
+					n = dir.get_next()
+					continue
+				entry["resolution"] = "ALREADY_COMPLETE" if intent_state == "CLEANUP_COMPLETE" else "PARTIAL_FOREIGN_FILES_PRESERVED"
+				entry["requires_attention"] = intent_state != "CLEANUP_COMPLETE"
+				if intent_state == "CLEANUP_COMPLETE" and not include_completed:
+					n = dir.get_next()
+					continue
+			elif str(entry["intent_state"]) == "CLEANUP_FINALIZATION_PENDING":
+				entry["resolution"] = "FINALIZATION_RETRY_ELIGIBLE" if remaining_owned == 0 else "FILES_STILL_PRESENT"
+			elif str(entry["intent_state"]) == "CLEANUP_PREPARED" or str(entry["intent_state"]) == "CLEANUP_RECOVERY_PENDING":
+				if bool(monitor.get("active", false)):
+					entry["resolution"] = "PROTECTED_ACTIVE_MONITOR"
+				elif ledger_state == "":
+					entry["resolution"] = "PROTECTED_LEDGER_UNRESOLVED"
+				elif remaining_owned == 0:
+					entry["resolution"] = "RETRY_ELIGIBLE_OWNED_FILES_GONE"
+				else:
+					entry["resolution"] = "RETRY_REQUIRES_RECONCILIATION"
+			else:
+				entry["resolution"] = "UNKNOWN_INTENT_STATE"
+			out.append(entry)
+		n = dir.get_next()
+	dir.list_dir_end()
+	return out

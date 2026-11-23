@@ -22,6 +22,7 @@ var config_path: String = ""
 var observation_filename: String = ""
 var observation_expected_path: String = ""
 var mount_marker: String = ""
+var marker_odf_filename: String = "shaman_mount_marker.odf"
 var expected_odf_hashes: Dictionary = {}
 var game_executable_hash: String = ""
 var game_build_id: String = "UNKNOWN"
@@ -125,6 +126,8 @@ static func create(p_stage_root: String, p_scenario: Dictionary, p_discovery: Di
 		"observation_filename": obs_file,
 		"observation_expected_path": s.observation_expected_path,
 		"mount_marker": s.mount_marker,
+		"marker_odf_filename": s.marker_odf_filename,
+		"mission_basename": mbase,
 		"mission_bzn": mbase + ".bzn",
 		"mission_lua": mbase + ".lua",
 	}
@@ -171,6 +174,7 @@ func to_dict() -> Dictionary:
 		"observation_filename": observation_filename,
 		"observation_expected_path": observation_expected_path,
 		"mount_marker": mount_marker,
+		"marker_odf_filename": marker_odf_filename,
 		"expected_odf_hashes": expected_odf_hashes.duplicate(true),
 		"game_executable_hash": game_executable_hash,
 		"game_build_id": game_build_id,
@@ -209,6 +213,7 @@ static func from_dict(d: Dictionary) -> RefCounted:
 	s.observation_filename = str(d.get("observation_filename", ""))
 	s.observation_expected_path = str(d.get("observation_expected_path", ""))
 	s.mount_marker = str(d.get("mount_marker", ""))
+	s.marker_odf_filename = str(d.get("marker_odf_filename", "shaman_mount_marker.odf"))
 	s.expected_odf_hashes = (d.get("expected_odf_hashes", {}) as Dictionary).duplicate(true)
 	s.game_executable_hash = str(d.get("game_executable_hash", ""))
 	s.game_build_id = str(d.get("game_build_id", "UNKNOWN"))

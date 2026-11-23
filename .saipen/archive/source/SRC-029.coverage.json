@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-029:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-105 closed with verification evidence in LOG: verify -> PASS [target: T-105] conf: high -- convergence attribution refreshed for 49 paths; convergence_verdict ok=True",
+      "text": "Refresh stale convergence attribution for 18 main-source paths changed by T-86..T-91 waves",
+      "verification": "the Work this request created reached its own verification gate; see the T-105 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-105"
+    }
+  },
+  "schema_version": 1
+}

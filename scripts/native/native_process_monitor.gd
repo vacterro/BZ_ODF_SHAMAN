@@ -13,9 +13,13 @@ extends RefCounted
 ## evidence only. Both timeout_s and max_polls bound every active monitor.
 
 const STATE_STEAM := "STEAM_PROCESS_STARTED"
+const STATE_MONITOR_ARMED := "MONITOR_ARMED"
 const STATE_GAME := "GAME_PROCESS_DETECTED"
+const STATE_GAME_CANDIDATE := "GAME_PROCESS_CANDIDATE"
+const STATE_GAME_VERIFIED := "GAME_PROCESS_VERIFIED"
 const STATE_MISSION := "MISSION_OBSERVED"
 const STATE_PROBE := "RESOURCE_PROBE_CONFIRMED"
+const STATE_OBS_IMPORTED := "OBSERVATION_IMPORTED"
 const STATE_COMPARISON := "COMPARISON_COMPLETE"
 const STATE_VERIFIED := "NATIVE_VERIFIED"
 const STATE_TIMEOUT := "TIMEOUT"
@@ -28,6 +32,11 @@ var session_id: String = ""
 var state: String = STATE_STEAM
 var reason: String = ""
 var active: bool = true
+var manual_armed: bool = false
+var arm_source: String = ""
+var cancel_status: String = ""
+var recoverable: bool = false
+var observation_imported: bool = false
 var started_at_s: float = 0.0
 var relative_clock: bool = false
 var timeout_s: float = 30.0
@@ -88,7 +97,7 @@ func detect_game(inspector: Callable, legacy_detector: Callable) -> Dictionary:
 					continue
 				game_pid = pid
 				game_exe_verified = true
-				state = STATE_GAME
+				state = STATE_GAME_VERIFIED if manual_armed else STATE_GAME
 				return {"detected": true, "game_pid": pid, "game_exe_verified": true, "source": "process_inspector"}
 		return {"detected": false, "game_pid": 0, "game_exe_verified": false, "source": "process_inspector"}
 	if legacy_detector.is_valid():
@@ -98,7 +107,7 @@ func detect_game(inspector: Callable, legacy_detector: Callable) -> Dictionary:
 			if pid > 0 and not preexisting_game_pids.has(pid):
 				game_pid = pid
 				game_exe_verified = false
-				state = STATE_GAME
+				state = STATE_GAME_CANDIDATE if manual_armed else STATE_GAME
 				return {"detected": true, "game_pid": pid, "game_exe_verified": false, "source": "legacy_detector"}
 	return {"detected": false, "game_pid": 0, "game_exe_verified": false, "source": "none"}
 
@@ -107,7 +116,7 @@ func apply_mission_probe(info: Dictionary) -> void:
 	mission_observed = bool(info.get("mission_observed", false))
 	mission_loaded_at = str(info.get("mission_loaded_at", ""))
 	resource_probe_confirmed = bool(info.get("resource_probe_confirmed", false))
-	if mission_observed and state == STATE_GAME:
+	if mission_observed and state in [STATE_GAME, STATE_GAME_VERIFIED, STATE_GAME_CANDIDATE]:
 		state = STATE_MISSION
 	if resource_probe_confirmed and state == STATE_MISSION:
 		state = STATE_PROBE
@@ -137,6 +146,8 @@ func finish_collection(result: Dictionary) -> void:
 func cancel() -> void:
 	state = STATE_CANCELLED
 	reason = "MONITOR_CANCELLED"
+	cancel_status = "CANCELLATION_COMMITTED"
+	recoverable = false
 	active = false
 
 
@@ -152,6 +163,11 @@ func to_dict() -> Dictionary:
 		"state": state,
 		"reason": reason,
 		"active": active,
+		"manual_armed": manual_armed,
+		"arm_source": arm_source,
+		"cancel_status": cancel_status,
+		"recoverable": recoverable,
+		"observation_imported": observation_imported,
 		"started_at_s": started_at_s,
 		"relative_clock": relative_clock,
 		"timeout_s": timeout_s,
@@ -181,6 +197,11 @@ static func from_dict(d: Dictionary) -> NativeProcessMonitor:
 	monitor.state = str(d.get("state", STATE_STEAM))
 	monitor.reason = str(d.get("reason", ""))
 	monitor.active = bool(d.get("active", true))
+	monitor.manual_armed = bool(d.get("manual_armed", false))
+	monitor.arm_source = str(d.get("arm_source", ""))
+	monitor.cancel_status = str(d.get("cancel_status", ""))
+	monitor.recoverable = bool(d.get("recoverable", false))
+	monitor.observation_imported = bool(d.get("observation_imported", false))
 	monitor.started_at_s = float(d.get("started_at_s", 0.0))
 	monitor.relative_clock = bool(d.get("relative_clock", false))
 	monitor.timeout_s = float(d.get("timeout_s", 30.0))

@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-030:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "E-1571",
+      "text": "Mode 2 night shift: secure recovery journal trust boundary (bytes/hash, mixed targets, path ownership, restore-working after restart, recovery UI confirmation), native provenance receipts, mid-operation crash tests, then product work",
+      "verification": "canonical suite 1105/0 PASS, 1106/0 core, T121 trust 34/0, crash 37/0, UI confirm 7/0, build exe SHA256 e25fd89e",
+      "work": "T-121"
+    }
+  },
+  "schema_version": 1
+}

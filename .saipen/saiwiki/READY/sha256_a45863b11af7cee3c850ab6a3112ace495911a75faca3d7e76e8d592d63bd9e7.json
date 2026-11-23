@@ -1,0 +1,16 @@
+{
+  "producer": "saiwiki",
+  "role_revision": "sha256:54a42475a124ab0f27e83d600a284a9cc54d9668029c4828cfc48512b031df13",
+  "base_source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+  "base_source_tree_fingerprint": "git-delta-v1:372298b50c9cf21667ba38218026fe10439d39abbe03255b6bf83f9e514c5900",
+  "base_discovery_model": "git-delta-v1",
+  "scope": "wiki-mirror-current",
+  "read_set": {},
+  "write_set": {},
+  "epoch": 0,
+  "dependency_fp": "sha256:3558528864ed9f10f91a09012d92bb2fb63fa763ce72f05446396876b14dc612",
+  "package_identity": "sha256:a45863b11af7cee3c850ab6a3112ace495911a75faca3d7e76e8d592d63bd9e7",
+  "status": "ready",
+  "payload_hashes": {},
+  "payload_bytes": {}
+}

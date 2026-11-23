@@ -1,0 +1,43 @@
+{
+  "blocking_findings": {
+    "problem_count": 1,
+    "problems": [
+      {
+        "category": null,
+        "credential": false,
+        "detail": "source freshness computation BLOCKED -- source tree or HEAD changed while fingerprint inputs were being read; no package may become ready or be collected with unknown input",
+        "detail_hash": "1410b61991eace63",
+        "finding_key": "76b48f23558dce11",
+        "rule_id": "unclassified",
+        "severity": "problem",
+        "subject_id": null,
+        "subject_kind": "global",
+        "subject_ref": null
+      }
+    ],
+    "ruleset_fingerprint": "9a47d608ed3f3a833348aaeeca5cd9e9076f3bf53b1ef92b6ade46958e3e3fec",
+    "ruleset_version": 2,
+    "status": "complete",
+    "warning_count": 3
+  },
+  "board_hash": "33676915ee6e60cd",
+  "canonical_next_command": null,
+  "content_hash": "8ecbe7c8dd93eb92",
+  "exit_code": 1,
+  "external_actions": [],
+  "gate": "core",
+  "install_fingerprint": "install-v1:c3cdc23620f8598d38e7343aaa03fae109bb87f9624c8b5439c33be27c4075b4",
+  "install_home": "C:\\ProgramData\\SAI\\SAIPEN\\runtime\\acfb97b835400d59",
+  "kind": "conformance_receipt",
+  "log_hash": "d66799c2e8259ded",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "receipt_id": "receipt-78f8af83b8ff",
+  "remediation_commands": [],
+  "schema_version": 2,
+  "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+  "source_tree_fingerprint": "git-delta-v1:6b2033bfe20d2f6a21f2038bf169f7385887b86619516d054ffc93946f532007",
+  "state_hash": "e978d30036abee33",
+  "timestamp_utc": "2026-11-22T11:37:42.482736Z",
+  "validator_protocol_version": "1",
+  "verdict": "FAIL"
+}

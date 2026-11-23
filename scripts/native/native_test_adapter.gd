@@ -32,13 +32,18 @@ const EVIDENCE_STATES := [
 	"STRUCTURALLY_VALID",
 	"RESOURCES_MOUNTED",
 	"LAUNCH_REQUESTED",
+	"AWAITING_OPERATOR",
+	"MONITOR_ARMED",
 	"STEAM_PROCESS_STARTED",
 	"GAME_STARTED",
+	"GAME_PROCESS_CANDIDATE",
 	"GAME_PROCESS_DETECTED",
+	"GAME_PROCESS_VERIFIED",
 	"MISSION_LOADED",
 	"MISSION_OBSERVED",
 	"RESOURCE_PROBE_CONFIRMED",
 	"OBSERVATION_CAPTURED",
+	"OBSERVATION_IMPORTED",
 	"COMPARISON_COMPLETE",
 	"NATIVE_VERIFIED",
 	"TIMEOUT",
@@ -722,6 +727,45 @@ static func create_session(stage_root: String, scenario: Dictionary, discovery: 
 	return NativeSessionScript.create(stage_root, scenario, discovery, mission_base, terrain_name, session_id, launch_nonce)
 
 
+## Derive a unique BZCC-safe ASCII mission basename from session identity so
+## simultaneous STOCK_ADDON stages never collide on a shared shaman_shot.bzn (P1-NATIVE-02).
+static func derive_session_mission_basename(session_id: String, launch_nonce: String = "") -> String:
+	var seed_str := "%s|%s" % [session_id.strip_edges(), launch_nonce.strip_edges()]
+	if seed_str == "|":
+		seed_str = "shaman_%d_%d" % [Time.get_ticks_usec(), randi()]
+	var short_id := seed_str.md5_text().to_lower().substr(0, 10)
+	return "shaman_" + short_id
+
+
+## Derive a session-isolated mount marker ODF filename for STOCK_ADDON mode.
+static func derive_session_marker_odf(session_id: String, launch_nonce: String = "",
+		launch_mode: String = "CUSTOM_CONFIG") -> String:
+	if launch_mode.strip_edges().to_upper() == "STOCK_ADDON":
+		var seed_str := "%s|%s|marker" % [session_id.strip_edges(), launch_nonce.strip_edges()]
+		var short_id := seed_str.md5_text().to_lower().substr(0, 10)
+		return "shaman_mk_%s.odf" % short_id
+	return "shaman_mount_marker.odf"
+
+
+## Validate a native BZCC mission basename against path traversal, whitespace,
+## non-ASCII characters, and excessive length before staging.
+static func validate_mission_basename(mbase: String) -> Dictionary:
+	var raw := mbase.strip_edges()
+	if raw == "":
+		return {"ok": false, "normalized": "", "reason": "INVALID_MISSION_BASENAME", "error": "mission basename is empty"}
+	if raw.contains("/") or raw.contains("\\") or raw.contains("..") or raw.contains(" ") or raw.contains("\t"):
+		return {"ok": false, "normalized": "", "reason": "INVALID_MISSION_BASENAME", "error": "mission basename contains illegal path or whitespace characters: " + raw}
+	var stem := raw.get_basename()
+	if stem == "" or stem.length() > 32:
+		return {"ok": false, "normalized": "", "reason": "INVALID_MISSION_BASENAME", "error": "mission basename must be 1..32 chars: " + stem}
+	for i in stem.length():
+		var c := stem.unicode_at(i)
+		var ok_ch := (c >= 48 and c <= 57) or (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or c == 95 or c == 45
+		if not ok_ch:
+			return {"ok": false, "normalized": "", "reason": "INVALID_MISSION_BASENAME", "error": "mission basename contains non-ASCII/unsupported char in: " + stem}
+	return {"ok": true, "normalized": stem.to_lower(), "reason": "", "error": ""}
+
+
 ## Build the reproducible LuaMission BZN + controlled Lua state machine +
 ## bzshell_init + exact-mount filesystem config package driven by a single
 ## NativeExperimentSession so every artifact shares exact immutable identifiers.
@@ -729,9 +773,13 @@ static func build_experiment_files_for_session(session: RefCounted, profile: Wea
 		staged_odfs: Dictionary = {}) -> Dictionary:
 	if session == null:
 		return {}
+	var marker_odf := str(session.marker_odf_filename).strip_edges()
+	if marker_odf == "":
+		marker_odf = "shaman_mount_marker.odf"
 	var files := build_experiment_files(
 		profile, session.stage_id, staged_odfs, session.stage_root,
-		session.session_id, session.launch_nonce, session.mission_basename, session.terrain_name
+		session.session_id, session.launch_nonce, session.mission_basename, session.terrain_name,
+		marker_odf
 	)
 	session.expected_odf_hashes.clear()
 	for raw_rel in files:
@@ -739,7 +787,8 @@ static func build_experiment_files_for_session(session: RefCounted, profile: Wea
 		if rel.to_lower().ends_with(".odf"):
 			var raw = files[raw_rel]
 			var bytes: PackedByteArray = raw if raw is PackedByteArray else str(raw).to_utf8_buffer()
-			var role := "mount_marker" if rel.get_file().to_lower() == "shaman_mount_marker.odf" else "staged_odf"
+			var leaf_lc := rel.get_file().to_lower()
+			var role := "mount_marker" if (leaf_lc == marker_odf.to_lower() or leaf_lc == "shaman_mount_marker.odf") else "staged_odf"
 			session.set_expected_odf_hash(rel, WorkspaceStore._md5_bytes(bytes), role, "", rel.get_file())
 	return files
 
@@ -750,10 +799,14 @@ static func build_experiment_files(profile: WeaponProfile, stage_id: String,
 		staged_odfs: Dictionary = {}, stage_root: String = "",
 		session_id: String = "", launch_nonce: String = "",
 		mission_base: String = DEFAULT_MISSION_BASE,
-		terrain_name: String = DEFAULT_TERRAIN_NAME) -> Dictionary:
+		terrain_name: String = DEFAULT_TERRAIN_NAME,
+		marker_odf_filename: String = "shaman_mount_marker.odf") -> Dictionary:
 	var resolved_stage := stage_root if stage_root != "" else WorkspaceStore.canonical("user://native_tests").path_join(stage_id)
 	var sid := session_id if session_id != "" else ("sess_" + stage_id)
 	var nonce := launch_nonce if launch_nonce != "" else (sid + "_" + str(Time.get_ticks_usec())).md5_text().substr(0, 16)
+	var marker_odf := marker_odf_filename.strip_edges()
+	if marker_odf == "":
+		marker_odf = "shaman_mount_marker.odf"
 	var mount := build_mount_plan(resolved_stage, stage_id, sid, mission_base)
 	var files: Dictionary = {}
 	var primary_odf_cfg := ""
@@ -778,7 +831,7 @@ static func build_experiment_files(profile: WeaponProfile, stage_id: String,
 
 	# Unique test-only marker ODF mounted from stage assets to verify RESOURCES_MOUNTED in BZCC.
 	var marker_val := "SHAMAN_MNT_" + nonce
-	files["assets/ODF/shaman_mount_marker.odf"] = "[ShamanMarker]\r\nstageMarker = \"%s\"\r\nsessionId = \"%s\"\r\n" % [marker_val, sid]
+	files["assets/ODF/" + marker_odf] = "[ShamanMarker]\r\nstageMarker = \"%s\"\r\nsessionId = \"%s\"\r\nmissionBase = \"%s\"\r\n" % [marker_val, sid, mission_base]
 
 	var cfg_lines := [
 		"ConfigureFileSystem()",
@@ -800,11 +853,13 @@ static func build_experiment_files(profile: WeaponProfile, stage_id: String,
 	files["shaman_native.cfg"] = "\r\n".join(cfg_lines) + "\r\n"
 	files["assets/Config/bzshell_init.cfg"] = "Exec(\"bzgame_init.cfg\");\r\nCmd(\"shell.single.launch %s.bzn\");\r\n" % mission_base
 	files["assets/Missions/%s.bzn" % mission_base] = build_minimal_luamission_bzn(mission_base, terrain_name)
-	files["assets/Missions/%s.inf" % mission_base] = "[DESCRIPTION]\r\nmissionName = \"SHAMAN Native Shot Probe\"\r\n"
+	files["assets/Missions/%s.inf" % mission_base] = "[DESCRIPTION]\r\nmissionName = \"SHAMAN Native Shot Probe (%s)\"\r\n" % mission_base
 	files["assets/Missions/%s.lua" % mission_base] = _build_controlled_lua_script({
 		"session_id": sid,
 		"launch_nonce": nonce,
 		"scenario_id": "scn_" + weapon_cfg,
+		"mission_basename": mission_base,
+		"marker_odf": marker_odf,
 		"shooter": shooter_cfg,
 		"target": target_cfg,
 		"weapon": weapon_cfg,
@@ -830,6 +885,8 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 		"local SESSION_ID = \"%s\"" % str(p.session_id),
 		"local LAUNCH_NONCE = \"%s\"" % str(p.launch_nonce),
 		"local SCENARIO_ID = \"%s\"" % str(p.scenario_id),
+		"local MISSION_BASE = \"%s\"" % str(p.get("mission_basename", DEFAULT_MISSION_BASE)),
+		"local MARKER_ODF = \"%s\"" % str(p.get("marker_odf", "shaman_mount_marker.odf")),
 		"local SHOOTER_ODF = \"%s\"" % str(p.shooter),
 		"local TARGET_ODF = \"%s\"" % str(p.target),
 		"local WEAPON_ODF = \"%s\"" % str(p.weapon),
@@ -871,8 +928,8 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 		"  -- never file hashing, so observed_odf_md5 stays empty instead of echoing",
 		"  -- EXPECTED_ODF_MD5 as if Lua computed a digest.",
 		"  local json = string.format(",
-		"    '{\"contract_version\":2,\"measurement_method\":\"GetCurHealth_delta\",\"session_id\":\"%s\",\"launch_nonce\":\"%s\",\"scenario_id\":\"%s\",\"state\":\"%s\",\"shooter\":\"%s\",\"target\":\"%s\",\"weapon\":\"%s\",\"ordnance\":\"%s\",\"hp_before\":%.3f,\"hp_after\":%.3f,\"hp_max\":%.3f,\"health_ratio_before\":%.6f,\"health_ratio_after\":%.6f,\"damage\":%.3f,\"elapsed_mission_s\":%.4f,\"fire_to_impact_s\":%.4f,\"tps\":%d,\"odf_probe_damage\":%.3f,\"odf_probe_speed\":%.3f,\"odf_probe_life\":%.3f,\"expected_odf_md5\":\"%s\",\"observed_odf_md5\":\"\",\"observed_odf_hash_available\":false,\"mount_marker\":\"%s\",\"resources_mounted\":%s,\"fire_confirmed\":%s,\"health_delta_observed\":%s,\"shot_count_status\":\"%s\",\"error\":\"%s\"}\\n',",
-		"    esc(SESSION_ID), esc(LAUNCH_NONCE), esc(SCENARIO_ID), esc(state),",
+		"    '{\"contract_version\":2,\"measurement_method\":\"GetCurHealth_delta\",\"session_id\":\"%s\",\"launch_nonce\":\"%s\",\"scenario_id\":\"%s\",\"mission_basename\":\"%s\",\"state\":\"%s\",\"shooter\":\"%s\",\"target\":\"%s\",\"weapon\":\"%s\",\"ordnance\":\"%s\",\"hp_before\":%.3f,\"hp_after\":%.3f,\"hp_max\":%.3f,\"health_ratio_before\":%.6f,\"health_ratio_after\":%.6f,\"damage\":%.3f,\"elapsed_mission_s\":%.4f,\"fire_to_impact_s\":%.4f,\"tps\":%d,\"odf_probe_damage\":%.3f,\"odf_probe_speed\":%.3f,\"odf_probe_life\":%.3f,\"expected_odf_md5\":\"%s\",\"observed_odf_md5\":\"\",\"observed_odf_hash_available\":false,\"mount_marker\":\"%s\",\"resources_mounted\":%s,\"fire_confirmed\":%s,\"health_delta_observed\":%s,\"shot_count_status\":\"%s\",\"error\":\"%s\"}\\n',",
+		"    esc(SESSION_ID), esc(LAUNCH_NONCE), esc(SCENARIO_ID), esc(MISSION_BASE), esc(state),",
 		"    esc(SHOOTER_ODF), esc(TARGET_ODF), esc(WEAPON_ODF), esc(ORDNANCE_ODF),",
 		"    hp_before, hp_now, hp_max, ratio_before, ratio_now, dmg,",
 		"    elapsed, flight, tps, odf_probe_damage, odf_probe_speed, odf_probe_life, esc(EXPECTED_ODF_MD5), esc(mount_marker_seen), mounted_ok, fc_str, hd_str, esc(shot_count_status), esc(err_msg)",
@@ -883,8 +940,8 @@ static func _build_controlled_lua_script(p: Dictionary) -> String:
 		"",
 		"function Start()",
 		"  start_time = GetTime()",
-		"  PrintConsoleMessage(\"SHAMAN_STATE: INITIALIZING session=\" .. SESSION_ID)",
-		"  local hMarker = OpenODF and OpenODF(\"shaman_mount_marker.odf\") or nil",
+		"  PrintConsoleMessage(\"SHAMAN_STATE: INITIALIZING session=\" .. SESSION_ID .. \" mission=\" .. MISSION_BASE)",
+		"  local hMarker = OpenODF and OpenODF(MARKER_ODF) or nil",
 		"  if hMarker and GetODFString then",
 		"    mount_marker_seen = GetODFString(hMarker, \"ShamanMarker\", \"stageMarker\", \"\") or \"\"",
 		"  end",
@@ -958,8 +1015,74 @@ static func sha256_bytes(bytes: PackedByteArray) -> String:
 	return ctx.finish().hex_encode().to_lower()
 
 
-## Read-only inspection of stock `bzone.cfg` verifying whether BZCC mounts
-## `@mydocsdir\addon` first in `ConfigureStream("base")`. Never mutates BZ2R.
+static func _strip_cfg_comments(txt: String) -> String:
+	var src := txt.replace("\r\n", "\n")
+	var out := ""
+	var i := 0
+	var n := src.length()
+	var in_str := false
+	var in_block := false
+	var in_line := false
+	while i < n:
+		var ch := src.substr(i, 1)
+		var nxt := src.substr(i + 1, 1) if i + 1 < n else ""
+		if in_line:
+			if ch == "\n":
+				in_line = false
+				out += "\n"
+			i += 1
+			continue
+		if in_block:
+			if ch == "*" and nxt == "/":
+				in_block = false
+				i += 2
+				continue
+			if ch == "\n":
+				out += "\n"
+			i += 1
+			continue
+		if in_str:
+			out += ch
+			if ch == "\\" and i + 1 < n:
+				out += nxt
+				i += 2
+				continue
+			if ch == "\"":
+				in_str = false
+			i += 1
+			continue
+		if ch == "\"":
+			in_str = true
+			out += ch
+			i += 1
+			continue
+		if ch == "/" and nxt == "/":
+			in_line = true
+			i += 2
+			continue
+		if ch == "/" and nxt == "*":
+			in_block = true
+			i += 2
+			continue
+		out += ch
+		i += 1
+	return out
+
+
+static func _extract_quoted_arg(line: String) -> String:
+	var q1 := line.find("\"")
+	if q1 < 0:
+		return ""
+	var q2 := line.find("\"", q1 + 1)
+	if q2 <= q1:
+		return ""
+	return line.substr(q1 + 1, q2 - q1 - 1)
+
+
+## Read-only structured parser of stock `bzone.cfg` (`ConfigureFileSystem()`,
+## `ConfigureStream("<name>")`, `SetActiveStream("<name>")`, `AppendToMyDocs`,
+## `AddDirRecurse` / `AddDir`, `EnableAddonMods`, with full `//` and `/* */`
+## comment stripping). Never mutates BZ2R (P1-NATIVE-03 / SA-08).
 static func inspect_stock_bzone_cfg(game_root: String = DEFAULT_GAME_ROOT) -> Dictionary:
 	var cfg_path := WorkspaceStore.canonical(game_root).path_join("bzone.cfg")
 	if not FileAccess.file_exists(cfg_path):
@@ -967,31 +1090,247 @@ static func inspect_stock_bzone_cfg(game_root: String = DEFAULT_GAME_ROOT) -> Di
 			"ok": false,
 			"exists": false,
 			"path": cfg_path,
+			"active_stream": "",
+			"append_to_mydocs": "",
 			"mounts_addon_first": false,
 			"first_mount": "",
+			"mounts": [],
+			"streams": {},
+			"enable_addon_mods": false,
 			"reason": "STOCK_BZONE_CFG_MISSING",
 		}
-	var txt := FileAccess.get_file_as_string(cfg_path)
-	var mounts: Array[String] = []
-	for raw_line in txt.replace("\r\n", "\n").split("\n"):
+	var clean := _strip_cfg_comments(FileAccess.get_file_as_string(cfg_path))
+	var in_fs := false
+	var fs_depth := 0
+	var current_stream := ""
+	var stream_depth := 0
+	var active_stream := ""
+	var append_to_mydocs := ""
+	var enable_addon_mods := false
+	var streams: Dictionary = {}
+	var stream_order: Array[String] = []
+	var pending_fs := false
+	var pending_stream := ""
+
+	for raw_line in clean.split("\n"):
 		var line := raw_line.strip_edges()
-		if line.begins_with("//"):
+		if line == "":
 			continue
-		if line.begins_with("AddDirRecurse("):
-			var q1 := line.find("\"")
-			var q2 := line.find("\"", q1 + 1)
-			if q1 >= 0 and q2 > q1:
-				mounts.append(line.substr(q1 + 1, q2 - q1 - 1))
-	var first_m := mounts[0] if not mounts.is_empty() else ""
+		if not in_fs and line.find("ConfigureFileSystem(") >= 0:
+			pending_fs = true
+		if pending_fs and line.contains("{"):
+			in_fs = true
+			pending_fs = false
+			fs_depth = 0
+		if not in_fs:
+			continue
+		if line.find("ConfigureStream(") >= 0:
+			pending_stream = _extract_quoted_arg(line)
+			if pending_stream == "":
+				pending_stream = "base"
+			if not streams.has(pending_stream):
+				streams[pending_stream] = []
+				stream_order.append(pending_stream)
+		if pending_stream != "" and line.contains("{"):
+			current_stream = pending_stream
+			pending_stream = ""
+			stream_depth = fs_depth + 1
+		var open_b := line.count("{")
+		var close_b := line.count("}")
+		fs_depth += open_b - close_b
+		if current_stream == "":
+			if line.find("AppendToMyDocs(") >= 0:
+				append_to_mydocs = _extract_quoted_arg(line)
+			elif line.find("SetActiveStream(") >= 0:
+				active_stream = _extract_quoted_arg(line)
+		else:
+			if line.find("AddDirRecurse(") >= 0 or line.find("AddDir(") >= 0:
+				var mpath := _extract_quoted_arg(line)
+				if mpath != "":
+					(streams[current_stream] as Array).append(mpath)
+			elif line.find("EnableAddonMods(") >= 0:
+				enable_addon_mods = true
+			if fs_depth < stream_depth:
+				current_stream = ""
+				stream_depth = 0
+		if fs_depth <= 0 and close_b > 0:
+			in_fs = false
+
+	if active_stream == "":
+		if streams.has("base"):
+			active_stream = "base"
+		elif not stream_order.is_empty():
+			active_stream = stream_order[0]
+	var active_mounts: Array[String] = []
+	if active_stream != "" and streams.has(active_stream):
+		for item in streams[active_stream]:
+			active_mounts.append(str(item))
+	var first_m := active_mounts[0] if not active_mounts.is_empty() else ""
 	var addon_first := first_m.to_lower().replace("/", "\\") == "@mydocsdir\\addon"
+	var eff_addon_rel := "addon" if append_to_mydocs == "" else (append_to_mydocs.replace("\\", "/").trim_suffix("/") + "/addon")
 	return {
 		"ok": addon_first,
 		"exists": true,
 		"path": cfg_path,
+		"active_stream": active_stream,
+		"append_to_mydocs": append_to_mydocs,
+		"effective_addon_rel": eff_addon_rel,
 		"mounts_addon_first": addon_first,
 		"first_mount": first_m,
-		"mounts": mounts,
+		"mounts": active_mounts,
+		"active_mounts": active_mounts,
+		"streams": streams,
+		"enable_addon_mods": enable_addon_mods,
 		"reason": "" if addon_first else "STOCK_ADDON_MOUNT_NOT_FIRST",
+	}
+
+
+static func _scan_dir_files_readonly(dir_path: String, out: Array[String]) -> void:
+	var d := DirAccess.open(dir_path)
+	if d == null:
+		return
+	d.list_dir_begin()
+	var n := d.get_next()
+	while n != "":
+		if n != "." and n != "..":
+			var full := dir_path.path_join(n)
+			if d.current_is_dir():
+				_scan_dir_files_readonly(full, out)
+			else:
+				out.append(WorkspaceStore.canonical(full))
+		n = d.get_next()
+	d.list_dir_end()
+
+
+## Read-only mount-conflict preflight for shared `@mydocsdir\addon` (P1-NATIVE-03 / SA-05..SA-09).
+## Scans existing foreign addons and sibling SHAMAN_* stages without modifying,
+## renaming, or deleting any file, and reports colliding mission/ODF basenames
+## plus safe resolution options.
+static func scan_addon_mount_conflicts(addon_dir: String, own_stage_root: String,
+		staged_files: Dictionary, closure_report: Dictionary = {},
+		loadout_info: Dictionary = {}) -> Dictionary:
+	var canon_addon := WorkspaceStore.canonical(addon_dir)
+	var canon_own := WorkspaceStore.canonical(own_stage_root)
+	var own_lc := canon_own.to_lower().trim_suffix("/")
+	var own_targets := {} # basename.to_lower() -> {rel, kind}
+	var mission_targets := {}
+	for raw_rel in staged_files:
+		var rel := str(raw_rel).replace("\\", "/")
+		var leaf := rel.get_file()
+		var leaf_lc := leaf.to_lower()
+		var ext := leaf_lc.get_extension()
+		if ext in ["bzn", "lua", "inf"]:
+			mission_targets[leaf_lc] = rel
+			own_targets[leaf_lc] = {"rel": rel, "kind": "mission"}
+		elif ext in ["odf", "msh", "dds", "tga", "wav"]:
+			own_targets[leaf_lc] = {"rel": rel, "kind": "staged_asset"}
+	# Also include transitive closure ODF basenames so a foreign addon overriding
+	# a stock ODF depended on by our experiment (e.g. atstab_c.odf) is caught!
+	var resolved_list = closure_report.get("resolved", [])
+	if resolved_list is Array:
+		for item in resolved_list:
+			if item is Dictionary:
+				var rname := str(item.get("name", item.get("filename", ""))).get_file().to_lower()
+				if rname != "" and not rname.ends_with(".odf") and str(item.get("path", "")).to_lower().ends_with(".odf"):
+					rname = str(item.get("path", "")).get_file().to_lower()
+				if rname != "" and not own_targets.has(rname):
+					own_targets[rname] = {"rel": str(item.get("path", rname)), "kind": "closure_odf"}
+	elif resolved_list is Dictionary:
+		for k in resolved_list:
+			var rname2 := str(k).get_file().to_lower()
+			if rname2 != "" and not own_targets.has(rname2):
+				own_targets[rname2] = {"rel": str(resolved_list[k]), "kind": "closure_odf"}
+
+	var conflicts: Array[Dictionary] = []
+	var foreign_files := 0
+	var old_shaman_dirs: Array[String] = []
+	var scanned := 0
+	var ambiguous_winners: Array[String] = []
+	var resolution_options: Array[String] = []
+
+	if canon_addon != "" and DirAccess.dir_exists_absolute(canon_addon):
+		var all_files: Array[String] = []
+		_scan_dir_files_readonly(canon_addon, all_files)
+		scanned = all_files.size()
+		var addon_lc := canon_addon.to_lower().trim_suffix("/")
+		for fpath in all_files:
+			var flc := fpath.to_lower()
+			if own_lc != "" and (flc == own_lc or flc.begins_with(own_lc + "/")):
+				continue
+			var rel_in_addon := fpath.substr(canon_addon.length()).trim_prefix("/")
+			var top_seg := rel_in_addon.get_slice("/", 0) if rel_in_addon.contains("/") else ""
+			var is_old_shaman := top_seg.begins_with("SHAMAN_")
+			if is_old_shaman:
+				if not old_shaman_dirs.has(top_seg):
+					old_shaman_dirs.append(top_seg)
+			else:
+				foreign_files += 1
+			var leaf_lc := fpath.get_file().to_lower()
+			if not own_targets.has(leaf_lc):
+				continue
+			var tinfo: Dictionary = own_targets[leaf_lc]
+			var code := ""
+			if mission_targets.has(leaf_lc):
+				code = "MISSION_NAME_COLLISION"
+			elif is_old_shaman:
+				code = "OLD_SHAMAN_STAGE_COLLISION"
+			else:
+				code = "ADDON_FOREIGN_ODF_COLLISION"
+			var safe_opts: Array[String] = []
+			if is_old_shaman:
+				safe_opts.append("Run SafeStageManager cleanup on old SHAMAN stage '%s' (never touches foreign files)" % top_seg)
+				safe_opts.append("Use isolated CUSTOM_CONFIG route with operator @rootdir handoff")
+			else:
+				safe_opts.append("Move or temporarily disable conflicting foreign addon file '%s' manually (SHAMAN will never delete/rename foreign user mods)" % rel_in_addon)
+				safe_opts.append("Use isolated CUSTOM_CONFIG route to bypass @mydocsdir\\addon")
+			conflicts.append({
+				"code": code,
+				"resource": leaf_lc,
+				"target_kind": str(tinfo.get("kind", "")),
+				"own_path": str(tinfo.get("rel", "")),
+				"conflicting_path": fpath,
+				"rel_in_addon": rel_in_addon,
+				"source_kind": "old_shaman_stage" if is_old_shaman else "foreign_addon",
+				"stage_dir": top_seg if is_old_shaman else "",
+				"safe_resolutions": safe_opts,
+			})
+			if not ambiguous_winners.has(leaf_lc):
+				ambiguous_winners.append(leaf_lc)
+			for opt in safe_opts:
+				if not resolution_options.has(opt):
+					resolution_options.append(opt)
+
+	var primary_reason := ""
+	for c in conflicts:
+		if str(c.get("code", "")) == "MISSION_NAME_COLLISION":
+			primary_reason = "MISSION_NAME_COLLISION"
+			break
+	if primary_reason == "":
+		for c in conflicts:
+			if str(c.get("code", "")) == "ADDON_FOREIGN_ODF_COLLISION":
+				primary_reason = "ADDON_FOREIGN_ODF_COLLISION"
+				break
+	if primary_reason == "" and not conflicts.is_empty():
+		primary_reason = str(conflicts[0].get("code", "OLD_SHAMAN_STAGE_COLLISION"))
+
+	return {
+		"ok": conflicts.is_empty(),
+		"verification_allowed": conflicts.is_empty(),
+		"reason": primary_reason,
+		"addon_dir": canon_addon,
+		"own_stage_root": canon_own,
+		"scanned_files": scanned,
+		"foreign_addon_files": foreign_files,
+		"old_shaman_dirs": old_shaman_dirs,
+		"conflicts": conflicts,
+		"active_loadout_profile_id": str(loadout_info.get("active_loadout_profile_id", "")),
+		"active_packages": (loadout_info.get("active_packages", []) as Array).duplicate(),
+		"provenance": {
+			"mount_namespace": "@mydocsdir\\addon",
+			"ambiguous_winners": ambiguous_winners,
+			"resolution_options": resolution_options,
+			"read_only_scan": true,
+		},
 	}
 
 
@@ -2078,12 +2417,14 @@ static func preflight_experiment(stage_root: String, files: Dictionary, scenario
 	# P0-NATIVE-02: Validate mount config (CUSTOM_CONFIG) or stock addon marker safety (STOCK_ADDON).
 	var mount_check: Dictionary = {}
 	if launch_mode == "STOCK_ADDON":
-		var has_marker := files.has("assets/ODF/shaman_mount_marker.odf")
+		var exp_marker := str(session.marker_odf_filename) if (session != null and str(session.marker_odf_filename) != "") else "shaman_mount_marker.odf"
+		var has_marker := files.has("assets/ODF/" + exp_marker) or files.has("assets/ODF/shaman_mount_marker.odf")
 		var pollutes_shell := files.has("assets/Config/bzshell_init.cfg")
 		var stock_chk := inspect_stock_bzone_cfg(str(disc.get("game_root", DEFAULT_GAME_ROOT)))
 		mount_check = {
 			"ok": has_marker and not pollutes_shell and bool(stock_chk.get("ok", false)),
 			"mode": "STOCK_ADDON",
+			"marker_odf_filename": exp_marker,
 			"has_marker": has_marker,
 			"pollutes_shell_init": pollutes_shell,
 			"stock_bzone_cfg": stock_chk,

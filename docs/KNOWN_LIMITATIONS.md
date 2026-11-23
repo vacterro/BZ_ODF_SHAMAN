@@ -41,6 +41,13 @@ Ordered by impact. None of these is silently removed from scope.
 - Approximated beam/lightning (`BoltBeamNode` for `draw_bolt`/`draw_beam`/`ArcCannonClass`), homing missile turning (`omegaTurn`), seeded `shotVariance` spread, recoil kick, moving shooter velocity inheritance, configurable Moving Target patterns (`Strafe`/`Wiggle`/`Orbit`/`Approach`), and Shooter Aim modes (`Manual`/`Track`/`Lead`/`Fixed Forward`) are implemented as `APPROXIMATED` preview models, not native engine formulas.
 - Salvos/bursts use `salvoCount`/`salvoDelay`; `altName` alternate fire is previewable via FIRE ALT, but the `switchMask`/deploy transition itself, ammo cost, and morph timing are not modelled.
 - Multi-target splash falloff is linear (`APPROXIMATED`) across primary and secondary targets on vehicle/obstacle/ground impacts.
+- Multi-barrel firing resolves one record per declared `weaponHardN` and preserves missing-hardpoint
+  positions; SALVO cycles those records and stores the actual hardpoint in `ShotIdentity`. Replay GUI
+  states distinguish `RUNNING`, `PAUSED`, `CANCELLED`, `COMPLETE`, `FAILED` and `PARTIAL_RESULT`; a
+  step-limit stop is `FAILED`, never `COMPLETE`. The Physical Hardpoint Inspector on the Timeline tab
+  shows one row per declared slot with `RESOLVED_MODEL_NODE`, `DECLARED_BUT_MISSING`,
+  `FALLBACK_ORIGIN` or `APPROXIMATED` fidelity and the last fired `ShotIdentity`; it never promotes a
+  guessed origin to a verified physical hardpoint. Replay fidelity remains `APPROXIMATED`.
 - No native tick-rate/unit calibration; treat distances as editor metres (`NATIVE_VERIFIED: 0`).
 
 ## ODF editing
@@ -49,14 +56,31 @@ Ordered by impact. None of these is silently removed from scope.
   for lookup.
 - Raw-editor “Apply” replaces the document (and clears its undo stack); it is explicit.
 - Undo history is in-memory only, not persisted.
-- Batch editing across several properties, diff-before-commit review, and side-by-side ODF
-  comparison are not implemented (immutable `CombatReplaySnapshot` capture & sandboxed replay are implemented in Weapons Lab).
+- Batch editing across several properties and side-by-side ODF comparison are not implemented
+  (immutable `CombatReplaySnapshot` capture & sandboxed replay are implemented in Weapons Lab).
+  A related read-only view exists for interrupted transactions: `compare_journal_target_revision()`
+  decodes hash-authenticated previous/working bytes from a save-group journal and lists changed
+  ODF properties in the Recovery Center confirmation preview. T-122 extends the same read-only view
+  with an independent `physical_source_diff`: byte equality plus comment, duplicate-occurrence and
+  encoding/BOM differences, so a comment-only change is never shown as an effective-value change.
+  It is a recovery aid, not a general pre-commit diff tool.
+- T-122 recovery trust boundary: a save-group `group_id` is a single validated path component bound
+  to its journal filename; `restore_working` refuses a current revision changed after the confirmation
+  preview (journal hash, manifest fingerprint, per-file MD5 and existence are captured in a revision
+  token and rechecked immediately before mutation); successful direct restores converge or invalidate
+  cached `OdfDocument` instances. Legacy callers without an explicit UI token get an atomically
+  captured token at call time, so the same guard always runs.
 - The parameter sweep varies exactly one property over a numeric range; it does not combine
   values. CSV export is implemented (`save_sweep_csv`) and covered by the UI smoke test.
 - No project manifest/module import/export packaging beyond single-ODF staging.
 
 ## Particles
 
+- Physical reference slots are shown as separate `OUT n · renderNameN` ports and as a physical-slot
+  list. A mouse disconnect uses the port/focused physical entry; parallel references with no
+  selected slot are refused as `AMBIGUOUS_GRAPH_CONNECTION` instead of removing the first match.
+  Keyboard and mouse disconnect share the same identity-aware removal path. A failed move restores
+  byte-exact original ODF bytes, encoding, dirty flag and undo history.
 - Connections and reference values are editable and persisted as emitName/renderNameN; nodes can
   be created (`NEW NODE`, documented `draw_sprite` template), renamed (all local references are
   rewritten), duplicated (local property lines only, inheritance is not flattened), multi-selected,
@@ -86,8 +110,11 @@ Ordered by impact. None of these is silently removed from scope.
   order. Conflicting Workshop packages exist for `atstab_c.odf` (100 vs 140 heavy damage).
 - `.pak` archives are not indexed.
 - Asset references are matched by filename, not by model/material internal paths.
-- Indexing is in-memory only; each launch rescans. The Rescan button rebuilds the full index
-  from scratch; there is no filesystem watcher or incremental rescan.
+- `PERSISTENT_RESOURCEINDEX_CACHE: IMPLEMENTED`, `ODF/INI_CONTENT_FINGERPRINT: IMPLEMENTED`,
+  and `CACHE_PAYLOAD_VERIFICATION: IMPLEMENTED`. A warm launch loads the persistent cache instead
+  of rescanning; the Rescan button still rebuilds from scratch and there is no filesystem watcher.
+  `BINARY_ASSET_CONTENT_HASHING: PARTIAL / METADATA-BASED` — binary mesh/texture cache validity is
+  metadata-based, not a verified byte identity.
 - Saves use a recoverable per-file transaction (verified temp → durable journal → backup →
   replace → verify → commit; startup reconciliation). This is not crash-atomic: a process kill
   during the remove/rename window is recovered from the journal, not prevented. Recovery reports
@@ -97,7 +124,7 @@ Ordered by impact. None of these is silently removed from scope.
   revision in `backups/`. There is no all-or-nothing multi-file transaction or workspace browser/
   diff. Restored overrides are flagged OVERRIDE/CONFLICT; there is no merge UI for conflicts.
 - A dirty cached document never has external source changes overwritten; it is marked CONFLICT.
-  A clean cache reloads the source, but there is no persistent index fingerprint cache yet.
+  A clean cache reloads the source; index fingerprints and payloads are persisted with checksum verification.
 - The workspace root can be redirected with `BZ_SHAMAN_WORKSPACE_ROOT`; smoke tests use a
   unique temporary root. There is no UI control for switching roots yet.
 - If a source ODF disappears after saving, its override can still be restored in CONFLICT
@@ -114,13 +141,23 @@ Ordered by impact. None of these is silently removed from scope.
 - Theme is a token conversion, not pixel-identical browser chrome.
 - No screenshots/recording/report export beyond the text export report.
 - Sweep results are text rows plus a CSV file; there is no chart or multi-property matrix.
+- T-86 Recovery Center: startup discovery is read-only and lists interrupted Save Dependencies
+  save groups plus incomplete native cleanup intents from durable records; every recover /
+  resolve action is a deliberate user choice. Discovery does not repair anything silently, and
+  a `CLEANUP_FINALIZATION_PENDING` intent surfaces as retry-eligible rather than auto-deleting.
+- T-86 Dependency Save Preview: SAVE DEPENDENCIES computes a read-only preview (operation,
+  override presence, revision, conflicts). With zero conflicts it saves directly (one click);
+  with conflicts or unavailable sources it opens a confirmation dialog listing every intended
+  write before any journal or file is touched.
 
 ## Models and native validation
 
 - Baked **DOCB v1 `.msh`** meshes (e.g. `ivtank00.msh`, `ivscav00.msh`), `.material` descriptors,
   DDS/TGA textures, `turret_y`/`turret_x` hierarchy, and `hp_*` hardpoints are decoded by
-  `scripts/core/bz_mesh_reader.gd` and displayed in the Weapons Lab; `.msha` and animations are not
-  decoded, and any unresolvable model falls back to an explicit `PLACEHOLDER MESH` box.
+  `scripts/core/bz_mesh_reader.gd` and displayed in the Weapons Lab. Real 44-byte DOCB v1 `.msha`
+  header identity is parsed (`EMBEDDED_DOCB_ANIMATION: IMPLEMENTED`), but timing is
+  `APPROXIMATED` and `EXTERNAL_MSHA_SKELETAL_SKINNING: NOT_IMPLEMENTED`; any unresolvable model
+  falls back to an explicit `PLACEHOLDER MESH` box.
 - `scripts/native/` (`NativeExperimentSession`, `NativeResourceClosureBuilder`, `SafeStageManager`,
   `NativeTestAdapter`, `NativeExperimentRunner`) enforces single immutable session identity,
   resource closure + Workshop ambiguity checks, allowlisted staging (`user://native_tests`) with
@@ -131,7 +168,72 @@ Ordered by impact. None of these is silently removed from scope.
   synthetic vs runner-attested receipts, checked durable transitions, and the bounded async
   `NativeProcessMonitor`. Live launch reports `BLOCKED` (`STEAM_USER_NOT_LOGGED_IN`) when no logged-in
   Steam session is active; a later GUI session reported `STRUCTURALLY_VALID` / `STEAM_MANAGED`,
-  which is still not a live attested run (`NATIVE VERIFIED` count remains `0`).
+  which is still not a live attested run (`NATIVE_VERIFIED: 0`).
+- Native stage conflicts are real: three `SHAMAN_*` stages exist in the BZCC Addon folder. Two are
+  manifest-owned with matching hashes in `STAGED` state; one has no manifest
+  (`STAGE_OWNERSHIP_UNRESOLVED`). The read-only stage inventory button in the Native tab reports
+  session id, state, ownership, hash status, unknown files and cleanup eligibility. Cleanup is
+  refused for every non-terminal or unresolved stage; no game, Workshop or stage file is deleted
+  automatically. `SafeStageManager.reconcile_stage()` reads the durable session ledger on top
+  of the read-only inventory. Cleanup eligibility now requires manifest ownership, matching
+  hashes, a session id, a parseable ledger whose record has the same session id in a terminal
+  state, agreement between ledger and evidence state, and no active or recoverable
+  `process_monitors.json` entry. Corrupt, missing, absent-session, disagreeing or
+  monitor-active cases return `PROTECT` with `recovery_pending: true` instead of
+  `CLEANUP_ELIGIBLE`. Monitor validation checks the persisted state independently of the
+  `active` flag: a nonterminal or unknown state with `active=false` is still `ACTIVE` for
+  cleanup purposes and stays protected; a terminal state with `recoverable=true` or a pending
+  cancellation is also protected. The Native stage inventory uses this same reconciliation
+  verdict as its final cleanup column, so the GUI cannot show `allowed` when the authoritative
+  check says `PROTECT`; manifest inspection is kept only as a separate preliminary candidate.
+  It never deletes; any removal still requires an explicit authorized cleanup call. The actual
+  `NativeExperimentRunner.cleanup_stage()` route now applies the same authoritative
+  reconciliation before deletion. `RECOVERY_PENDING`, `FAILED` and `PARTIAL_CLEANUP` sessions are
+  protected even when a mutable monitor object looks terminal; active, recoverable, nonterminal
+  or unknown monitor states also block deletion. A durable `CLEANUP_PREPARED` intent is written
+  and read back before any file is removed; a final commit failure is recorded as
+  `CLEANUP_RECOVERY_PENDING` so no false `CLEANED_UP` state is published.
+- T-86 native cleanup hardening: a never-launched `STAGED` stage is cleanup-eligible only with
+  POSITIVE proof (ledger record present with a never-launched-safe state, no launch-requested
+  checkpoint, no monitor, hashes matching); anything less stays `PROTECT`. When unknown files
+  survive cleanup, the manifest is retained alongside a `stage_provenance.json` snapshot and a
+  `stage_cleanup_receipt.json` naming every preserved foreign file — the result honestly reports
+  `FOREIGN_FILES_PRESERVED` + `stage_directory_retained` instead of implying the directory
+  vanished. The final `CLEANUP_COMPLETE` intent write is read back and verified; an unverifiable
+  finalization publishes `CLEANUP_FINALIZATION_PENDING` in the ledger and session record.
+  `NativeExperimentRunner.discover_cleanup_intents()` provides the read-only startup scan of
+  incomplete intents (schema, session identity, ledger, monitor, remaining owned files, foreign
+  survivors, retry classification) used by the Recovery Center. T-122 separates terminal outcomes:
+  a partial cleanup retaining foreign files writes `CLEANUP_PARTIAL_FOREIGN_FILES_PRESERVED` to both
+  ledger and intent (never an unqualified `CLEANUP_COMPLETE`), while `discover_cleanup_intents(true)`
+  keeps completed history inspectable; by default only actionable intents count toward the Recovery
+  Center warning total, so a normal restart after successful cleanup no longer produces a false
+  interrupted-transaction warning.
+- T-128 native cleanup contract: the shared authorization gate binds requested session ID, session
+  record ID, session object ID, stage evidence ID, manifest `stage_id` and reconciled ledger session;
+  a stage owned by another session is refused by both normal and terminal entrypoints. Finalization-only
+  retry never treats a missing manifest as proof: it requires a verified stage cleanup receipt bound to
+  the same session/stage or a durable `ok=true`, non-partial prior cleanup plus a clean file inventory;
+  otherwise `FINALIZATION_EVIDENCE_INSUFFICIENT` protects the stage. Discovery uses strict
+  intent-to-ledger correspondence (`CLEANUP_COMPLETE` ↔ `CLEANED_UP`, partial ↔ `PARTIAL_CLEANUP`)
+  and reports missing receipts, unclassified stage contents and wrong-session receipts as drift.
+  Cleanup results report `files_cleanup_ok`, `ledger_commit_ok`, `intent_finalized`,
+  `durable_complete` and `recovery_required`; `ok` means durable completion only. A supplied recovery
+  token with a missing or mismatched `group_id` is refused and never rewritten.
+- T-86 save-group recovery integrity (see also the ODF editing section): a `COMPLETE` or
+  `RECOVERED` group is refused with `RECOVERY_NOT_APPLICABLE` and zero mutation; recovery
+  restores the exact pre-transaction structural state (absent override stays absent and its
+  manifest entry is removed; existing overrides restore byte-exact previous bytes; an empty
+  override stays present and empty); unknown or newer current revisions and source revision
+  drift block rollback as `RECOVERY_CONFLICT_PENDING` which stays discoverable at startup until
+  an explicit `keep_current` / `restore_working` resolution; working-copy artifacts are stored
+  under a unique per-source identity (no basename collisions) and hash-verified; the final
+  `RECOVERED` verdict requires a verified durable journal write, otherwise the honest
+  `RECOVERY_FINALIZATION_PENDING` is reported. A true cross-process verifier
+  (`tests/verify_t86_cross_process_save.gd` + `tests/save_group_worker.gd`) kills a real Godot
+  OS process mid-save and recovers from fresh processes.
+- AUDAPACK producer access is `BLOCKED_EXTERNAL: AUDAPACK_PRODUCER_AUTH` (bridge `/v1/status` returned
+  HTTP 403). The audit ZIP is not regenerated and no COMPLETE status is claimed.
 
 ## Build
 

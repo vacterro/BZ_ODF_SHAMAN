@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "V:\\__STORE_V\\_SOFT\\Godot\\4.7.2-stable\\Godot_v4.7.2-stable_win64.exe",
+    "--headless",
+    "--path",
+    ".",
+    "--script",
+    "res://tests/verify_t128_cleanup_contract.gd"
+  ],
+  "command_sha256": "43764bfc12053f9af9f7bde6780cfe78ad521f1e9d8d28635252c1a8115755b7",
+  "status": "PASS",
+  "exit_code": 0,
+  "totals": null,
+  "duration_s": 2.3,
+  "timeout_s": 3600,
+  "subject_before": "git:d05c575c52d81c9af3457b574eea737e1efdfef66ab80bf0c8455c501276b337",
+  "subject": "git:d05c575c52d81c9af3457b574eea737e1efdfef66ab80bf0c8455c501276b337",
+  "stdout_tail": "-04: manifest stage ID differing from session stage ID is REFUSED\n  ✓ OWN-05: matching identities remain cleanup eligible\n  ✓ OWN-05: eligible stage still cleans normally\n  ✓ FIN-01: missing manifest with owned file remaining is REFUSED\n  ✓ FIN-01: refused finalization leaves owned bytes\n  ✓ FIN-02: empty stage without cleanup receipt is REFUSED\n  ✓ FIN-03: prior cleanup ok=false cannot finalize COMPLETE\n  ✓ FIN-04: prior partial cleanup is not promoted to COMPLETE\n  ✓ FIN-04: partial outcome preserved\n  ✓ FIN-05: verified fully cleaned stage finalizes\n  ✓ FIN-05: final intent reaches CLEANUP_COMPLETE\n  ✓ FIN-07: unresolved state survives restart and needs attention\n  ✓ DISC-01: COMPLETE intent + PARTIAL_CLEANUP ledger -> DRIFT\n  ✓ DISC-02: PARTIAL intent + CLEANED_UP ledger -> DRIFT\n  ✓ DISC-03: native COMPLETE ledger is not cleanup proof -> DRIFT\n  ✓ DISC-04: COMPLETE intent + CLEANED_UP + clean stage -> verified\n  ✓ DISC-05: PARTIAL intent + PARTIAL_CLEANUP + receipt -> partial\n  ✓ DISC-12: foreign file preserved\n  ✓ DISC-06: unknown ledger state -> attention\n  ✓ DISC-08: missing manifest with a file requires attention\n  ✓ DISC-10: receipt with wrong session ID requires attention\n  ✓ API-01: failed final intent write -> ok=false\n  ✓ API-02: file cleanup result still reported\n  ✓ API-03: durable finalization unfinished -> recovery\n  ✓ API-05: retry reaches verified complete\n  ✓ INT-01: incomplete intent identity is REFUSED\n  ✓ INT-01: refusal preserves owned bytes\n  ✓ INT-02: incomplete intent identity is REFUSED\n  ✓ INT-02: refusal preserves owned bytes\n  ✓ INT-03: incomplete intent identity is REFUSED\n  ✓ INT-03: refusal preserves owned bytes\n  ✓ INT-06: fully matched intent is accepted\n  ✓ REC-135: valid token captured\n  ✓ REC-133: provided token lacking group_id is REFUSED\n  ✓ REC-134: empty token group_id is REFUSED\n  ✓ REC-137: invalid token performs no mutation\n  ✓ REC-135: valid group ID still accepted\n\nT-128 Contract: 44 checks, 0 failure(s)\nRESULT: PASS\n",
+  "stderr_tail": "",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-23T19:54:59Z",
+  "verdict": "PASS",
+  "problems": []
+}

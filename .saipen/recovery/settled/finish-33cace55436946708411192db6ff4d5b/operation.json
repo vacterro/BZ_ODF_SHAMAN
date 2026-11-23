@@ -1,0 +1,62 @@
+{
+  "op_id": "finish-33cace55436946708411192db6ff4d5b",
+  "operation": "finish",
+  "created_at": "2026-11-23T06:11:23Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "b2138370eb5ac125",
+  "preconditions": {
+    ".saipen/STATE.md": "01c46cd15e81bca6",
+    ".saipen/BOARD.md": "1c8e1a7bf59f90d6",
+    ".saipen/LOG.md": "959132589ca33538"
+  },
+  "read_preconditions": {
+    ".saipen/logs": "tree-missing-v1"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 5,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "959132589ca33538",
+      "after_hash": "5de389fff8ff6a9a",
+      "applied": true
+    },
+    {
+      "path": ".saipen/recovery/board-compaction/T-110/T-110-7233bf4f14daf33865a994e4.BOARD.md",
+      "role": "generic",
+      "action": "write",
+      "before_hash": "",
+      "after_hash": "7233bf4f14daf338",
+      "applied": true
+    },
+    {
+      "path": ".saipen/recovery/board-compaction/T-110/T-110-7233bf4f14daf33865a994e4.json",
+      "role": "generic",
+      "action": "write",
+      "before_hash": "",
+      "after_hash": "428f5398873f49c6",
+      "applied": true
+    },
+    {
+      "path": ".saipen/BOARD.md",
+      "role": "board",
+      "action": "write",
+      "before_hash": "1c8e1a7bf59f90d6",
+      "after_hash": "10286d280a84b984",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "01c46cd15e81bca6",
+      "after_hash": "037b3aa1b75c5013",
+      "applied": true
+    }
+  ]
+}

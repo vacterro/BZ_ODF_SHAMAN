@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-032:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-123 closed with verification evidence in LOG: verify -> PASS [target: T-123] conf: high -- final revision: tools\\run_tests.cmd core 1106/1106, T-122 28/28, T-123 31/31, UI 0 failures; suite record ec60a408a0ad774d-20261123T172231089368Z.json; red control 2 failures (pre-fix), green 0 failures after restore; Windows build sha256 80cfc7d57c1664b48c3d60cb5296e83fddd1b05a433a071f218987d5d2ab2bfa",
+      "text": "Fix P0/P1 native cleanup reconciliation, durable intent state and Recovery confirmation contract regressions per 23.11 handoff; preserve T-122",
+      "verification": "the Work this request created reached its own verification gate; see the T-123 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-123"
+    }
+  },
+  "schema_version": 1
+}

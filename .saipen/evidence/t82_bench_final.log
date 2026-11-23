@@ -1,0 +1,11 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+BENCH BZ_ODF_SHAMAN (Godot 4.7.2-stable (official))
+index: 17028 ODFs, 37161 asset names in 1317.8 ms
+parse: 500 ODFs, 0.55 MB in 692.4 ms (0.8 MB/s)
+inheritance: 100 cold merges of ivtank_vsr in 117.6 ms (1.18 ms each, 131 rows)
+sim: 500 shots in 10959.0 ms (21.92 ms each, 500 hits)
+soak_1m: 3600 frames in 1656.6 ms (timeline=41, compressed=3589, replay=77.8 ms, ok=true)
+soak_10m: 36000 frames in 1653.0 ms (timeline=91, compressed=35939, mem_delta_after_reset=2.73 MB)
+memory: 152.0 MB static
+RESULT: PASS (measurement only)

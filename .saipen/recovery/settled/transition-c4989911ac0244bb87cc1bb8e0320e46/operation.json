@@ -1,0 +1,46 @@
+{
+  "op_id": "transition-c4989911ac0244bb87cc1bb8e0320e46",
+  "operation": "transition",
+  "created_at": "2026-11-23T20:22:00Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "7c5ee7ccface765b",
+  "preconditions": {
+    ".saipen/STATE.md": "b973483b2fb6a0c1",
+    ".saipen/BOARD.md": "956f363a6fa03d16",
+    ".saipen/LOG.md": "cf14c3d1b02c4ab2"
+  },
+  "read_preconditions": {
+    ".saipen/logs": "tree-missing-v1"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 3,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "cf14c3d1b02c4ab2",
+      "after_hash": "e063511aa7d7a693",
+      "applied": true
+    },
+    {
+      "path": ".saipen/BOARD.md",
+      "role": "board",
+      "action": "write",
+      "before_hash": "956f363a6fa03d16",
+      "after_hash": "a7a7b2a287404b2d",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "b973483b2fb6a0c1",
+      "after_hash": "c3a491a58f2a3600",
+      "applied": true
+    }
+  ]
+}

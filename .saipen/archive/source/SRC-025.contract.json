@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-025:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "SAIHANDOFF-18 MODE 2 night shift: preserve external file.header identity through Move/Reconnect, make native inventory agree with reconcile_stage, validate nonterminal monitor states, finish T-82, resolve T-83 overlap, advance T-75 and product work"
+    }
+  },
+  "derived_at": "2026-11-22T23:45:11Z",
+  "derived_from": "SRC-025",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "1478e55a312911a02326f0746669a84bcaccece184767c093c1f6a0efe6a2c99"
+}

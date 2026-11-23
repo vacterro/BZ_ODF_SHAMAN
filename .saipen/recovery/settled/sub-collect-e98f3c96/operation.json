@@ -1,0 +1,70 @@
+{
+  "op_id": "sub-collect-e98f3c96",
+  "operation": "sub_collect",
+  "created_at": "2026-11-23T06:10:56Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "6fe120d6c3451565",
+  "preconditions": {
+    ".saipen/LOG.md": "f7eac7e13cd14c6d",
+    ".saipen/BOARD.md": "4a5ef69a07ca8099",
+    ".saipen/STATE.md": "60d55b28375810e0",
+    ".saipen/extensions/subs/MANIFEST.md": "c83e2138f442e547"
+  },
+  "read_preconditions": {
+    ".": "source-identity-v1:b8e5733632923f88ae96337a411c3f5811a2adf4a6d8bf1ee89e5d3915683d93",
+    "V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/.saipen/extensions/subs/saipython.md": "a82a330b15f229c8",
+    ".saipen/extensions/subs/saipython/kitchen/OUTBOX.md": "42b45c155ac77580"
+  },
+  "verification_policy": "sub_collect",
+  "status": "COMMITTED",
+  "progress_index": 4,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "f7eac7e13cd14c6d",
+      "after_hash": "dc45e6041880a937",
+      "applied": true
+    },
+    {
+      "path": ".saipen/BOARD.md",
+      "role": "board",
+      "action": "write",
+      "before_hash": "4a5ef69a07ca8099",
+      "after_hash": "be5e946ecb072602",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "60d55b28375810e0",
+      "after_hash": "4e33c1b5cc021c45",
+      "applied": true
+    },
+    {
+      "path": ".saipen/extensions/subs/MANIFEST.md",
+      "role": "manifest",
+      "action": "write",
+      "before_hash": "c83e2138f442e547",
+      "after_hash": "56d3f48d3bfb6589",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "sub_collect",
+    "status": "COMMITTED",
+    "package_identities": [
+      "sha256:6ede443cf178a9db2cc9cc6c9be5146428f95d5bc718ddde78f3e7358d7e13f0"
+    ],
+    "producers": [
+      "saipython"
+    ],
+    "tickets": [
+      "T-112"
+    ]
+  }
+}

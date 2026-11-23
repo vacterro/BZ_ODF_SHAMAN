@@ -1,0 +1,27 @@
+{
+  "op_id": "producer-integrate-7ea3d63674b148276ba50b28ff53731f-44cf3e35fca8",
+  "operation": "producer_integration",
+  "created_at": "2026-11-23T20:35:37Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "sha256:7ea3d63674b148276ba50b28ff53731fe826e1cf02c431ce665f9556a05ff6de",
+  "preconditions": {},
+  "read_preconditions": {},
+  "verification_policy": "none",
+  "status": "COMMITTED",
+  "progress_index": 0,
+  "targets": [],
+  "receipt_metadata": {
+    "operation": "producer_integration",
+    "status": "COMMITTED",
+    "crew_epoch": "converge_intent-d3ebb39ea6fc4e49a5b6367538eddb53",
+    "ticket_id": "T-149",
+    "producer": "saiwiki",
+    "package_identity": "sha256:7ea3d63674b148276ba50b28ff53731fe826e1cf02c431ce665f9556a05ff6de",
+    "input_source": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "input_source_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22",
+    "resulting_source": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "resulting_source_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22"
+  }
+}

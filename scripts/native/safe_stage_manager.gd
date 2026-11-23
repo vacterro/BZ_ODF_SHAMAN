@@ -489,6 +489,307 @@ static func _rollback_stage_writes(created_targets: Array[String], overwritten_b
 ## manifest hash. Modified files are preserved and reported as
 ## MODIFIED_FILE_PRESERVED; unknown files are never touched; symlinks/junctions
 ## and corrupted manifests are unconditionally rejected.
+## Read-only inventory of a SHAMAN stage directory. Establishes ownership,
+## verifies current file hashes against the manifest, and reports whether a
+## cleanup would be safe. It never writes, renames, or deletes anything.
+static func inspect_stage(stage_root: String) -> Dictionary:
+	var canon := WorkspaceStore.canonical(stage_root)
+	var result := {
+		"ok": false, "stage_root": canon, "stage_id": "",
+		"ownership": "UNRESOLVED", "hash_status": "UNVERIFIED",
+		"session_status": "UNKNOWN", "session_id": "",
+		"unknown_files": [], "modified_files": [], "missing_files": [],
+		"cleanup_allowed": false,
+		"reason": "STAGE_INSPECTION_INCOMPLETE",
+	}
+	if canon == "" or not DirAccess.dir_exists_absolute(canon):
+		result["reason"] = "STAGE_MISSING"
+		return result
+	var manifest_path := canon.path_join(MANIFEST_NAME)
+	if not FileAccess.file_exists(manifest_path):
+		result["reason"] = "MANIFEST_MISSING"
+		return result
+	var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(manifest_path))
+	if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
+		result["reason"] = "MANIFEST_CORRUPT"
+		return result
+	var manifest: Dictionary = jres.get("data", {})
+	var validation := _validate_manifest_dict(manifest, canon)
+	if not bool(validation.get("ok", false)):
+		result["reason"] = str(validation.get("reason", "MANIFEST_INVALID"))
+		return result
+	result["ok"] = true
+	result["stage_id"] = str(manifest.get("stage_id", ""))
+	result["ownership"] = "MANIFEST_OWNED"
+	var files: Array = manifest.get("files", []) if manifest.get("files", []) is Array else []
+	for item in files:
+		if not (item is Dictionary):
+			result["modified_files"].append("<invalid manifest row>")
+			continue
+		var rel := str((item as Dictionary).get("rel", ""))
+		var expected := str((item as Dictionary).get("md5", "")).to_lower()
+		var path := canon.path_join(rel)
+		if not FileAccess.file_exists(path):
+			result["missing_files"].append(rel)
+		elif WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(path)).to_lower() != expected:
+			result["modified_files"].append(rel)
+	var existing: Array[String] = []
+	_list_existing_rel_files(canon, canon, existing)
+	var declared := {}
+	for item in files:
+		if item is Dictionary:
+			declared[str((item as Dictionary).get("rel", ""))] = true
+	declared[MANIFEST_NAME] = true
+	# native_evidence.json is written by SHAMAN itself; treat it as known
+	# metadata, never as a foreign file that blocks safety checks by mistake.
+	declared["native_evidence.json"] = true
+	for rel in existing:
+		if not declared.has(rel) and not rel.begins_with(BACKUP_SUBDIR + "/"):
+			result["unknown_files"].append(rel)
+	var evidence_path := canon.path_join("native_evidence.json")
+	if FileAccess.file_exists(evidence_path):
+		var eres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(evidence_path))
+		if bool(eres.get("ok", false)) and (eres.get("data", null) is Dictionary):
+			var evidence: Dictionary = eres.get("data", {})
+			result["session_id"] = str(evidence.get("session_id", ""))
+			result["session_status"] = str(evidence.get("status", "UNKNOWN"))
+	# Unknown files are reported and always preserved by cleanup(); they do not
+	# invalidate the integrity of the manifest-owned files themselves.
+	result["hash_status"] = "MATCH" if result["missing_files"].is_empty() and result["modified_files"].is_empty() else "MISMATCH"
+	# Terminal-only gate: STAGED/FAILED sessions stay untouched; no automatic
+	# deletion for an unresolved, active, or modified stage.
+	var terminal := str(result["session_status"]).to_upper() in ["COMPLETE", "CANCELLED", "TIMEOUT", "NATIVE_VERIFIED", "COMPARISON_COMPLETE", "FAILED"]
+	result["cleanup_allowed"] = terminal and result["hash_status"] == "MATCH" and result["session_id"] != ""
+	result["reason"] = "TERMINAL_OWNED_STAGE" if result["cleanup_allowed"] else "STAGE_OWNERSHIP_UNRESOLVED"
+	return result
+
+
+## Terminal states that may authorize cleanup only after an authoritative ledger
+## check. Kept local so reconciliation never depends on a live runner instance.
+const _TERMINAL_RECONCILE_STATES := [
+	"COMPLETE", "CANCELLED", "TIMEOUT", "NATIVE_VERIFIED",
+	"COMPARISON_COMPLETE", "FAILED", "CLEANED_UP",
+]
+
+
+## Read-only check for a still-running monitor in process_monitors.json beside
+## the ledger. A persisted monitor that is active, non-terminal, or pending
+## recovery makes cleanup ineligible even when the session record is terminal.
+static func _active_monitor_for_session(ledger_file: String, session_id: String) -> Dictionary:
+	var result := {"active": false, "status": "NOT_FOUND"}
+	if ledger_file.is_empty() or session_id == "":
+		return result
+	var path := ledger_file.get_base_dir().path_join("process_monitors.json")
+	if not FileAccess.file_exists(path):
+		return result
+	var parsed := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(path))
+	if not bool(parsed.get("ok", false)) or not (parsed.get("data", null) is Dictionary):
+		result["status"] = "CORRUPT"
+		result["active"] = true
+		return result
+	var monitors = (parsed.get("data", {}) as Dictionary).get("monitors", null)
+	if not (monitors is Dictionary):
+		result["status"] = "CORRUPT"
+		result["active"] = true
+		return result
+	if not (monitors as Dictionary).has(session_id):
+		result["status"] = "NO_MONITOR"
+		return result
+	var mon = (monitors as Dictionary).get(session_id, null)
+	if not (mon is Dictionary):
+		result["status"] = "CORRUPT"
+		result["active"] = true
+		return result
+	var d: Dictionary = mon
+	var state := str(d.get("state", "")).to_upper()
+	var terminal := state in ["COMPARISON_COMPLETE", "NATIVE_VERIFIED", "TIMEOUT", "CANCELLED", "FAILED"]
+	var active := bool(d.get("active", false)) or not terminal
+	if bool(d.get("recoverable", false)) or state == "RECOVERY_PENDING" or str(d.get("cancel_status", "")) == "CANCEL_REQUESTED":
+		active = true
+	result["state"] = state
+	result["status"] = "TERMINAL" if (terminal and not active) else "ACTIVE"
+	result["active"] = active
+	return result
+
+
+## Safe reconciliation decision for a stage. Reads the durable session ledger
+## without modifying it. Active, unknown, hash-mismatched, and evidence-bearing
+## stages are always protected. This method never deletes files.
+##
+## CLEANUP_ELIGIBLE requires ALL of: manifest ownership, matching hashes, a
+## session id, a parseable ledger with that session in a terminal state, ledger
+## and evidence agreeing, and no active/recoverable monitor. A corrupt, missing
+## or disagreeing ledger can never authorize cleanup; it yields PROTECT with
+## RECOVERY_PENDING so a human reconciliation step is required.
+static func reconcile_stage(stage_root: String, ledger_path: String = "") -> Dictionary:
+	var inspection := inspect_stage(stage_root)
+	var result: Dictionary = inspection.duplicate(true)
+	result["action"] = "NONE"
+	result["reconciled_at"] = Time.get_datetime_string_from_system()
+	result["evidence_preserved"] = true
+	result["ledger_status"] = "NOT_FOUND"
+	result["monitor_status"] = "NOT_CHECKED"
+	result["recovery_pending"] = false
+	result["reason"] = "STAGE_INSPECTION_INCOMPLETE"
+	if not bool(inspection.get("ok", false)):
+		# The inspection failed (STAGE_MISSING, MANIFEST_MISSING,
+		# MANIFEST_CORRUPT, ...): keep its specific reason instead of masking
+		# it with the generic placeholder.
+		result["action"] = "PROTECT"
+		result["reason"] = str(inspection.get("reason", "STAGE_INSPECTION_INCOMPLETE"))
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	var sid := str(inspection.get("session_id", ""))
+	var evidence_state := str(inspection.get("session_status", "")).to_upper()
+	var ledger_state := ""
+	var ledger_file := ledger_path
+	if ledger_file.is_empty():
+		ledger_file = WorkspaceStore.root().path_join("native_sessions").path_join("session_ledger.json")
+	if sid == "":
+		result["ledger_status"] = "NO_SESSION_ID"
+	elif not FileAccess.file_exists(ledger_file):
+		result["ledger_status"] = "LEDGER_NOT_FOUND"
+	else:
+		var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ledger_file))
+		if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
+			result["ledger_status"] = "LEDGER_CORRUPT"
+		else:
+			var items = (jres.get("data", {}) as Dictionary).get("sessions", null)
+			var ledger_sessions = (jres.get("data", {}) as Dictionary).get("ledger", null)
+			if not (items is Dictionary) and ledger_sessions is Dictionary:
+				items = ledger_sessions
+			if not (items is Dictionary):
+				result["ledger_status"] = "LEDGER_CORRUPT"
+			elif not (items as Dictionary).has(sid):
+				result["ledger_status"] = "SESSION_NOT_IN_LEDGER"
+			else:
+				var rec = (items as Dictionary).get(sid, null)
+				if not (rec is Dictionary) or str((rec as Dictionary).get("state", "")).strip_edges() == "":
+					result["ledger_status"] = "RECORD_NO_STATE"
+				else:
+					ledger_state = str((rec as Dictionary).get("state", "")).to_upper()
+					var ledger_sid := str((rec as Dictionary).get("session_id", ""))
+					if ledger_sid != "" and ledger_sid.to_lower() != sid.to_lower():
+						result["ledger_status"] = "SESSION_ID_MISMATCH"
+						ledger_state = ""
+					else:
+						result["ledger_status"] = "MATCH"
+
+	var monitor := _active_monitor_for_session(ledger_file, sid)
+	result["monitor_status"] = str(monitor.get("status", "NOT_CHECKED"))
+	result["active_monitor"] = bool(monitor.get("active", false))
+
+	var terminal := _TERMINAL_RECONCILE_STATES
+	if str(inspection.get("ownership", "")) != "MANIFEST_OWNED" or evidence_state.is_empty() or evidence_state == "UNKNOWN":
+		result["protect_reason"] = "STAGE_OWNERSHIP_UNRESOLVED"
+		result["action"] = "PROTECT"
+		result["reason"] = "STAGE_OWNERSHIP_UNRESOLVED"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	if str(inspection.get("hash_status", "")) != "MATCH":
+		result["protect_reason"] = "STAGE_HASH_MISMATCH"
+		result["action"] = "PROTECT"
+		result["reason"] = "STAGE_HASH_MISMATCH"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	# P1-NATIVE-01: a never-launched dry-run stage is disposable without a
+	# terminal native-game state. It requires its own, deliberately narrower
+	# policy: ownership + hashes must still be verified, and the session must be
+	# provably STAGED (never launched, no monitor, no launch-requested
+	# checkpoint). Launched sessions keep the full terminal reconciliation below.
+	var never_launched_states := ["STAGED"]
+	var monitor_preflight := str(monitor.get("status", "NOT_CHECKED"))
+	var ledger_unresolved := ledger_state == ""
+	if never_launched_states.has(evidence_state) and str(inspection.get("session_id", "")) != "":
+		var launched_markers := ["LAUNCH_REQUESTED", "STEAM_PROCESS_STARTED", "MONITOR_ARMED",
+			"GAME_PROCESS_CANDIDATE", "GAME_PROCESS_DETECTED", "GAME_PROCESS_VERIFIED",
+			"MISSION_OBSERVED", "RESOURCE_PROBE_CONFIRMED", "GAME_STARTED", "MISSION_LOADED"]
+		var provably_never_launched := false
+		if ledger_file != "" and FileAccess.file_exists(ledger_file):
+			var lres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ledger_file))
+			if bool(lres.get("ok", false)) and (lres.get("data", null) is Dictionary):
+				var items_nl = (lres.get("data", {}) as Dictionary).get("sessions", null)
+				var ledger_nl = (lres.get("data", {}) as Dictionary).get("ledger", null)
+				if not (items_nl is Dictionary) and ledger_nl is Dictionary:
+					items_nl = ledger_nl
+				if items_nl is Dictionary and (items_nl as Dictionary).has(sid):
+					var rec_nl = (items_nl as Dictionary).get(sid, {})
+					if rec_nl is Dictionary:
+						var sess_nl: Dictionary = (rec_nl as Dictionary).get("session", {})
+						var launched := bool((rec_nl as Dictionary).get("launch_attempted", false))
+						for cp in (sess_nl.get("checkpoints", []) as Array):
+							if cp is Dictionary:
+								var cp_state := str((cp as Dictionary).get("state", "")).to_upper()
+								if launched_markers.has(cp_state):
+									launched = true
+									break
+						# NC-44: the dry-run policy is additionally constrained to
+						# ledger states that are themselves never-launched-safe;
+						# a RECOVERY_PENDING record can never authorize it.
+						var nl_state := str((rec_nl as Dictionary).get("state", "")).to_upper()
+						provably_never_launched = not launched and nl_state in ["STAGED", "STAGE_MISSING"]
+		# The dry-run shortcut demands POSITIVE proof: the ledger must contain
+		# the session with no launch checkpoints, the monitor must be absent,
+		# and the ledger must be resolvable at all.
+		if provably_never_launched and not ledger_unresolved \
+				and (monitor_preflight == "NO_MONITOR" or monitor_preflight == "NOT_FOUND") \
+				and not bool(monitor.get("active", false)):
+			result["action"] = "CLEANUP_ELIGIBLE_DRY_RUN"
+			result["reason"] = "NEVER_LAUNCHED_OWNED_STAGE"
+			result["cleanup_allowed"] = true
+			result["never_launched"] = true
+			return result
+	if str(inspection.get("session_id", "")) == "":
+		result["protect_reason"] = "NO_SESSION_ID"
+		result["action"] = "PROTECT"
+		result["reason"] = "NO_SESSION_ID"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	if ledger_state.is_empty():
+		result["protect_reason"] = "LEDGER_STATE_UNRESOLVED"
+		result["action"] = "PROTECT"
+		result["reason"] = "LEDGER_STATE_UNRESOLVED"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	if not terminal.has(ledger_state):
+		result["protect_reason"] = "STAGE_ACTIVE_OR_RECOVERABLE"
+		result["action"] = "PROTECT"
+		result["reason"] = "STAGE_ACTIVE_OR_RECOVERABLE"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	if evidence_state != ledger_state:
+		result["protect_reason"] = "LEDGER_EVIDENCE_DISAGREE"
+		result["action"] = "PROTECT"
+		result["reason"] = "LEDGER_EVIDENCE_DISAGREE"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	if str(monitor.get("status", "")) == "CORRUPT":
+		result["protect_reason"] = "MONITOR_STATE_UNRESOLVED"
+		result["action"] = "PROTECT"
+		result["reason"] = "MONITOR_STATE_UNRESOLVED"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	if bool(monitor.get("active", false)):
+		result["protect_reason"] = "ACTIVE_MONITOR"
+		result["action"] = "PROTECT"
+		result["reason"] = "ACTIVE_MONITOR"
+		result["cleanup_allowed"] = false
+		result["recovery_pending"] = true
+		return result
+	result["action"] = "CLEANUP_ELIGIBLE"
+	result["reason"] = "TERMINAL_OWNED_STAGE"
+	result["cleanup_allowed"] = true
+	return result
+
+
 static func cleanup(stage_root: String, extra_protected: Array[String] = [],
 		owned_updated_hashes: Dictionary = {}) -> Dictionary:
 	var check := validate_stage_destination(stage_root, extra_protected)
@@ -568,6 +869,101 @@ static func cleanup(stage_root: String, extra_protected: Array[String] = [],
 			"results": results,
 		}
 
+	# P1-NATIVE-02: when unknown (non-manifest) files survive inside the stage,
+	# the ownership manifest must NOT be deleted with the directory retained:
+	# that would leave provenance-less leftovers. Instead record exactly what
+	# was removed and keep a durable provenance receipt beside the stage, then
+	# report the retained directory honestly.
+	var surviving_unknown: Array[String] = []
+	var remaining: Array[String] = []
+	_list_existing_rel_files(stage_dir, stage_dir, remaining)
+	var declared_after := {}
+	declared_after[MANIFEST_NAME] = true
+	declared_after["native_evidence.json"] = true
+	declared_after["stage_provenance.json"] = true
+	declared_after["stage_cleanup_receipt.json"] = true
+	for rel in remaining:
+		if not declared_after.has(rel) and not rel.begins_with(BACKUP_SUBDIR + "/"):
+			surviving_unknown.append(rel)
+	if not surviving_unknown.is_empty():
+		var receipt := {
+			"schema": 1,
+			"status": "OWNED_FILES_REMOVED_FOREIGN_FILES_PRESERVED",
+			"completed_at": Time.get_datetime_string_from_system(),
+			"stage_root": stage_dir,
+			"removed_files": results,
+			"foreign_files_preserved": surviving_unknown,
+			"stage_directory_retained": true,
+		}
+		var receipt_path := stage_dir.path_join("stage_cleanup_receipt.json")
+		receipt["stage_id"] = str(parsed.get("stage_id", ""))
+		var evidence_result := _parse_json_safe(FileAccess.get_file_as_string(stage_dir.path_join("native_evidence.json")))
+		var evidence_data = evidence_result.get("data", {})
+		receipt["session_id"] = str(evidence_data.get("session_id", "")) if evidence_data is Dictionary else ""
+		var provenance := _stage_provenance_snapshot(parsed, stage_dir)
+		var receipt_payload := JSON.stringify(receipt, "  ").to_utf8_buffer()
+		var prov_payload := JSON.stringify(provenance, "  ").to_utf8_buffer()
+		# Test-only fault phases mirror WorkspaceStore.fault_phases; production
+		# never sets these. They simulate a stale receipt and a failed write.
+		var fault_receipt: bool = bool(WorkspaceStore.fault_phases.get("native_receipt_write", false))
+		var fault_prov: bool = bool(WorkspaceStore.fault_phases.get("native_provenance_write", false))
+		if fault_receipt and not FileAccess.file_exists(receipt_path):
+			_write_stale_evidence(receipt_path)
+		if fault_prov and not FileAccess.file_exists(stage_dir.path_join("stage_provenance.json")):
+			_write_stale_evidence(stage_dir.path_join("stage_provenance.json"))
+		var rw := WorkspaceStore.atomic_write_abs(receipt_path, receipt_payload) if not fault_receipt else {"ok": false}
+		var pw := WorkspaceStore.atomic_write_abs(stage_dir.path_join("stage_provenance.json"), prov_payload) if not fault_prov else {"ok": false}
+		# NPROV-01..04: existence alone proves nothing. Both artifacts must be
+		# written successfully and read back byte-for-byte, and must carry the
+		# current stage/session identity, before evidence can be claimed.
+		var verify_fault: bool = bool(WorkspaceStore.fault_phases.get("native_receipt_verify", false))
+		var receipt_ok := not verify_fault and bool(rw.get("ok", false)) and FileAccess.file_exists(receipt_path) and \
+			WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(receipt_path)) == WorkspaceStore._md5_bytes(receipt_payload)
+		var prov_ok := bool(pw.get("ok", false)) and FileAccess.file_exists(stage_dir.path_join("stage_provenance.json")) and \
+			WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(stage_dir.path_join("stage_provenance.json"))) == WorkspaceStore._md5_bytes(prov_payload)
+		if not receipt_ok or not prov_ok:
+			var missing: Array[String] = []
+			if not receipt_ok:
+				missing.append("receipt")
+			if not prov_ok:
+				missing.append("provenance")
+			return {
+				"ok": true,
+				"partial": true,
+				"status": "CLEANUP_EVIDENCE_PENDING",
+				"reason": "PROVENANCE_PERSISTENCE_FAILED",
+				"stage": stage_dir,
+				"removed": removed,
+				"preserved": [],
+				"rejected": [],
+				"results": results,
+				"foreign_files": surviving_unknown,
+				"stage_directory_retained": true,
+				"provenance_preserved": false,
+				"evidence_failed": missing,
+				"error": "durable cleanup evidence could not be verified: " + ", ".join(PackedStringArray(missing)),
+			}
+		return {
+			"ok": true,
+			"partial": true,
+			"status": "FOREIGN_FILES_PRESERVED",
+			"reason": "OWNED_FILES_REMOVED",
+			"stage": stage_dir,
+			"removed": removed,
+			"preserved": [],
+			"rejected": [],
+			"results": results,
+			"foreign_files": surviving_unknown,
+			"stage_directory_retained": true,
+			"provenance_preserved": prov_ok,
+			"receipt_verified": receipt_ok,
+			"provenance_verified": prov_ok,
+		}
+
+	# The evidence artifact and the manifest are SHAMAN's own metadata; a full
+	# clean removes them too so an owned stage leaves no orphan directory that
+	# only exists to hold stale evidence (NC-39: empty stage dirs must go).
+	DirAccess.remove_absolute(stage_dir.path_join("native_evidence.json"))
 	DirAccess.remove_absolute(manifest_path)
 	# Remove stage_dir itself only if completely empty (preserves unknown files!).
 	_remove_if_empty(stage_dir)
@@ -581,6 +977,28 @@ static func cleanup(stage_root: String, extra_protected: Array[String] = [],
 		"preserved": [],
 		"rejected": [],
 		"results": results,
+	}
+
+
+static func _write_stale_evidence(path: String) -> void:
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f != null:
+		f.store_string("{\"schema\":1,\"status\":\"STALE\"}")
+		f.close()
+
+
+## Durable provenance snapshot written when foreign files keep a stage
+## directory alive after the owned files were removed. Reconciliation and
+## inventory can then attribute survivors without the live manifest.
+static func _stage_provenance_snapshot(manifest: Dictionary, stage_dir: String) -> Dictionary:
+	return {
+		"schema": 1,
+		"stage_id": str(manifest.get("stage_id", "")),
+		"stage_root": stage_dir,
+		"recorded_at": Time.get_datetime_string_from_system(),
+		"owned_files": manifest.get("files", []),
+		"note": "owned files were removed; foreign files preserved; manifest content retained here",
 	}
 
 

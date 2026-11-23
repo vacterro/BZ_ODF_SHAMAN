@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-023:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Mode 2 night shift: fix GraphEdit slot/output port identity, external edges, native cleanup safety, verify fresh Windows release, continue T-75 and product work"
+    }
+  },
+  "derived_at": "2026-11-22T23:42:20Z",
+  "derived_from": "SRC-023",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "41febbb5aeec50df9c0408609dd514afe047bf5bdc9f12da351088c936a6b6a7"
+}

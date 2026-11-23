@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "fec226b1fbb9100a83007f3551232071a18fe63b88bb13c033c2cea4c1f96a40",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 0.9,
+  "timeout_s": 3600,
+  "subject_before": "git:38aa5261d46b3e4e3239b358ea35bf2ba3851328f566bcebba8a3ef4455171b1",
+  "subject": "git:38aa5261d46b3e4e3239b358ea35bf2ba3851328f566bcebba8a3ef4455171b1",
+  "stdout_tail": "== Core tests ==\nGodot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\n\n\nTESTS FAILED\n",
+  "stderr_tail": "SCRIPT ERROR: Parse Error: Identifier \"GAME_ROOT\" not declared in the current scope.\n   at: GDScript::reload (res://tests/test_runner.gd:4688)\nERROR: Failed to load script \"res://tests/test_runner.gd\" with error \"Parse error\".\n   at: load (modules/gdscript/gdscript_resource_format.cpp:46)\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-22T11:46:51Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

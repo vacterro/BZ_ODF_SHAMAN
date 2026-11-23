@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-031:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Mode 2 autonomous night shift: repair recovery current-revision guard, group-id validation, cache sync, native cleanup intent consistency and completed-intent filtering, physical ODF diff; verify and advance product"
+    }
+  },
+  "derived_at": "2026-11-23T16:15:36Z",
+  "derived_from": "SRC-031",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "ef6c7244d63e362cae25443fa8fa195107f3df5dae2106630a6a2a9482ab0b05"
+}

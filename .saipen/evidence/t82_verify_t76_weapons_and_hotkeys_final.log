@@ -1,0 +1,42 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-76 Weapon Switching & Node Hotkey Verifier
+  ✓ WPN-01: vehicle profile resolves
+  ✓ WPN-02: all four weaponNameN slots enumerated (got 4)
+  ✓ WPN-03: slot 0 defaults to AT Stab (got atstab)
+  ✓ WPN-04: AT Stab slot fires only its own hardpoint
+  ✓ WPN-05: slot 1 switches to minigun (got minigun)
+  ✓ WPN-06: minigun exposes both barrels, not the AT Stab hardpoint
+  ✓ WPN-07: slot 3 switches to mortar (got mortar)
+  ✓ WPN-08: barrel policy SALVO preserved with both barrels
+  ✓ KEY-01: ParticleLab exposes cut/copy/paste link operations
+  ✓ KEY-02: ParticleLab exposes reconnect/disconnect link operations
+  ✓ KEY-03: ParticleLab exposes link move operation
+  ✓ KEY-04: ParticleLab has a graph hotkey dispatcher
+  ✓ KEY-05: cut/delete key bound
+  ✓ KEY-06: copy/paste keys bound
+  ✓ KEY-07: MainWindow routes graph hotkeys to ParticleLab
+  ✓ KEY-08: link hotkey edits are undoable in one compound step
+  ✓ WPN-09: TANDEM volley bypasses reload for extra barrels
+  ✓ BARREL-01: zero-hardpoint TANDEM uses one explicit fallback origin
+  ✓ VOLLEY-01/02: volley aggregate carries complete authoritative outcome
+  ✓ WPN-38/39: full VolleyResult contract present
+  ✓ GRAPH-18: self-link refused, bytes intact
+  ✓ GRAPH-13: invalid destination preserves bytes
+  ✓ GRAPH-20: occupied slot refused
+  ✓ GRAPH-22: swap preserves both links
+  ✓ GRAPH-19: zero-length self-reference treated as cycle
+  ✓ XREF-01: valid external file.header edit accepted; external file unchanged
+  ✓ XREF-02: missing external header rejected without mutation
+  ✓ XREF-07: exact physical parallel slot selected for commands
+  ✓ GRAPH-24: physical renderName2 has a real output port
+  ✓ GRAPH-24: focused renderName2 disconnected, renderName1 preserved
+  ✓ GRAPH-26: focused disconnect is undoable
+  ✓ GRAPH-26: undo restores exact byte-exact original property
+  ✓ GRAPH-26: undo leaves a coherent redo step
+  ✓ GRAPH-26: redo removes only focused property
+  ✓ GRAPH-25/28: ambiguous parallel disconnect refused without ODF mutation
+  ✓ GRAPH-29: failed Move restores bytes/dirty/history exactly
+
+T-76 Verifier: 36 checks, 0 failure(s)
+RESULT: PASS

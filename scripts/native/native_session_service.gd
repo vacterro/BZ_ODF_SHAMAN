@@ -34,6 +34,16 @@ func ensure_initialized() -> void:
 		add_child(poll_timer)
 
 
+func _start_poll_timer() -> void:
+	if poll_timer == null:
+		return
+	if poll_timer.is_inside_tree():
+		if poll_timer.is_stopped():
+			poll_timer.start()
+	else:
+		poll_timer.autostart = true
+
+
 func recover_pending_sessions() -> Dictionary:
 	ensure_initialized()
 	var rec: Dictionary = runner.recover_sessions()
@@ -49,8 +59,8 @@ func recover_pending_sessions() -> Dictionary:
 			if bool(mres.get("active", false)):
 				if not _monitoring_sessions.has(sid):
 					_monitoring_sessions.append(sid)
-		if not _monitoring_sessions.is_empty() and poll_timer != null and poll_timer.is_inside_tree() and poll_timer.is_stopped():
-			poll_timer.start()
+		if not _monitoring_sessions.is_empty():
+			_start_poll_timer()
 		if active_session_id != "":
 			_emit_if_changed(active_session_id, true)
 	return rec
@@ -137,9 +147,49 @@ func cancel_monitoring(session_id: String = "") -> Dictionary:
 	if sid == "":
 		return {"ok": false, "state": "NO_ACTIVE_MONITOR", "active": false}
 	var res: Dictionary = runner.cancel_monitor(sid)
-	_monitoring_sessions.erase(sid)
-	if _monitoring_sessions.is_empty() and poll_timer != null:
-		poll_timer.stop()
+	var st := str(res.get("state", ""))
+	# P1-NATIVE-01 (NC-08..NC-12): NEVER silently abandon GUI monitoring when
+	# durable cancellation fails! Only stop polling once CANCELLED is committed
+	# or there is no active monitor.
+	if (bool(res.get("ok", false)) and st == "CANCELLED") or st == "NO_ACTIVE_MONITOR":
+		_monitoring_sessions.erase(sid)
+		if _monitoring_sessions.is_empty() and poll_timer != null:
+			poll_timer.stop()
+			poll_timer.autostart = false
+	else:
+		if not _monitoring_sessions.has(sid):
+			_monitoring_sessions.append(sid)
+		_start_poll_timer()
+	_emit_if_changed(sid, true)
+	return res
+
+
+func arm_manual_observation(session_id: String = "", options: Dictionary = {}) -> Dictionary:
+	ensure_initialized()
+	var sid := session_id if session_id != "" else active_session_id
+	if sid == "":
+		return {"ok": false, "reason": "NO_ACTIVE_SESSION", "active": false}
+	var res: Dictionary = runner.arm_manual_observation(sid, options)
+	if bool(res.get("ok", false)) and bool(res.get("active", false)):
+		active_session_id = sid
+		if not _monitoring_sessions.has(sid):
+			_monitoring_sessions.append(sid)
+		_start_poll_timer()
+	_emit_if_changed(sid, true)
+	return res
+
+
+func import_manual_observation(session_id: String = "", observation_path: String = "") -> Dictionary:
+	ensure_initialized()
+	var sid := session_id if session_id != "" else active_session_id
+	if sid == "":
+		return {"ok": false, "reason": "NO_ACTIVE_SESSION"}
+	var res: Dictionary = runner.import_manual_observation(sid, observation_path)
+	if bool(res.get("ok", false)):
+		_monitoring_sessions.erase(sid)
+		if _monitoring_sessions.is_empty() and poll_timer != null:
+			poll_timer.stop()
+			poll_timer.autostart = false
 	_emit_if_changed(sid, true)
 	return res
 
@@ -154,8 +204,7 @@ func resume_monitoring(session_id: String = "") -> Dictionary:
 		active_session_id = sid
 		if not _monitoring_sessions.has(sid):
 			_monitoring_sessions.append(sid)
-		if poll_timer != null and poll_timer.is_stopped():
-			poll_timer.start()
+		_start_poll_timer()
 	_emit_if_changed(sid, true)
 	return res
 
@@ -229,6 +278,7 @@ func get_status_snapshot(session_id: String = "") -> Dictionary:
 		"state": st,
 		"launch_route": str(rec.get("launch_route", "")),
 		"game_pid": int(mon.get("game_pid", 0)),
+		"game_exe_verified": bool(mon.get("game_exe_verified", false)),
 		"mission_status": "OBSERVED" if mission_ok else "WAITING",
 		"resource_probe": "CONFIRMED" if probe_ok else "WAITING",
 		"observation_status": "VERIFIED" if verified else ("COLLECTED" if obs_ok else "WAITING"),
@@ -237,6 +287,9 @@ func get_status_snapshot(session_id: String = "") -> Dictionary:
 		"active": bool(mon.get("active", false)),
 		"monitoring": _monitoring_sessions.has(sid),
 		"reason": str(mon.get("reason", rec.get("reason", ""))),
+		"cancel_status": str(mon.get("cancel_status", rec.get("cancel_status", ""))),
+		"recoverable": bool(mon.get("recoverable", rec.get("recoverable", false))),
+		"manual_armed": bool(mon.get("manual_armed", false)),
 		"native_verified": verified,
 		"polls": int(mon.get("polls", 0)),
 	}

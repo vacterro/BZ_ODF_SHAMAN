@@ -1,0 +1,23 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-82 Cross-File Reference Identity Verifier
+  ✓ XREF-MOVE-01: free move preserves external file.header (got other_effect.Render)
+  ✓ XREF-MOVE-01: move changed real ODF bytes
+  ✓ XREF-MOVE-01: undo restores exact external bytes
+  ✓ XREF-MOVE-01: redo restores external target
+  ✓ XREF-MOVE-02: same-name local header does not replace external (got other_effect.Render)
+  ✓ XREF-MOVE-03: swap exchanges exact values (r2=other_effect.Render r4=LocalRender)
+  ✓ XREF-MOVE-07: swap refuses invalid destination and preserves byte-exact ODF
+  ✓ XREF-MOVE-04: replace writes exact external value at destination
+  ✓ XREF-REC-01/02: reconnect keeps external when local header collides (got other_effect.Render)
+  ✓ XREF-REC-02: external ODF bytes unchanged
+  ✓ XREF-REC-03: explicit local target is written as local header (got Render)
+  ✓ XREF-REC-04: local -> external writes exact file.header (got other_effect.Render)
+  ✓ XREF-REC-05: undo restores local identity
+  ✓ XREF-REC-05: redo restores external identity byte-exactly
+  ✓ GRAPH-32/33: occupied external port remains selected (focus={ "src": "EmitterA", "key": "renderName1", "dst": "", "target": { "kind": "external", "header": "Render", "path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/verify_t82_xref_756416/ext/other_effect.odf" }, "reference": { "kind": "external", "header": "Render", "path": "C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/verify_t82_xref_756416/ext/other_effect.odf", "package": "", "value": "other_effect.Render" }, "src_header_id": "emittera#0", "src_occurrence": 0, "key_occurrence": 0, "doc_key_occurrence": 0, "entry_line": 4, "doc_revision": 20, "selection_source": "graph_port" })
+  ✓ GRAPH-32: occupied external port leaves source byte-exact
+  ✓ XREF-MOVE-06: external ODF bytes unchanged
+
+T-82 Cross-File Verifier: 17 checks, 0 failure(s)
+RESULT: PASS

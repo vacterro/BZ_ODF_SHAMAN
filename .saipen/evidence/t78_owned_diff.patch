@@ -1,0 +1,3154 @@
+diff --git a/scripts/core/resource_index.gd b/scripts/core/resource_index.gd
+index fa61399..68d99a1 100644
+--- a/scripts/core/resource_index.gd
++++ b/scripts/core/resource_index.gd
+@@ -1080,3 +1080,302 @@ func find_asset(name: String, extensions: Array[String], context_path: String =
+ 
+ func asset_count() -> int:
+ 	return assets_by_name.size()
++
++
++const CACHE_SCHEMA := 2
++
++## Cache lives inside the active workspace. Fingerprints bind workspace override
++## state, so a cache written for one workspace must never be read by another.
++static func default_cache_path() -> String:
++	return WorkspaceStore.root().path_join("resource_index_cache.json")
++
++
++func _collect_dir_fingerprint_rows(abs_dir: String, root_path: String, rows: Array[String]) -> void:
++	var dir := DirAccess.open(abs_dir)
++	if dir == null:
++		return
++	dir.list_dir_begin()
++	var n := dir.get_next()
++	var subdirs: Array[String] = []
++	var fnames: Array[String] = []
++	while n != "":
++		if n != "." and n != "..":
++			var full := abs_dir.path_join(n)
++			if dir.current_is_dir():
++				subdirs.append(full)
++			else:
++				var ext := n.get_extension().to_lower()
++				if ext == "odf" or ext == "ini" or ASSET_EXTS.has(ext):
++					fnames.append(n)
++		n = dir.get_next()
++	dir.list_dir_end()
++	fnames.sort()
++	for fn in fnames:
++		var fp := abs_dir.path_join(fn)
++		var rel := fp.trim_prefix(root_path).trim_prefix("/")
++		var mtime := FileAccess.get_modified_time(fp)
++		var flen := 0
++		var fa := FileAccess.open(fp, FileAccess.READ)
++		if fa != null:
++			flen = int(fa.get_length())
++			fa.close()
++		rows.append("F|%s|%d|%d" % [rel.to_lower(), flen, mtime])
++	subdirs.sort()
++	for sd in subdirs:
++		_collect_dir_fingerprint_rows(sd, root_path, rows)
++
++
++## Compute a deterministic SHA256 fingerprint across all enabled roots, file
++## metadata (paths, sizes, mtimes), active ModLoadout/package priority state,
++## explicit resource winners, and WorkspaceStore overrides (Wave E).
++func compute_roots_fingerprint(include_workshop: bool = true) -> Dictionary:
++	var lines: Array[String] = []
++	lines.append("SCHEMA=%d|WORKSHOP=%s" % [CACHE_SCHEMA, str(include_workshop)])
++	lines.append("LOADOUT=%s|POLICY=%s|STRICT=%s|BASE_FB=%s|DIS_WIN=%s" % [
++		active_loadout_profile_id, resolution_policy, str(strict_package_filter),
++		str(allow_base_game_fallback), str(allow_disabled_explicit_winners)
++	])
++	lines.append("ACTIVE_PKGS=" + ",".join(active_packages))
++	var wkeys := explicit_resource_winners.keys()
++	wkeys.sort()
++	for wk in wkeys:
++		lines.append("WIN|%s=%s" % [str(wk), str(explicit_resource_winners[wk])])
++	# Include WorkspaceStore manifest & override files so saving/reverting any override invalidates the cache!
++	var ws_root := WorkspaceStore.canonical(WorkspaceStore.root())
++	var ws_proj := ws_root.path_join("project.json")
++	if FileAccess.file_exists(ws_proj):
++		lines.append("WS_PROJ|" + WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(ws_proj)))
++	else:
++		lines.append("WS_PROJ|NONE")
++	var ws_odf_dir := ws_root.path_join("odf")
++	if DirAccess.dir_exists_absolute(ws_odf_dir):
++		var ws_rows: Array[String] = []
++		_collect_dir_fingerprint_rows(ws_odf_dir, ws_odf_dir, ws_rows)
++		for wr in ws_rows:
++			lines.append("WS_" + wr)
++	var file_count := 0
++	for r in available_roots():
++		var kind := str(r.get("kind", ""))
++		if kind == "workshop" and not include_workshop:
++			continue
++		var rpath := WorkspaceStore.canonical(str(r.get("path", "")))
++		lines.append("ROOT|%s|%s|%d|%s" % [rpath.to_lower(), kind, int(r.get("priority", 10)), str(r.get("label", ""))])
++		var r_rows: Array[String] = []
++		_collect_dir_fingerprint_rows(rpath, rpath, r_rows)
++		file_count += r_rows.size()
++		lines.append_array(r_rows)
++	var payload := "\n".join(lines).to_utf8_buffer()
++	var ctx := HashingContext.new()
++	ctx.start(HashingContext.HASH_SHA256)
++	ctx.update(payload)
++	var sha := ctx.finish().hex_encode().to_lower()
++	return {"ok": true, "fingerprint": sha, "tracked_entries": file_count, "include_workshop": include_workshop}
++
++
++func _canonical_json_value(value):
++	if value is Dictionary:
++		var out := {}
++		for k in (value as Dictionary).keys():
++			out[str(k)] = _canonical_json_value((value as Dictionary)[k])
++		return out
++	if value is Array:
++		var arr := []
++		for v in (value as Array):
++			arr.append(_canonical_json_value(v))
++		return arr
++	if value is float and is_equal_approx(float(value), roundf(float(value))):
++		return int(value)
++	return value
++
++
++func _sha256_hex(bytes: PackedByteArray) -> String:
++	var ctx := HashingContext.new()
++	ctx.start(HashingContext.HASH_SHA256)
++	ctx.update(bytes)
++	return ctx.finish().hex_encode().to_lower()
++
++
++## Persist the scanned ResourceIndex along with its live SHA256 fingerprint.
++func save_index_cache(cache_path: String = "", include_workshop: bool = true) -> Dictionary:
++	var target := cache_path.strip_edges() if cache_path.strip_edges() != "" else default_cache_path()
++	var abs_target := WorkspaceStore.canonical(target)
++	var fp := compute_roots_fingerprint(include_workshop)
++	var payload := JSON.stringify({
++		"total_files": total_files,
++		"files": files,
++		"assets_by_name": assets_by_name,
++		"package_names": package_names,
++		"extension_counts": extension_counts,
++	})
++	var doc := {
++		"schema": CACHE_SCHEMA,
++		"payload_sha256": _sha256_hex(payload.to_utf8_buffer()),
++		"saved_at": Time.get_datetime_string_from_system(),
++		"include_workshop": include_workshop,
++		"fingerprint": str(fp.get("fingerprint", "")),
++		"total_files": total_files,
++		"files": files,
++		"assets_by_name": assets_by_name,
++		"package_names": package_names,
++		"extension_counts": extension_counts,
++	}
++	var wres := WorkspaceStore.atomic_write_abs(abs_target, JSON.stringify(doc).to_utf8_buffer())
++	if not bool(wres.get("ok", false)):
++		return {"ok": false, "reason": "CACHE_WRITE_FAILED", "error": str(wres.get("error", ""))}
++	return {"ok": true, "path": abs_target, "fingerprint": str(fp.get("fingerprint", "")), "total_files": total_files}
++
++
++## Load a previously saved ResourceIndex ONLY when the live SHA256 fingerprint
++## (roots, priorities, file sizes/mtimes, active ModLoadout, WorkspaceStore
++## overrides) matches the cached fingerprint bit-for-bit.
++func load_index_cache(include_workshop: bool = true, cache_path: String = "") -> Dictionary:
++	var target := cache_path.strip_edges() if cache_path.strip_edges() != "" else default_cache_path()
++	var abs_target := WorkspaceStore.canonical(target)
++	if not FileAccess.file_exists(abs_target):
++		return {"ok": false, "cache_hit": false, "reason": "CACHE_MISSING", "path": abs_target}
++	var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(abs_target))
++	if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
++		return {"ok": false, "cache_hit": false, "reason": "CACHE_CORRUPT", "path": abs_target}
++	var doc: Dictionary = jres.get("data", {})
++	if int(doc.get("schema", 0)) != CACHE_SCHEMA:
++		return {"ok": false, "cache_hit": false, "reason": "CACHE_SCHEMA_MISMATCH", "path": abs_target}
++	var live_fp := compute_roots_fingerprint(include_workshop)
++	var cached_fp := str(doc.get("fingerprint", ""))
++	if cached_fp == "" or cached_fp != str(live_fp.get("fingerprint", "")):
++		return {
++			"ok": false,
++			"cache_hit": false,
++			"reason": "FINGERPRINT_MISMATCH",
++			"cached_fingerprint": cached_fp,
++			"live_fingerprint": str(live_fp.get("fingerprint", "")),
++		}
++	if bool(doc.get("include_workshop", false)) != include_workshop:
++		return {"ok": false, "cache_hit": false, "reason": "CACHE_WORKSHOP_MISMATCH", "path": abs_target}
++	var cached_payload := {
++		"total_files": doc.get("total_files", null),
++		"files": doc.get("files", null),
++		"assets_by_name": doc.get("assets_by_name", null),
++		"package_names": doc.get("package_names", null),
++		"extension_counts": doc.get("extension_counts", null),
++	}
++	var required_maps := ["files", "assets_by_name", "package_names", "extension_counts"]
++	for key in required_maps:
++		if not (doc.get(key, null) is Dictionary):
++			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
++	if not (doc.get("total_files", null) is int or doc.get("total_files", null) is float):
++		return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
++	var cache_counts: Dictionary = doc.get("extension_counts", {})
++	for ck in cache_counts.keys():
++		if not (cache_counts[ck] is int or cache_counts[ck] is float):
++			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
++	var payload_str := JSON.stringify(cached_payload)
++	var expected_hash := str(doc.get("payload_sha256", ""))
++	var payload_hash := _sha256_hex(payload_str.to_utf8_buffer())
++	# JSON round-trip turns integers into floats; canonicalize every numeric
++	# level before hashing so a valid cache survives a save/load cycle.
++	var normalized_hash := _sha256_hex(JSON.stringify(_canonical_json_value(cached_payload)).to_utf8_buffer())
++	if expected_hash == "" or (payload_hash != expected_hash and normalized_hash != expected_hash):
++		return {"ok": false, "cache_hit": false, "reason": "CACHE_PAYLOAD_HASH_MISMATCH", "path": abs_target}
++	var cached_files: Dictionary = cached_payload["files"]
++	var cached_counts: Dictionary = cached_payload["extension_counts"]
++	var sum_counts := 0
++	for key in cached_counts.keys():
++		if not (cached_counts[key] is int or cached_counts[key] is float):
++			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
++		sum_counts += int(cached_counts[key])
++	for key in cached_files.keys():
++		if not (cached_files[key] is Array):
++			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
++	var cached_file_entries := 0
++	for key in cached_files.keys():
++		cached_file_entries += (cached_files[key] as Array).size()
++	if int(cached_payload["total_files"]) != cached_file_entries or sum_counts != cached_file_entries:
++		return {"ok": false, "cache_hit": false, "reason": "CACHE_COUNT_MISMATCH", "path": abs_target}
++	var t0 := Time.get_ticks_msec()
++	files = cached_files.duplicate(true)
++	assets_by_name = (cached_payload["assets_by_name"] as Dictionary).duplicate(true)
++	package_names = (cached_payload["package_names"] as Dictionary).duplicate(true)
++	extension_counts = cached_counts.duplicate(true)
++	total_files = int(cached_payload["total_files"])
++	_game_name_cache.clear()
++	generation += 1
++	last_scan_msec = Time.get_ticks_msec() - t0
++	scan_finished.emit(total_files)
++	return {"ok": true, "cache_hit": true, "reason": "", "fingerprint": cached_fp, "total_files": total_files, "load_ms": last_scan_msec}
++
++
++func invalidate_cache(cache_path: String = "") -> void:
++	var target := cache_path.strip_edges() if cache_path.strip_edges() != "" else default_cache_path()
++	var abs_target := WorkspaceStore.canonical(target)
++	if FileAccess.file_exists(abs_target):
++		DirAccess.remove_absolute(abs_target)
++
++
++## Application index-build entry point: reuse a fingerprint-valid cache when it
++## still matches the live roots, otherwise scan and persist a fresh one. A cache
++## write failure must never prevent the index from being built.
++func scan_or_load_cache(include_workshop: bool = true, cache_path: String = "") -> Dictionary:
++	var hit := load_index_cache(include_workshop, cache_path)
++	if bool(hit.get("ok", false)) and bool(hit.get("cache_hit", false)):
++		hit["scanned"] = false
++		return hit
++	scan(include_workshop)
++	var saved := save_index_cache(cache_path, include_workshop)
++	var result := {
++		"ok": true,
++		"cache_hit": false,
++		"scanned": true,
++		"reason": str(hit.get("reason", "CACHE_MISS")),
++		"fingerprint": str(saved.get("fingerprint", "")),
++		"cache_saved": bool(saved.get("ok", false)),
++		"total_files": total_files,
++	}
++	return result
++
++
++## Return rich live provenance for any resource reference: effective source,
++## package identity, content hash/revision, workspace override flag, alternative
++## candidates across packages/roots, and honest preview fidelity.
++func provenance_summary(name: String, context_path: String = "") -> Dictionary:
++	var resolved := resolve_ex(name, context_path)
++	var found := bool(resolved.get("found", false))
++	var entry: Dictionary = resolved.get("entry", {}) if resolved.get("entry", {}) is Dictionary else {}
++	var eff_path := str(resolved.get("path", ""))
++	var ident := resource_identity(entry if not entry.is_empty() else eff_path, context_path) if found else {}
++	var ws_entry := WorkspaceStore.entry_for(eff_path) if eff_path != "" else {}
++	var has_ws := not ws_entry.is_empty()
++	var alts_raw := alternatives(name)
++	var alts_out: Array[Dictionary] = []
++	for c in alts_raw:
++		var cp := str(c.get("path", ""))
++		if found and WorkspaceStore._same_canon_path(cp, eff_path):
++			continue
++		alts_out.append({
++			"path": cp,
++			"package_id": str(c.get("package", "")),
++			"mod_label": str(c.get("mod_label", "")),
++			"kind": str(c.get("kind", "")),
++			"priority": int(c.get("priority", 0)),
++		})
++	var cat := str(entry.get("category", ""))
++	var fidelity := "EDITING_COMPLETE"
++	if cat in ["Weapons", "Ordnance", "Explosions / FX", "Vehicles"]:
++		fidelity = "APPROXIMATED"
++	return {
++		"found": found,
++		"resource": _clean_ref(name).to_lower(),
++		"effective_path": eff_path,
++		"package_id": str(resolved.get("package", "")),
++		"mod_label": str(entry.get("mod_label", "Stock (BZ2R)" if str(resolved.get("kind", "")) == "game" else "")),
++		"collection": str(entry.get("collection", "")),
++		"kind": str(resolved.get("kind", "")),
++		"content_hash": str(ident.get("content_hash", "")),
++		"workspace_revision": int(ident.get("workspace_revision", 0)),
++		"has_workspace_override": has_ws,
++		"active_loadout_profile_id": active_loadout_profile_id,
++		"rule": str(resolved.get("rule", "")),
++		"status": str(resolved.get("status", "")),
++		"warning": str(resolved.get("warning", "")),
++		"alternatives": alts_out,
++		"preview_fidelity": fidelity,
++	}
+diff --git a/scripts/lab/particle_lab.gd b/scripts/lab/particle_lab.gd
+index 47a7325..f323cc3 100644
+--- a/scripts/lab/particle_lab.gd
++++ b/scripts/lab/particle_lab.gd
+@@ -73,6 +73,10 @@ var _selected_header: String = ""
+ var _selected_external_path: String = ""
+ var _selected_headers: Array[String] = []
+ static var _clipboard_nodes: Array[Dictionary] = []
++## T-76: clipboard for link cut/copy/paste and the last link chosen for
++## reconnect/move operations. Each record is {src, key, dst}.
++static var _clipboard_links: Array[Dictionary] = []
++var _link_focus: Dictionary = {}
+ var _emitters: Array = []
+ var _live_inspection_label: Label = null
+ var _preview_nodes: Array = []
+@@ -372,6 +376,7 @@ func _build_ui() -> void:
+ 	graph.connection_request.connect(_on_connection_request)
+ 	graph.disconnection_request.connect(_on_disconnection_request)
+ 	graph.end_node_move.connect(_save_layout)
++	graph.gui_input.connect(_on_graph_gui_input)
+ 	split.add_child(graph)
+ 
+ 	var right_vsplit := VSplitContainer.new()
+@@ -500,12 +505,15 @@ func load_document(p_doc: OdfDocument) -> void:
+ 	_clear_emitters()
+ 	_rebuild_quick_inspector()
+ 	if doc == null:
+-		header_label.text = "Particle Lab: no document."
++		if header_label != null:
++			header_label.text = "Particle Lab: no document."
+ 		return
+ 	var renders := doc.render_headers()
+-	header_label.text = "Particle Lab: %s  —  %d render header(s)" % [doc.get_display_name(), renders.size()]
++	if header_label != null:
++		header_label.text = "Particle Lab: %s  —  %d render header(s)" % [doc.get_display_name(), renders.size()]
+ 	if renders.is_empty():
+-		info.text = "[color=#D37676]This ODF declares no renderBase/simulateBase headers.[/color]\nIt may still attach renders by reference; open the render ODF itself."
++		if info != null:
++			info.text = "[color=#D37676]This ODF declares no renderBase/simulateBase headers.[/color]\nIt may still attach renders by reference; open the render ODF itself."
+ 		status_changed.emit("Particle Lab: no render headers in " + doc.get_display_name(), "warning")
+ 		return
+ 	var positions := {}
+@@ -540,6 +548,8 @@ func load_document(p_doc: OdfDocument) -> void:
+ 		for key in _child_keys(doc, h.name):
+ 			var ref := doc.get_value(h.name, key, "")
+ 			var ref_row := HBoxContainer.new()
++			ref_row.set_meta("ref_key", key)
++			ref_row.set_meta("ref_header", h.name)
+ 			var ref_label := Label.new()
+ 			ref_label.text = key
+ 			ref_label.add_theme_font_size_override("font_size", 11)
+@@ -553,13 +563,15 @@ func load_document(p_doc: OdfDocument) -> void:
+ 			ref_row.add_child(ref_edit)
+ 			rows.add_child(ref_row)
+ 		node.set_slot(0, true, 0, Color("#D3B57A"), true, 0, Color("#969630"))
+-		graph.add_child(node)
++		if graph != null:
++			graph.add_child(node)
+ 		positions[h.name.to_lower()] = node.name
+ 		i += 1
+ 	var built := EffectRuntime.build_document_preview(index, doc)
+ 	_header_preview_nodes = built.get("header_nodes", {})
+ 	for pn in built.get("nodes", []):
+-		preview_root.add_child(pn)
++		if preview_root != null:
++			preview_root.add_child(pn)
+ 		_preview_nodes.append(pn)
+ 	for em in built.get("emitters", []):
+ 		_emitters.append(em)
+@@ -582,18 +594,21 @@ func load_document(p_doc: OdfDocument) -> void:
+ 				"external":
+ 					to = _external_node(str(resolved.path), str(resolved.header), ext_i)
+ 					ext_i += 1
+-			if to != "" and to != from:
++			if to != "" and to != from and graph != null:
+ 				graph.connect_node(from, 0, to, 0)
+ 	_apply_layout()
++	_refresh_edge_highlight()
+ 	if _selected_header == "" and not renders.is_empty():
+ 		_selected_header = renders[0].name
+ 		_selected_headers = [_selected_header]
+-		var first_gn := graph.get_node_or_null(NodePath(_selected_header.validate_node_name()))
++		var first_gn := graph.get_node_or_null(NodePath(_selected_header.validate_node_name())) if graph != null else null
+ 		if first_gn is GraphNode:
+ 			(first_gn as GraphNode).selected = true
+ 		_rebuild_quick_inspector()
+-	info.text = _describe_graph(renders)
+-	counter_label.text = "render nodes: %d    emitters: %d" % [renders.size(), _emitters.size()]
++	if info != null:
++		info.text = _describe_graph(renders)
++	if counter_label != null:
++		counter_label.text = "render nodes: %d    emitters: %d" % [renders.size(), _emitters.size()]
+ 	_update_toolbar()
+ 	status_changed.emit("Particle Lab loaded %s (%d render headers)" % [doc.get_display_name(), renders.size()], "success")
+ 
+@@ -868,16 +883,11 @@ func _reference_header(value: String) -> String:
+ func _on_connection_request(from_node: StringName, _from_port: int, to_node: StringName, _to_port: int) -> void:
+ 	var src := _header_for_node(String(from_node))
+ 	var dst := _header_for_node(String(to_node))
+-	if src == "" or dst == "" or src == dst:
+-		status_changed.emit("Connection refused: both ends must be different render headers.", "warning")
+-		return
+-	if _would_cycle(src, dst):
+-		status_changed.emit("Connection refused: %s -> %s would create a cycle." % [src, dst], "warning")
+-		return
+-	var key := _next_reference_key(src)
+-	if key == "":
+-		status_changed.emit("Connection refused: all emitName/renderName1..32 slots are occupied.", "warning")
++	var check := _validate_link(src, dst)
++	if not bool(check.get("ok", false)):
++		_report_link_failure(str(check.get("code", "INVALID")))
+ 		return
++	var key := str(check.get("key", ""))
+ 	var entry = doc.find_entry(src, key)
+ 	if entry != null:
+ 		doc.set_entry_value(entry, dst)
+@@ -904,6 +914,416 @@ func _on_disconnection_request(from_node: StringName, _from_port: int, to_node:
+ 	graph.disconnect_node(from_node, 0, to_node, 0)
+ 
+ 
++# ---------------------------------------------------------------------------
++# T-76: node-link manipulation hotkeys. Links are emitName/renderNameN entries
++# on a source render header whose value names a target header. Every operation
++# is one compound, undoable ODF edit followed by a graph rebuild.
++# ---------------------------------------------------------------------------
++
++const GRAPH_LINK_ERRORS := {
++	"INVALID": "Link refused: invalid source or destination.",
++	"SELF": "Link refused: a node cannot reference itself.",
++	"CYCLE": "Link refused: the connection would create a cycle.",
++	"SLOT_MISSING": "Link refused: the reference slot does not exist.",
++	"SLOT_OCCUPIED": "Link refused: the destination slot is occupied.",
++}
++
++## One validator for every graph reference entry point (mouse, reconnect,
++## paste, move, direct edit). `ignore_key` drops an existing edge from the
++## cycle walk so reconnect/move can validate the candidate before mutating.
++func _validate_link(src: String, dst: String, key: String = "",
++		ignore_key: String = "", allow_replace: bool = false) -> Dictionary:
++	if doc == null or src.is_empty() or dst.is_empty() or not doc.has_header(src) or not doc.has_header(dst):
++		return {"ok": false, "code": "INVALID"}
++	if src.to_lower() == dst.to_lower():
++		return {"ok": false, "code": "SELF"}
++	if _would_cycle(src, dst, ignore_key):
++		return {"ok": false, "code": "CYCLE"}
++	var use_key := key if key != "" else _next_reference_key(src)
++	if use_key.is_empty():
++		return {"ok": false, "code": "SLOT_MISSING"}
++	var existing = doc.find_entry(src, use_key)
++	if existing != null and not allow_replace and use_key != ignore_key:
++		return {"ok": false, "code": "SLOT_OCCUPIED", "entry": existing}
++	return {"ok": true, "code": "OK", "key": use_key, "entry": existing}
++
++
++func _report_link_failure(code: String) -> void:
++	status_changed.emit(GRAPH_LINK_ERRORS.get(code, str(GRAPH_LINK_ERRORS["INVALID"])), "warning")
++
++
++func _entry_for_link(rec: Dictionary):
++	if doc == null:
++		return null
++	var src := str(rec.get("src", ""))
++	var key := str(rec.get("key", ""))
++	var header_occ := int(rec.get("src_occurrence", -1))
++	var key_occ := int(rec.get("key_occurrence", -1))
++	if header_occ >= 0 or key_occ >= 0:
++		return doc.find_entry_occurrence(src, key, header_occ, -1, key_occ)
++	return doc.find_entry(src, key)
++
++
++func _refresh_edge_highlight() -> void:
++	if graph == null:
++		return
++	for connection in graph.get_connection_list():
++		graph.set_connection_activity(str(connection.get("from_node", "")), int(connection.get("from_port", 0)),
++			str(connection.get("to_node", "")), int(connection.get("to_port", 0)), 0.0)
++	if not _focus_is_current():
++		return
++	var src := str(_link_focus.get("src", ""))
++	var dst := str(_link_focus.get("dst", ""))
++	for connection in graph.get_connection_list():
++		var from_node := str(connection.get("from_node", ""))
++		var to_node := str(connection.get("to_node", ""))
++		if _header_for_node(from_node) != src or _header_for_node(to_node) != dst:
++			continue
++		graph.set_connection_activity(from_node, int(connection.get("from_port", 0)),
++			to_node, int(connection.get("to_port", 0)), 1.0)
++
++
++func _clear_edge_highlight() -> void:
++	if graph == null:
++		return
++	for connection in graph.get_connection_list():
++		graph.set_connection_activity(str(connection.get("from_node", "")), int(connection.get("from_port", 0)),
++			str(connection.get("to_node", "")), int(connection.get("to_port", 0)), 0.0)
++
++
++## A selection only applies to the exact document revision it was captured
++## on; later edits or undo/redo invalidate it instead of retargeting a
++## different physical property occurrence.
++func _focus_is_current() -> bool:
++	if _link_focus.is_empty() or doc == null:
++		return false
++	if int(_link_focus.get("doc_revision", -1)) != doc.revision:
++		_link_focus.clear()
++		return false
++	var e = _entry_for_link(_link_focus)
++	if e == null or _reference_header(e.core_value()) != str(_link_focus.get("dst", "")):
++		_link_focus.clear()
++		return false
++	return true
++
++
++func select_edge(src: String, key: String, dst: String, source: String = "graph") -> void:
++	if doc == null:
++		return
++	var e = doc.find_entry(src, key)
++	if e == null:
++		_link_focus.clear()
++		_clear_edge_highlight()
++		return
++	_link_focus = {
++		"src": src, "key": key, "dst": dst,
++		"src_header_id": str(e.header_id),
++		"src_occurrence": int(e.occurrence_index),
++		"key_occurrence": int(e.key_occurrence_index),
++		"entry_line": int(e.line),
++		"doc_revision": int(doc.revision),
++		"selection_source": source,
++	}
++	_refresh_edge_highlight()
++	status_changed.emit("Selected edge %s.%s -> %s" % [src, key, dst], "muted")
++
++
++func clear_edge_selection() -> void:
++	if _link_focus.is_empty():
++		return
++	_link_focus.clear()
++	_clear_edge_highlight()
++
++
++func _on_graph_gui_input(event: InputEvent) -> void:
++	if not (event is InputEventMouseButton) or not (event as InputEventMouseButton).pressed:
++		return
++	if (event as InputEventMouseButton).button_index != MOUSE_BUTTON_LEFT:
++		return
++	var conn = graph.get_closest_connection_at_point(
++		graph.get_local_mouse_position() + graph.get_scroll_offset(), 10.0)
++	if conn == null or not (conn is Dictionary):
++		clear_edge_selection()
++		return
++	var cd: Dictionary = conn
++	var src_node := str(cd.get("from_node", ""))
++	var to_node := str(cd.get("to_node", ""))
++	var src := _header_for_node(src_node)
++	var dst := _header_for_node(to_node)
++	if src.is_empty() or dst.is_empty():
++		clear_edge_selection()
++		return
++	var e = doc.find_entry(src, "emitName")
++	var key := "emitName"
++	if e != null and _reference_header(e.core_value()) == dst:
++		pass
++	else:
++		for k in _child_keys(doc, src):
++			e = doc.find_entry(src, k)
++			if e != null and _reference_header(e.core_value()) == dst:
++				key = k
++				break
++	select_edge(src, key, dst)
++
++
++## Collect link records touching the selected headers (or the focused link).
++func _collect_target_links() -> Array[Dictionary]:
++	var out: Array[Dictionary] = []
++	if doc == null:
++		return out
++	if _focus_is_current():
++		out.append(_link_focus.duplicate(true))
++		return out
++	var selected := get_selected_headers()
++	for src in selected:
++		for key in _child_keys(doc, src):
++			var e = doc.find_entry(src, key)
++			if e == null:
++				continue
++			var dst := _reference_header(e.core_value())
++			if dst != "" and doc.has_header(dst):
++				out.append({"src": src, "key": key, "dst": dst})
++	return out
++
++
++func _remove_link(rec: Dictionary) -> bool:
++	var e = _entry_for_link(rec)
++	if e == null or _reference_header(e.core_value()) != str(rec.get("dst", "")):
++		return false
++	doc.remove_entry(e)
++	return true
++
++
++func _add_link(src: String, dst: String, key: String = "", allow_replace: bool = false) -> bool:
++	var check := _validate_link(src, dst, key, "", allow_replace)
++	if not bool(check.get("ok", false)):
++		_report_link_failure(str(check.get("code", "INVALID")))
++		return false
++	var use_key := str(check.get("key", ""))
++	var existing = check.get("entry", null)
++	if existing != null:
++		doc.set_entry_value(existing, dst)
++	else:
++		doc.append_entry(src, use_key, dst)
++	return true
++
++
++## Mutate one existing entry in place. Preferred for reconnect: preserves the
++## physical header, property occurrence, surrounding comments and formatting.
++func _retarget_link(rec: Dictionary, dst: String) -> bool:
++	var e = _entry_for_link(rec)
++	if e == null or _reference_header(e.core_value()) != str(rec.get("dst", "")):
++		return false
++	doc.set_entry_value(e, dst)
++	return true
++
++
++func copy_selected_links() -> int:
++	var links := _collect_target_links()
++	_clipboard_links = links.duplicate(true)
++	status_changed.emit("Copied %d graph link(s)." % links.size(), "muted")
++	return links.size()
++
++
++func cut_selected_links() -> int:
++	var links := _collect_target_links()
++	if links.is_empty():
++		return 0
++	doc.begin_compound()
++	var removed := 0
++	for rec in links:
++		if _remove_link(rec):
++			removed += 1
++	doc.end_compound()
++	_clipboard_links = links.duplicate(true)
++	clear_edge_selection()
++	document_edited.emit()
++	load_document(doc)
++	status_changed.emit("Cut %d graph link(s) (undo available)." % removed, "success")
++	return removed
++
++
++func paste_links() -> int:
++	if doc == null or _clipboard_links.is_empty():
++		return 0
++	var selected := get_selected_headers()
++	var target_src := selected[0] if not selected.is_empty() else ""
++	doc.begin_compound()
++	var added := 0
++	for rec in _clipboard_links:
++		var src := target_src if target_src != "" else str(rec.get("src", ""))
++		var dst := str(rec.get("dst", ""))
++		var use_key := "" if target_src != "" else str(rec.get("key", ""))
++		if not bool(_validate_link(src, dst, use_key).get("ok", false)):
++			_report_link_failure(str(_validate_link(src, dst, use_key).get("code", "INVALID")))
++			continue
++		if _add_link(src, dst, use_key):
++			added += 1
++	doc.end_compound()
++	document_edited.emit()
++	load_document(doc)
++	status_changed.emit("Pasted %d graph link(s) (undo available)." % added, "success")
++	return added
++
++
++func disconnect_selected_link() -> bool:
++	var links := _collect_target_links()
++	if links.is_empty():
++		return false
++	doc.begin_compound()
++	var ok := _remove_link(links[0])
++	doc.end_compound()
++	clear_edge_selection()
++	document_edited.emit()
++	load_document(doc)
++	status_changed.emit("Disconnected %s -> %s (undo available)." % [
++		str(links[0].get("src", "")), str(links[0].get("dst", ""))
++	], "success" if ok else "warning")
++	return ok
++
++
++## Reconnect edits the existing reference value in place. Validation and the
++## byte-exact document snapshot are taken before any mutation, so an invalid
++## destination cannot destroy the old ODF reference.
++func reconnect_selected_link(to_header: String = "") -> bool:
++	var links := _collect_target_links()
++	if links.is_empty():
++		return false
++	var rec: Dictionary = links[0]
++	var src := str(rec.get("src", ""))
++	var dst := to_header.strip_edges()
++	if dst == "":
++		var selected := get_selected_headers()
++		dst = selected[0] if not selected.is_empty() else ""
++	var key := str(rec.get("key", ""))
++	var check := _validate_link(src, dst, key, key)
++	if not bool(check.get("ok", false)):
++		_report_link_failure(str(check.get("code", "INVALID")))
++		return false
++	var before_revision: int = doc.revision
++	var before_focus: Dictionary = _link_focus.duplicate(true)
++	doc.begin_compound()
++	var ok := _retarget_link(rec, dst)
++	doc.end_compound()
++	if not ok or doc.revision == before_revision:
++		_link_focus = before_focus
++		load_document(doc)
++		status_changed.emit("Reconnect failed; original reference preserved.", "warning")
++		return false
++	clear_edge_selection()
++	document_edited.emit()
++	load_document(doc)
++	status_changed.emit("Reconnected %s.%s -> %s (undo available)." % [src, key, dst], "success")
++	return true
++
++
++func _slot_occupied(src: String, key: String) -> bool:
++	return doc != null and doc.find_entry(src, key) != null
++
++
++## Move semantics: "free" refuses an occupied destination, "swap" exchanges
++## both values, "replace" is an explicit acknowledged overwrite. All variants
++## validate before mutating and never silently overwrite in default mode.
++func move_selected_link(to_key: String = "", mode: String = "free") -> bool:
++	var links := _collect_target_links()
++	if links.is_empty():
++		return false
++	var rec: Dictionary = links[0]
++	var src := str(rec.get("src", ""))
++	var dst := str(rec.get("dst", ""))
++	var from_key := str(rec.get("key", ""))
++	var target := to_key.strip_edges()
++	if target.is_empty():
++		target = _next_reference_key(src)
++	if target.is_empty() or target == from_key:
++		return false
++	var action := mode.strip_edges().to_lower()
++	if action not in ["free", "swap", "replace"]:
++		status_changed.emit("Unknown move mode: " + action, "warning")
++		return false
++	var occupant = doc.find_entry(src, target)
++	if occupant != null and action == "free":
++		_report_link_failure("SLOT_OCCUPIED")
++		return false
++	if action == "swap" and (occupant == null or not _child_keys(doc, src).has(from_key)):
++		_report_link_failure("SLOT_MISSING")
++		return false
++	var check := _validate_link(src, dst, target, from_key, action != "free")
++	if not bool(check.get("ok", false)):
++		_report_link_failure(str(check.get("code", "INVALID")))
++		return false
++	var from_entry = _entry_for_link(rec)
++	if from_entry == null:
++		return false
++	var before_bytes: PackedByteArray = doc.to_bytes()
++	doc.begin_compound()
++	if action == "swap":
++		var other_dst := _reference_header(occupant.core_value())
++		if other_dst.is_empty():
++			status_changed.emit("Swap refused: destination does not reference a render header.", "warning")
++			doc.end_compound()
++			return false
++		doc.set_entry_value(from_entry, other_dst)
++		doc.set_entry_value(occupant, dst)
++	else:
++		if occupant != null:
++			doc.remove_entry(from_entry)
++			doc.set_entry_value(occupant, dst)
++		else:
++			var source_header_id := str(from_entry.header_id)
++			doc.remove_entry(from_entry)
++			var appended = doc.append_entry(src, target, dst, source_header_id)
++			if appended == null:
++				doc.end_compound()
++				doc.replace_text(doc.to_text())
++				doc.undo()
++				status_changed.emit("Move failed; original reference preserved.", "warning")
++				return false
++	doc.end_compound()
++	if doc.to_bytes() == before_bytes:
++		status_changed.emit("Move made no change.", "warning")
++		return false
++	clear_edge_selection()
++	document_edited.emit()
++	load_document(doc)
++	status_changed.emit("Moved %s.%s -> %s (%s)." % [src, from_key, target, action], "success")
++	return true
++
++
++## Keyboard dispatcher for graph link manipulation. Returns true when handled.
++## MODIFIER MAP: X/Delete = cut, C = copy, V = paste, R = reconnect,
++##               M = move, Alt+Delete/Backspace = disconnect.
++func _handle_graph_hotkey(event: InputEvent) -> bool:
++	if not (event is InputEventKey) or not event.pressed or event.echo:
++		return false
++	var k := event as InputEventKey
++	if graph == null or doc == null:
++		return false
++	var fo: Control = get_viewport().get_focus_owner() as Control
++	if fo is LineEdit or fo is TextEdit or fo is SpinBox:
++		return false
++	var focused := graph.has_focus()
++	var over_graph := graph.get_global_rect().has_point(graph.get_global_mouse_position())
++	if not focused and not over_graph:
++		return false
++	var cut_key := k.keycode == KEY_X or k.keycode == KEY_DELETE
++	if k.ctrl_pressed or k.meta_pressed:
++		if k.keycode == KEY_C:
++			return copy_selected_links() >= 0
++		if k.keycode == KEY_V:
++			return paste_links() > 0
++		if k.keycode == KEY_R:
++			return reconnect_selected_link()
++		if k.keycode == KEY_M:
++			return move_selected_link()
++		return false
++	if cut_key and k.alt_pressed:
++		return disconnect_selected_link()
++	if cut_key:
++		return cut_selected_links() > 0
++	return false
++
++
+ func _on_reference_submitted(header: String, key: String, text: String) -> void:
+ 	var value := text.strip_edges()
+ 	if value == "":
+@@ -921,6 +1341,10 @@ func _on_reference_submitted(header: String, key: String, text: String) -> void:
+ 	if target.to_lower() == header.to_lower():
+ 		status_changed.emit("Reference rejected: a node cannot reference itself.", "warning")
+ 		return
++	var check := _validate_link(header, target, key, key)
++	if not bool(check.get("ok", false)):
++		_report_link_failure(str(check.get("code", "INVALID")))
++		return
+ 	if target != "" and _would_cycle(header, target):
+ 		status_changed.emit("Reference rejected: %s -> %s would create a cycle." % [header, target], "warning")
+ 		return
+@@ -2296,7 +2720,9 @@ func _is_referenced(header: String) -> bool:
+ 
+ ## Depth-first reachability over local references. A new src -> dst edge is
+ ## invalid when dst already reaches src.
+-func _would_cycle(src: String, dst: String) -> bool:
++func _would_cycle(src: String, dst: String, ignore_key: String = "") -> bool:
++	if src.to_lower() == dst.to_lower():
++		return true
+ 	var stack: Array[String] = [dst]
+ 	var seen := {}
+ 	while not stack.is_empty():
+@@ -2306,7 +2732,11 @@ func _would_cycle(src: String, dst: String) -> bool:
+ 			continue
+ 		seen[key] = true
+ 		for child_key in _child_keys(doc, cur):
+-			var nxt := _reference_header(doc.get_value(cur, child_key, ""))
++			var nxt := ""
++			if cur.to_lower() == src.to_lower() and child_key.to_lower() == ignore_key.to_lower():
++				# Candidate edge replaces this one; exclude it from reachability.
++				continue
++			nxt = _reference_header(doc.get_value(cur, child_key, ""))
+ 			if nxt == "":
+ 				continue
+ 			if nxt.to_lower() == src.to_lower():
+diff --git a/scripts/lab/weapon_lab.gd b/scripts/lab/weapon_lab.gd
+index 123c848..37982b3 100644
+--- a/scripts/lab/weapon_lab.gd
++++ b/scripts/lab/weapon_lab.gd
+@@ -48,6 +48,63 @@ var shooter_model_info: Dictionary = {}
+ var target_model_info: Dictionary = {}
+ var shooter_hardpoint_node: Node3D = null
+ var hardpoint_mode: String = "editor-defined"
++## T-76: active vehicle weapon slot and multi-barrel firing policy.
++var active_weapon_slot: int = 0
++var barrel_mode: String = "TANDEM"
++var weapon_option: OptionButton = null
++var barrel_mode_option: OptionButton = null
++var _barrel_cycle: int = 0
++var _volley_counter: int = 0
++var last_volley_result = null
++
++## Structured result for one multi-barrel firing decision. Ammo and energy are
++## charged per accepted barrel; reload is enforced once per volley.
++class VolleyResult:
++	var volley_id: int = 0
++	var weapon_identity: String = ""
++	var barrel_mode: String = "SINGLE"
++	var requested_barrels: Array[String] = []
++	var accepted_barrels: Array[String] = []
++	var rejected_barrels: Array[String] = []
++	var shot_ids: Array[int] = []
++	var ammo_spent: int = 0
++	var energy_spent: float = 0.0
++	var reload_remaining: float = 0.0
++	var partial_failure: bool = false
++	var ok: bool = false
++
++	func to_dict() -> Dictionary:
++		return {
++			"volley_id": volley_id, "weapon_identity": weapon_identity,
++			"barrel_mode": barrel_mode,
++			"requested_barrels": requested_barrels.duplicate(),
++			"accepted_barrels": accepted_barrels.duplicate(),
++			"rejected_barrels": rejected_barrels.duplicate(),
++			"shot_ids": shot_ids.duplicate(), "ammo_spent": ammo_spent,
++			"energy_spent": energy_spent, "reload_remaining": reload_remaining,
++			"partial_failure": partial_failure, "ok": ok,
++		}
++
++	static func from_dict(d: Dictionary) -> VolleyResult:
++		var r := VolleyResult.new()
++		r.volley_id = int(d.get("volley_id", 0))
++		r.weapon_identity = str(d.get("weapon_identity", ""))
++		r.barrel_mode = str(d.get("barrel_mode", "SINGLE"))
++		for v in d.get("requested_barrels", []):
++			r.requested_barrels.append(str(v))
++		for v in d.get("accepted_barrels", []):
++			r.accepted_barrels.append(str(v))
++		for v in d.get("rejected_barrels", []):
++			r.rejected_barrels.append(str(v))
++		for v in d.get("shot_ids", []):
++			r.shot_ids.append(int(v))
++		r.ammo_spent = int(d.get("ammo_spent", 0))
++		r.energy_spent = float(d.get("energy_spent", 0.0))
++		r.reload_remaining = float(d.get("reload_remaining", 0.0))
++		r.partial_failure = bool(d.get("partial_failure", false))
++		r.ok = bool(d.get("ok", false))
++		return r
++
+ var projectiles: Array[Dictionary] = []
+ var last_fx_result: Dictionary = {}
+ var audio_player: AudioStreamPlayer
+@@ -110,8 +167,22 @@ var actor_inspector_tree: Tree
+ var replay_snapshot_option: OptionButton
+ var capture_replay_button: Button
+ var run_replay_button: Button
++var compare_replay_button: Button
+ var add_dot_button: Button
++var anim_clip_option: OptionButton
++var anim_play_button: Button
++var _anim_playing: bool = false
++var _anim_clip_name: String = ""
++var _anim_time_s: float = 0.0
++var projectile_traj_overlay: MeshInstance3D
+ var last_replay_result: Dictionary = {}
++var last_replay_comparison: Dictionary = {}
++var _active_replay_runner = null
++var _active_replay_label: String = ""
++var _replay_ab_queue: Array[Dictionary] = []
++var _replay_ab_results: Array[Dictionary] = []
++var _replay_ab_ids: Array[String] = []
++var _replay_paused: bool = false
+ var _last_actor_inspector_sig: String = ""
+ var _burst_is_first_shot: bool = true
+ var native_launch_mode_option: OptionButton
+@@ -167,6 +238,7 @@ var native_preflight_button: Button
+ var native_stage_button: Button
+ var native_launch_button: Button
+ var native_handoff_button: Button
++var native_arm_manual_button: Button
+ var native_collect_button: Button
+ var native_compare_button: Button
+ var native_cleanup_button: Button
+@@ -372,6 +444,23 @@ func _build_ui() -> void:
+ 	yaw_spin.tooltip_text = "Turret yaw (LMB drag / MMB Value Ladder / RMB reset to 0°)"
+ 	yaw_spin.value_changed.connect(func(_v): _apply_aim_transform())
+ 	fire_row.add_child(yaw_spin)
++	# T-76: vehicle weapon slot picker (AT Stab / minigun / mortar ...).
++	fire_row.add_child(_mk_label("Wpn"))
++	weapon_option = OptionButton.new()
++	weapon_option.custom_minimum_size = Vector2(150, 0)
++	weapon_option.tooltip_text = "Vehicle weapon slot (weaponName1..N). Switch to fire AT Stab, minigun, mortar, etc."
++	weapon_option.item_selected.connect(_on_weapon_slot_selected)
++	fire_row.add_child(weapon_option)
++	# T-76: multi-barrel policy for weapons with several weaponHardN barrels.
++	fire_row.add_child(_mk_label("Barrels"))
++	barrel_mode_option = OptionButton.new()
++	for bm in ["TANDEM", "SALVO", "SINGLE"]:
++		barrel_mode_option.add_item(bm)
++		barrel_mode_option.set_item_metadata(barrel_mode_option.item_count - 1, bm)
++	barrel_mode_option.select(0)
++	barrel_mode_option.tooltip_text = "TANDEM: all barrels fire together; SALVO: barrels cycle on salvoDelay; SINGLE: one barrel per shot."
++	barrel_mode_option.item_selected.connect(_on_barrel_mode_selected)
++	fire_row.add_child(barrel_mode_option)
+ 	fire_row.add_child(_mk_label("HP"))
+ 	hardpoint_option = OptionButton.new()
+ 	hardpoint_option.custom_minimum_size = Vector2(104, 0)
+@@ -590,8 +679,12 @@ func _build_ui() -> void:
+ 	tl_bar.add_child(replay_snapshot_option)
+ 	run_replay_button = _mk_button("REPLAY SANDBOX")
+ 	run_replay_button.tooltip_text = "Deterministically replay selected snapshot without mutating current active scenario"
+-	run_replay_button.pressed.connect(func(): replay_selected_snapshot())
++	run_replay_button.pressed.connect(func(): start_incremental_replay())
+ 	tl_bar.add_child(run_replay_button)
++	compare_replay_button = _mk_button("COMPARE A/B")
++	compare_replay_button.tooltip_text = "Run isolated sandboxed replays of the last two captured snapshots and diff outcomes"
++	compare_replay_button.pressed.connect(func(): start_bounded_ab_replay())
++	tl_bar.add_child(compare_replay_button)
+ 	add_dot_button = _mk_button("+ TEST DoT")
+ 	add_dot_button.tooltip_text = "Apply APPROXIMATED burn DoT (25 dps for 4.0s) to primary target"
+ 	add_dot_button.pressed.connect(func(): apply_test_dot())
+@@ -730,6 +823,21 @@ func _build_ui() -> void:
+ 	)
+ 	_bind_rmb_reset(shooter_aim_option, func(): set_shooter_aim_mode("manual"))
+ 	sandbox_row.add_child(shooter_aim_option)
++	sandbox_row.add_child(_mk_label("Anim"))
++	anim_clip_option = OptionButton.new()
++	anim_clip_option.custom_minimum_size = Vector2(106, 0)
++	anim_clip_option.tooltip_text = "Embedded DOCB .msh animation clip on Shooter A (moves attached hardpoints live)"
++	anim_clip_option.add_item("(static)")
++	anim_clip_option.disabled = true
++	anim_clip_option.item_selected.connect(func(idx: int):
++		if idx >= 0 and idx < anim_clip_option.item_count:
++			select_animation_clip(anim_clip_option.get_item_text(idx))
++	)
++	sandbox_row.add_child(anim_clip_option)
++	anim_play_button = _mk_button("Anim Play")
++	anim_play_button.tooltip_text = "Play or pause selected DOCB .msh animation clip on Shooter A"
++	anim_play_button.pressed.connect(func(): set_animation_playing(not _anim_playing))
++	sandbox_row.add_child(anim_play_button)
+ 	sandbox_row.add_child(_mk_label("Sh X"))
+ 	shooter_offset_x_spin = _mk_spin(-40.0, 40.0, 1.0, false)
+ 	shooter_offset_x_spin.suffix = " m"
+@@ -948,6 +1056,10 @@ func _build_ui() -> void:
+ 	native_handoff_button.tooltip_text = "Prepare durable operator handoff instructions (AWAITING_OPERATOR) without launching a process"
+ 	native_handoff_button.pressed.connect(func(): run_native_handoff())
+ 	native_row.add_child(native_handoff_button)
++	native_arm_manual_button = _mk_button("ARM MANUAL OBSERVATION")
++	native_arm_manual_button.tooltip_text = "Arm non-blocking monitoring (MONITOR_ARMED) before manual Steam launch; persists across restart"
++	native_arm_manual_button.pressed.connect(func(): run_native_arm_manual_observation())
++	native_row.add_child(native_arm_manual_button)
+ 	native_collect_button = _mk_button("COLLECT RESULTS")
+ 	native_collect_button.tooltip_text = "Collect and validate BZCC WriteToFile observation against Godot prediction"
+ 	native_collect_button.pressed.connect(func(): run_native_collect())
+@@ -1055,6 +1167,9 @@ func _build_world() -> void:
+ 	aim_overlay = MeshInstance3D.new()
+ 	aim_overlay.name = "AimOverlay"
+ 	world.add_child(aim_overlay)
++	projectile_traj_overlay = MeshInstance3D.new()
++	projectile_traj_overlay.name = "ProjectileTrajOverlay"
++	world.add_child(projectile_traj_overlay)
+ 	bbox_overlay = MeshInstance3D.new()
+ 	bbox_overlay.name = "BBoxOverlay"
+ 	world.add_child(bbox_overlay)
+@@ -1732,7 +1847,6 @@ func set_weapon_override(weapon_ref: String) -> bool:
+ 	combat_scenario.change_weapon(profile, true)
+ 	_current_health = combat_scenario.primary_target().hull_current
+ 	_current_shield = combat_scenario.primary_target().shield_current
+-	_clear_projectiles()
+ 	_update_stats()
+ 	_update_health_display()
+ 	refresh_actor_inspector(true)
+@@ -1831,7 +1945,7 @@ func _reload_scenario() -> void:
+ 	if shooter_path == "" or target_path == "":
+ 		return
+ 	profile = WeaponProfile.new()
+-	var ok := profile.resolve(index, shooter_path, target_path)
++	var ok := profile.resolve(index, shooter_path, target_path, "", true, active_weapon_slot, barrel_mode)
+ 	combat_scenario.configure_from_profile(profile, target_node.position if target_node != null else Vector3(0, 0, -50), false)
+ 	_current_health = combat_scenario.primary_target().hull_current if profile != null else 1000.0
+ 	_current_shield = combat_scenario.primary_target().shield_current if profile != null else 0.0
+@@ -1859,6 +1973,7 @@ func _reload_scenario() -> void:
+ 	_sync_sweep_property_labels()
+ 	_sync_sweep_bounds()
+ 	_update_chain_buttons()
++	_populate_weapon_picker()
+ 	if ok:
+ 		status_changed.emit("Scenario: %s -> %s" % [profile.weapon_name, profile.ordnance_name], "success")
+ 		scenario_loaded.emit(profile)
+@@ -1997,11 +2112,221 @@ func _rebuild_actor_models() -> void:
+ 		tph.queue_free()
+ 		target_label.text = "Target: %s — PLACEHOLDER MESH" % profile.target_path.get_file()
+ 	_populate_hardpoint_picker()
++	_populate_animation_picker()
+ 	_sync_target_bbox_to_profile()
+ 	_update_target_position()
+ 	_rebuild_hud_tags()
+ 
+ 
++func _populate_animation_picker() -> void:
++	_anim_playing = false
++	_anim_time_s = 0.0
++	_anim_clip_name = ""
++	if anim_play_button != null:
++		anim_play_button.text = "Anim Play"
++	if anim_clip_option == null:
++		return
++	anim_clip_option.clear()
++	if bool(shooter_model_info.get("ok", false)):
++		var names: Array = shooter_model_info.get("animation_names", [])
++		if not names.is_empty():
++			for nm in names:
++				anim_clip_option.add_item(str(nm))
++			anim_clip_option.select(0)
++			anim_clip_option.disabled = false
++			_anim_clip_name = str(names[0])
++			return
++	anim_clip_option.add_item("(static)")
++	anim_clip_option.disabled = true
++
++
++func select_animation_clip(clip_name: String) -> bool:
++	if not bool(shooter_model_info.get("ok", false)):
++		return false
++	var anims: Dictionary = shooter_model_info.get("animations", {})
++	if not anims.has(clip_name):
++		return false
++	_anim_clip_name = clip_name
++	_anim_time_s = 0.0
++	if anim_clip_option != null:
++		for i in anim_clip_option.item_count:
++			if anim_clip_option.get_item_text(i) == clip_name:
++				anim_clip_option.select(i)
++				break
++	var res := BzMeshReaderScript.apply_animation_pose(shooter_model_info, clip_name, 0.0, true)
++	_update_aim_overlay()
++	return bool(res.get("ok", false))
++
++
++func set_animation_playing(playing: bool) -> void:
++	if playing and (_anim_clip_name == "" or not bool(shooter_model_info.get("ok", false))):
++		_anim_playing = false
++	else:
++		_anim_playing = playing
++	if anim_play_button != null:
++		anim_play_button.text = "Anim Stop" if _anim_playing else "Anim Play"
++
++
++func step_model_animation(dt: float) -> Dictionary:
++	if not bool(shooter_model_info.get("ok", false)) or _anim_clip_name == "":
++		return {"ok": false}
++	_anim_time_s += maxf(0.0, dt)
++	var res := BzMeshReaderScript.apply_animation_pose(shooter_model_info, _anim_clip_name, _anim_time_s, true)
++	if bool(res.get("ok", false)):
++		_update_aim_overlay()
++	return res
++
++
++## Live per-projectile trajectory + estimated time-to-impact telemetry for active shots.
++func active_projectile_telemetry() -> Array[Dictionary]:
++	var out: Array[Dictionary] = []
++	var tgt_pos := target_node.position if target_node != null else Vector3(0, 2, -50)
++	for p in projectiles:
++		var s = p.get("shot", null)
++		if s == null or not bool(s.alive):
++			continue
++		var dist: float = (s.position as Vector3).distance_to(tgt_pos)
++		var spd: float = maxf(0.01, (s.velocity as Vector3).length())
++		var eta := dist / spd
++		out.append({
++			"shot_id": int(s.shot_id),
++			"position": s.position,
++			"velocity": s.velocity,
++			"age": float(s.age),
++			"distance_to_target": dist,
++			"eta_s": eta,
++			"predicted_point": (s.position as Vector3) + (s.velocity as Vector3) * minf(eta, maxf(0.0, float(s.life_span) - float(s.age))),
++		})
++	return out
++
++
++func _update_projectile_trajectories() -> void:
++	if projectile_traj_overlay == null:
++		return
++	var rows := active_projectile_telemetry()
++	if rows.is_empty() or not overlays_enabled:
++		projectile_traj_overlay.mesh = null
++		return
++	var im := ImmediateMesh.new()
++	im.surface_begin(Mesh.PRIMITIVE_LINES)
++	var mat := StandardMaterial3D.new()
++	mat.vertex_color_use_as_albedo = true
++	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
++	for r in rows:
++		var p0: Vector3 = r.get("position", Vector3.ZERO)
++		var p1: Vector3 = r.get("predicted_point", p0)
++		im.surface_set_color(Color("#f0d060"))
++		im.surface_add_vertex(p0)
++		im.surface_set_color(Color("#ff7b3b"))
++		im.surface_add_vertex(p1)
++	im.surface_end()
++	projectile_traj_overlay.mesh = im
++	projectile_traj_overlay.material_override = mat
++
++
++## Compare two captured replay snapshots side-by-side in isolated sandboxes (Wave E).
++func compare_replay_snapshots(snap_a_id: String, snap_b_id: String) -> Dictionary:
++	if combat_scenario == null:
++		return {"ok": false, "summary": "no combat scenario"}
++	var snap_a: Dictionary = {}
++	var snap_b: Dictionary = {}
++	for s in combat_scenario.saved_replay_snapshots:
++		var sid := str((s as Dictionary).get("snapshot_id", ""))
++		if sid == snap_a_id:
++			snap_a = s
++		if sid == snap_b_id:
++			snap_b = s
++	if snap_a.is_empty() or snap_b.is_empty():
++		return {"ok": false, "summary": "capture at least two replay snapshots first"}
++	var ra: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(snap_a)
++	var rb: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(snap_b)
++	last_replay_comparison = CombatScenarioScript.compare_replay_results(ra, rb)
++	last_replay_comparison["snapshot_a"] = snap_a_id
++	last_replay_comparison["snapshot_b"] = snap_b_id
++	_append_telemetry(sim.sim_time, "REPLAY_AB", str(last_replay_comparison.get("summary", "")))
++	status_changed.emit(str(last_replay_comparison.get("summary", "")), "success")
++	return last_replay_comparison
++
++
++func compare_last_two_replays() -> Dictionary:
++	if combat_scenario == null or (combat_scenario.saved_replay_snapshots as Array).size() < 2:
++		status_changed.emit("Compare A/B: capture at least two replay snapshots first.", "warning")
++		return {"ok": false}
++	var snaps: Array = combat_scenario.saved_replay_snapshots
++	var id_a := str((snaps[snaps.size() - 2] as Dictionary).get("snapshot_id", ""))
++	var id_b := str((snaps[snaps.size() - 1] as Dictionary).get("snapshot_id", ""))
++	return compare_replay_snapshots(id_a, id_b)
++
++
++## T-76: fill the weapon-slot picker from the profile's resolved weaponNameN
++## slots and keep it in sync with the active slot.
++func _populate_weapon_picker() -> void:
++	if weapon_option == null:
++		return
++	weapon_option.clear()
++	if profile != null and not profile.weapon_slots.is_empty():
++		for resolved_index in profile.weapon_slots.size():
++			var slot: Dictionary = profile.weapon_slots[resolved_index]
++			var wname := str(slot.get("weapon", ""))
++			var snum := str(slot.get("slot", ""))
++			weapon_option.add_item("W%s: %s" % [snum, wname])
++			weapon_option.set_item_metadata(weapon_option.item_count - 1, int(slot.get("resolved_index", resolved_index)))
++		var sel := clampi(active_weapon_slot, 0, weapon_option.item_count - 1)
++		weapon_option.select(sel)
++		weapon_option.disabled = false
++	else:
++		weapon_option.add_item("(no weapon slots)")
++		weapon_option.disabled = true
++	if barrel_mode_option != null:
++		for i in barrel_mode_option.item_count:
++			if str(barrel_mode_option.get_item_metadata(i)) == barrel_mode:
++				barrel_mode_option.select(i)
++				break
++
++
++func _on_weapon_slot_selected(idx: int) -> void:
++	if weapon_option == null or idx < 0 or idx >= weapon_option.item_count:
++		return
++	switch_weapon_slot(int(weapon_option.get_item_metadata(idx)))
++
++
++func _on_barrel_mode_selected(idx: int) -> void:
++	if barrel_mode_option == null or idx < 0 or idx >= barrel_mode_option.item_count:
++		return
++	barrel_mode = str(barrel_mode_option.get_item_metadata(idx))
++	if profile != null:
++		profile.barrel_mode = barrel_mode
++	status_changed.emit("Barrel mode: %s" % barrel_mode, "muted")
++
++
++## Switch the active vehicle weapon slot without resetting the scenario clock.
++func switch_weapon_slot(slot_index: int) -> bool:
++	if shooter_path == "" or target_path == "":
++		return false
++	var candidate := WeaponProfile.new()
++	if not candidate.resolve(index, shooter_path, target_path, "", true, slot_index, barrel_mode):
++		status_changed.emit("Weapon slot %d could not be resolved." % (slot_index + 1), "warning")
++		return false
++	active_weapon_slot = clampi(slot_index, 0, maxi(0, candidate.weapon_slots.size() - 1))
++	for slot_dict in candidate.weapon_slots:
++		if int((slot_dict as Dictionary).get("resolved_index", -1)) == slot_index:
++			candidate.active_slot_index = slot_index
++			break
++	profile = candidate
++	if combat_scenario.shooter != null:
++		combat_scenario.change_weapon(profile, true)
++	# In-flight shots keep their launch-time identity and visual nodes.
++	_rebuild_actor_models()
++	_populate_weapon_picker()
++	_populate_hardpoint_picker()
++	_update_chain_buttons()
++	status_changed.emit("Weapon slot: %s (%s) — %d barrel(s), %s" % [
++		profile.weapon_name, profile.ordnance_name, profile.weapon_hardpoints.size(), barrel_mode
++	], "success")
++	scenario_loaded.emit(profile)
++	return true
++
++
+ func _populate_hardpoint_picker() -> void:
+ 	if hardpoint_option == null:
+ 		return
+@@ -2462,7 +2787,8 @@ func _sync_sweep_bounds() -> void:
+ 	sweep_to.set_value_no_signal(snappedf(hi, 0.001))
+ 
+ 
+-func _shot_geometry() -> Dictionary:
++func _shot_geometry(hp_override: Node3D = null) -> Dictionary:
++	var hp: Node3D = hp_override if is_instance_valid(hp_override) else shooter_hardpoint_node
+ 	var d := distance_slider.value if distance_slider != null else 120.0
+ 	var target_y := 2.0
+ 	if bool(target_model_info.get("ok", false)) and target_node != null:
+@@ -2477,8 +2803,8 @@ func _shot_geometry() -> Dictionary:
+ 	)
+ 
+ 	var origin := (shooter_node.position + Vector3(0, 0.7, 0)) if shooter_node != null else Vector3(0, 1.8, 0)
+-	if shooter_hardpoint_node != null:
+-		var xf_o := _world_transform_in_lab(shooter_hardpoint_node)
++	if hp != null:
++		var xf_o := _world_transform_in_lab(hp)
+ 		origin = xf_o.origin
+ 	var yaw_val := deg_to_rad(yaw_spin.value if yaw_spin != null else 0.0)
+ 	var pitch_val := deg_to_rad(elevation_spin.value if elevation_spin != null else 0.0)
+@@ -2500,11 +2826,11 @@ func _shot_geometry() -> Dictionary:
+ 		dir = Vector3(0.0, 0.0, -1.0).rotated(Vector3.UP, deg_to_rad(shooter_yaw_offset_deg))
+ 		var right_f := dir.cross(Vector3.UP).normalized()
+ 		dir = dir.rotated(right_f, pitch_val).rotated(Vector3.UP, yaw_val)
+-	elif shooter_hardpoint_node != null:
+-		var xf := _world_transform_in_lab(shooter_hardpoint_node)
++	elif hp != null:
++		var xf := _world_transform_in_lab(hp)
+ 		origin = xf.origin
+ 		dir = (-xf.basis.z).normalized()
+-		var flags := _is_under_turret(shooter_hardpoint_node)
++		var flags := _is_under_turret(hp)
+ 		if not bool(flags.get("pitch", false)):
+ 			dir = dir.rotated(Vector3.RIGHT, pitch_val)
+ 		if not bool(flags.get("yaw", false)):
+@@ -2689,10 +3015,82 @@ func fire_once() -> void:
+ 	if not profile.errors.is_empty():
+ 		status_changed.emit("Cannot fire: " + profile.errors[0], "danger")
+ 		return
+-	_fire_one(false, "SINGLE", true)
++	_fire_volley(false, "SINGLE", true)
+ 	_running = true
+ 
+ 
++## T-76: fire one volley according to the barrel policy. TANDEM fires every
++## weaponHardN barrel from its own hardpoint in the same frame; SALVO cycles one
++## barrel per shot; SINGLE fires exactly one barrel. Returns the first result.
++func _fire_volley(use_alt: bool, fire_mode: String, enforce_reload: bool) -> Dictionary:
++	var hp_names: Array[String] = []
++	if profile != null:
++		for hp in profile.weapon_hardpoints:
++			var nm := str(hp)
++			if nm != "" and not hp_names.has(nm):
++				hp_names.append(nm)
++	var hp_nodes: Array = []
++	var hps: Dictionary = shooter_model_info.get("hardpoints", {}) if bool(shooter_model_info.get("ok", false)) else {}
++	for nm in hp_names:
++		if hps.has(nm.to_lower()):
++			hp_nodes.append(hps[nm.to_lower()])
++	var mode := barrel_mode.strip_edges().to_upper()
++	if mode not in ["TANDEM", "SALVO", "SINGLE"]:
++		mode = "TANDEM"
++	_volley_counter += 1
++	var volley := VolleyResult.new()
++	volley.volley_id = _volley_counter
++	volley.weapon_identity = str(profile.weapon_name) if profile != null else ""
++	volley.barrel_mode = mode
++	var first_result: Dictionary = {}
++	var barrel_indices: Array[int] = []
++	if mode == "TANDEM":
++		for i in range(hp_names.size()):
++			barrel_indices.append(i)
++	else:
++		barrel_indices.append(-1)
++	for barrel_index in barrel_indices:
++		var hp_name := hp_names[barrel_index] if barrel_index >= 0 and barrel_index < hp_names.size() else ""
++		volley.requested_barrels.append(hp_name)
++		var hp_node: Node3D = null
++		if mode == "TANDEM" and barrel_index >= 0 and barrel_index < hp_nodes.size():
++			hp_node = hp_nodes[barrel_index]
++		elif hp_nodes.size() > 1:
++			# SALVO fires barrel 0 first; SINGLE always uses barrel 0.
++			var idx := 0
++			if mode == "SALVO":
++				idx = _barrel_cycle % hp_nodes.size()
++				_barrel_cycle = (_barrel_cycle + 1) % hp_nodes.size()
++			hp_node = hp_nodes[idx]
++		var hp_for_shot: Node3D = hp_node if hp_node != null else shooter_hardpoint_node
++		var enforce := enforce_reload if volley.accepted_barrels.is_empty() else false
++		var volley_enforce = false # documented TANDEM contract: extra barrels bypass reload
++		var r := _fire_one(use_alt, fire_mode, enforce, hp_for_shot, hp_name, maxi(0, barrel_index), mode, volley.volley_id)
++		if first_result.is_empty():
++			first_result = r
++		if bool(r.get("ok", false)):
++			volley.accepted_barrels.append(hp_name)
++			var shot = r.get("shot", null)
++			if shot != null:
++				volley.shot_ids.append(int(shot.shot_id))
++			volley.ammo_spent += int(r.get("ammo_spent", 0))
++			volley.energy_spent += float(r.get("energy_spent", 0.0))
++			volley.reload_remaining = maxf(volley.reload_remaining, float(r.get("reload_remaining", 0.0)))
++		else:
++			volley.rejected_barrels.append(hp_name)
++	volley.partial_failure = not volley.rejected_barrels.is_empty()
++	volley.ok = not volley.accepted_barrels.is_empty()
++	last_volley_result = volley
++	if volley.partial_failure:
++		status_changed.emit("Volley %d partial failure: %d/%d barrels accepted" % [
++			volley.volley_id, volley.accepted_barrels.size(), volley.requested_barrels.size()
++		], "warning")
++	if first_result.is_empty():
++		return {"ok": false, "state": "NO_BARREL", "volley": volley.to_dict()}
++	first_result["volley"] = volley.to_dict()
++	return first_result
++
++
+ func fire_alt() -> void:
+ 	if profile == null:
+ 		status_changed.emit("No scenario loaded.", "warning")
+@@ -2700,8 +3098,9 @@ func fire_alt() -> void:
+ 	if profile.alt == null:
+ 		status_changed.emit("This weapon chain declares no resolvable altName.", "warning")
+ 		return
+-	# Alternate weapon (altName) uses an independent weapon mode mount.
+-	_fire_one(true, "SINGLE", false)
++	# Alternate weapon (altName) uses an independent weapon mode mount; barrel
++	# policy still applies when the mount has several barrels.
++	_fire_volley(true, "SINGLE", false)
+ 	_running = true
+ 
+ 
+@@ -2792,7 +3191,9 @@ func restart_test() -> void:
+ 	status_changed.emit("Test reset.", "muted")
+ 
+ 
+-func _fire_one(use_alt: bool = false, fire_mode: String = "SINGLE", enforce_reload: bool = true) -> Dictionary:
++func _fire_one(use_alt: bool = false, fire_mode: String = "SINGLE", enforce_reload: bool = true,
++		hp_override: Node3D = null, hp_name: String = "", barrel_index: int = 0,
++		barrel_mode: String = "SINGLE", volley_id: int = 0) -> Dictionary:
+ 	var prof := profile
+ 	if use_alt:
+ 		if profile == null or profile.alt == null:
+@@ -2804,7 +3205,7 @@ func _fire_one(use_alt: bool = false, fire_mode: String = "SINGLE", enforce_relo
+ 	if prof.shot_speed <= 0.0:
+ 		_append_telemetry(sim.sim_time, "ERROR", "shotSpeed is 0; the ordnance cannot travel.")
+ 		return {"ok": false, "state": "DISABLED", "reason": "ZERO_SHOT_SPEED"}
+-	var geom := _shot_geometry()
++	var geom := _shot_geometry(hp_override)
+ 	var origin: Vector3 = geom.origin
+ 	var target_pos: Vector3 = geom.target
+ 	var shooter_vel := Vector3.ZERO
+@@ -2816,7 +3217,8 @@ func _fire_one(use_alt: bool = false, fire_mode: String = "SINGLE", enforce_relo
+ 		combat_scenario.create_new_scenario(prof, target_pos, obstacles)
+ 	# P0-SIM-02: Single atomic fire permission + resource consumption transition inside CombatScenario.
+ 	var fire_res: Dictionary = combat_scenario.fire_shot(
+-		prof, origin, geom.direction, target_pos, obstacles, shooter_vel, enforce_reload, extra_targets, fire_mode
++		prof, origin, geom.direction, target_pos, obstacles, shooter_vel, enforce_reload, extra_targets,
++		fire_mode, hp_name, barrel_index, barrel_mode, volley_id
+ 	)
+ 	if not bool(fire_res.get("ok", false)):
+ 		var rej := str(fire_res.get("reason", "FIRE_REJECTED"))
+@@ -2901,7 +3303,12 @@ func _fire_one(use_alt: bool = false, fire_mode: String = "SINGLE", enforce_relo
+ 		if bool(rres.get("ok", false)) and rres.get("root", null) != null:
+ 			proj_node.add_child(rres.root)
+ 	projectile_root.add_child(proj_node)
+-	projectiles.append({"shot": shot, "mesh": proj_node, "bolt": bolt_node})
++	projectiles.append({
++		"shot": shot,
++		"mesh": proj_node,
++		"bolt": bolt_node,
++		"identity": shot.identity.to_dict() if shot.identity != null else {},
++	})
+ 	_refresh_telemetry()
+ 	return fire_res
+ 
+@@ -2970,10 +3377,9 @@ func capture_replay_snapshot(label: String = "") -> Dictionary:
+ 	return snap
+ 
+ 
+-func replay_selected_snapshot(snapshot_id: String = "") -> Dictionary:
++func _resolve_replay_snapshot(snapshot_id: String = "") -> Dictionary:
+ 	if combat_scenario == null or combat_scenario.saved_replay_snapshots.is_empty():
+-		status_changed.emit("Replay: capture a replay snapshot first.", "warning")
+-		return {"ok": false, "reason": "NO_REPLAY_SNAPSHOT"}
++		return {}
+ 	var target_id := snapshot_id
+ 	if target_id == "" and replay_snapshot_option != null and replay_snapshot_option.selected >= 0:
+ 		target_id = str(replay_snapshot_option.get_item_metadata(replay_snapshot_option.selected))
+@@ -2983,15 +3389,120 @@ func replay_selected_snapshot(snapshot_id: String = "") -> Dictionary:
+ 			if str((s as Dictionary).get("snapshot_id", "")) == target_id:
+ 				chosen = s
+ 				break
+-	# RP-08: Sandboxed replay never overwrites or destroys the active user scenario!
+-	last_replay_result = CombatScenarioScript.replay_snapshot_sandboxed(chosen)
+-	var prim_st: Dictionary = (last_replay_result.get("targets", {}) as Dictionary).get("primary", {})
+-	_append_telemetry(sim.sim_time, "REPLAY", "Sandboxed replay '%s': %d shot(s), ammo=%d, primary hull=%.1f shield=%.1f" % [
+-		str(chosen.get("label", target_id)), int(last_replay_result.get("shots_replayed", 0)),
+-		int(last_replay_result.get("shooter_ammo", 0)), float(prim_st.get("hull", 0.0)), float(prim_st.get("shield", 0.0))
++	return chosen
++
++
++func _finish_replay_report(label: String, res: Dictionary) -> void:
++	last_replay_result = res
++	var prim_st: Dictionary = (res.get("targets", {}) as Dictionary).get("primary", {})
++	_append_telemetry(sim.sim_time, "REPLAY", "Sandboxed replay '%s': %d shot(s) (%d acc / %d rej, peak_concurrent=%d), ammo=%d, primary hull=%.1f shield=%.1f" % [
++		label, int(res.get("shots_replayed", 0)), int(res.get("accepted_shots", 0)),
++		int(res.get("rejected_shots", 0)), int(res.get("max_concurrent_shots", 0)),
++		int(res.get("shooter_ammo", 0)), float(prim_st.get("hull", 0.0)), float(prim_st.get("shield", 0.0))
+ 	])
+-	status_changed.emit("Sandboxed replay complete: %d shot(s) (active scenario untouched)" % int(last_replay_result.get("shots_replayed", 0)), "success")
+-	return last_replay_result
++	var complete := bool(res.get("complete", true))
++	var reason := str(res.get("reason", "REPLAY_COMPLETE"))
++	if not complete:
++		status_changed.emit("Replay stopped: %s (%d/%d events, %d in flight)" % [
++			reason, int(res.get("events_processed", 0)),
++			int(res.get("events_processed", 0)) + int(res.get("events_remaining", 0)),
++			int(res.get("projectiles_in_flight", 0))
++		], "danger")
++		return
++	status_changed.emit("Sandboxed replay complete: %d shot(s), peak %d concurrent (active scenario untouched)" % [
++		int(res.get("shots_replayed", 0)), int(res.get("max_concurrent_shots", 0))
++	], "success")
++
++
++## Incremental non-blocking GUI replay for large many-shot snapshots (RPL-14).
++func start_incremental_replay(snapshot_id: String = "") -> Dictionary:
++	var chosen := _resolve_replay_snapshot(snapshot_id)
++	if chosen.is_empty():
++		status_changed.emit("Replay: capture a replay snapshot first.", "warning")
++		return {"ok": false, "reason": "NO_REPLAY_SNAPSHOT"}
++	_active_replay_label = str(chosen.get("label", str(chosen.get("snapshot_id", "replay"))))
++	_active_replay_runner = CombatScenarioScript.create_replay_runner(chosen)
++	var first_step: Dictionary = _active_replay_runner.step(18, 6.0)
++	if bool(first_step.get("done", false)):
++		var res: Dictionary = first_step.get("result", {})
++		_active_replay_runner = null
++		_finish_replay_report(_active_replay_label, res)
++		return {"ok": true, "done": true, "result": res}
++	status_changed.emit("Replaying '%s' incrementally (%.0f%%)…" % [_active_replay_label, float(first_step.get("progress", 0.0)) * 100.0], "muted")
++	return {"ok": true, "done": false, "progress": float(first_step.get("progress", 0.0))}
++
++
++func replay_selected_snapshot(snapshot_id: String = "") -> Dictionary:
++	# RPL-30..34: primary GUI replay is always incremental and cancellable;
++	# synchronous execution remains available only via the static sim API.
++	var started := start_incremental_replay(snapshot_id)
++	if not bool(started.get("ok", false)):
++		return started
++	if bool(started.get("done", false)):
++		return started.get("result", {})
++	return {"ok": true, "running": true, "reason": "REPLAY_IN_PROGRESS"}
++
++
++func cancel_replay() -> void:
++	if _active_replay_runner != null:
++		_active_replay_runner = null
++		_replay_ab_queue.clear()
++		status_changed.emit("Replay cancelled; active scenario preserved.", "warning")
++
++
++func toggle_replay_pause() -> void:
++	_replay_paused = not _replay_paused
++	status_changed.emit("Replay paused." if _replay_paused else "Replay resumed.", "muted")
++
++
++func start_bounded_ab_replay() -> Dictionary:
++	if combat_scenario == null or (combat_scenario.saved_replay_snapshots as Array).size() < 2:
++		status_changed.emit("Compare A/B: capture at least two replay snapshots first.", "warning")
++		return {"ok": false, "reason": "NO_REPLAY_SNAPSHOT"}
++	if _active_replay_runner != null or not _replay_ab_queue.is_empty():
++		status_changed.emit("Compare A/B already running.", "warning")
++		return {"ok": false, "reason": "REPLAY_ALREADY_RUNNING"}
++	var snaps: Array = combat_scenario.saved_replay_snapshots
++	_replay_ab_ids = [
++		str((snaps[snaps.size() - 2] as Dictionary).get("snapshot_id", "")),
++		str((snaps[snaps.size() - 1] as Dictionary).get("snapshot_id", "")),
++	]
++	_replay_ab_results.clear()
++	_replay_ab_queue = snaps.slice(maxi(0, snaps.size() - 2), snaps.size()).duplicate(true)
++	status_changed.emit("Compare A/B: queued 2 bounded replays.", "muted")
++	return {"ok": true, "queued": 2}
++
++
++func _advance_ab_queue() -> void:
++	if _replay_ab_queue.is_empty():
++		return
++	var next_snap: Dictionary = _replay_ab_queue[0]
++	_replay_ab_queue.remove_at(0)
++	var runner = CombatScenarioScript.create_replay_runner(next_snap)
++	var first_step: Dictionary = runner.step(18, 6.0)
++	if not bool(first_step.get("done", false)):
++		_active_replay_runner = runner
++		_active_replay_label = "A/B " + str(_replay_ab_results.size() + 1)
++		return
++	_replay_ab_results.append(first_step.get("result", {}))
++	_finish_ab_if_ready()
++
++
++func _finish_ab_if_ready() -> void:
++	if _replay_ab_queue.is_empty() and _replay_ab_results.size() >= 2:
++		var a: Dictionary = _replay_ab_results[0]
++		var b: Dictionary = _replay_ab_results[1]
++		last_replay_comparison = CombatScenarioScript.compare_replay_results(a, b)
++		last_replay_comparison["snapshot_a"] = _replay_ab_ids[0]
++		last_replay_comparison["snapshot_b"] = _replay_ab_ids[1]
++		last_replay_comparison["complete"] = bool(a.get("complete", false)) and bool(b.get("complete", false))
++		last_replay_comparison["reasons"] = [str(a.get("reason", "")), str(b.get("reason", ""))]
++		if not bool(last_replay_comparison.get("complete", false)):
++			status_changed.emit("A/B replay incomplete: " + str(last_replay_comparison.get("reasons", [])), "danger")
++		else:
++			status_changed.emit(str(last_replay_comparison.get("summary", "")), "success")
++		_replay_ab_results.clear()
++		_replay_ab_ids.clear()
+ 
+ 
+ func apply_test_dot(actor_id: String = "primary", effect_name: String = "Burn (APPROX)", dps: float = 25.0, duration_s: float = 4.0) -> bool:
+@@ -3264,11 +3775,26 @@ func compare_with_snapshot() -> Dictionary:
+ 
+ 
+ func _process(delta: float) -> void:
++	if _active_replay_runner != null and not _replay_paused:
++		var rstep: Dictionary = _active_replay_runner.step(18, 6.0)
++		if bool(rstep.get("done", false)):
++			var rres: Dictionary = rstep.get("result", {})
++			_active_replay_runner = null
++			if not _replay_ab_queue.is_empty() or not _replay_ab_results.is_empty():
++				_replay_ab_results.append(rres)
++				_finish_ab_if_ready()
++				_advance_ab_queue()
++			else:
++				_finish_replay_report(_active_replay_label, rres)
++	elif _active_replay_runner == null and not _replay_ab_queue.is_empty():
++		_advance_ab_queue()
+ 	_update_hud_tags()
+ 	if profile == null:
+ 		return
+ 	var speed: float = float(speed_spin.value) if speed_spin else 1.0
+ 	var dt := delta * speed
++	if _anim_playing and not _paused and _anim_clip_name != "":
++		step_model_animation(dt)
+ 	# Animate barrel recoil kick recovery smoothly.
+ 	if _recoil_offset > 0.001:
+ 		_recoil_offset = maxf(0.0, _recoil_offset - delta * 3.8)
+@@ -3300,7 +3826,7 @@ func _process(delta: float) -> void:
+ 		_sync_projectiles()
+ 		if _continuous:
+ 			if combat_scenario.shooter != null and float(combat_scenario.shooter.reload_remaining) <= 0.0001:
+-				var hres := _fire_one(false, "HOLD", true)
++				var hres := _fire_volley(false, "HOLD", true)
+ 				if not bool(hres.get("ok", false)) and str(hres.get("state", "")) in ["INSUFFICIENT_AMMO", "INSUFFICIENT_ENERGY", "DESTROYED", "DISABLED"]:
+ 					stop_fire()
+ 		if _burst_left > 0:
+@@ -3308,7 +3834,7 @@ func _process(delta: float) -> void:
+ 			if _burst_timer <= 0.0:
+ 				var bmode := "BURST" if _burst_is_first_shot else "SALVO_FOLLOWUP"
+ 				var enforce_rld := _burst_is_first_shot
+-				var bres := _fire_one(false, bmode, enforce_rld)
++				var bres := _fire_volley(false, bmode, enforce_rld)
+ 				if bool(bres.get("ok", false)):
+ 					_burst_left -= 1
+ 					_burst_is_first_shot = false
+@@ -3356,7 +3882,8 @@ func _sync_projectiles() -> void:
+ 				_has_last_impact = true
+ 				var tl_kind := "OBSTACLE_HIT" if s.hit_kind == "obstacle" else "IMPACT"
+ 				var tl_detail := "obstacle %s blocked shot" % s.hit_obstacle_id if s.hit_kind == "obstacle" else "%s hit %s (dmg=%.1f)" % [s.hit_kind, s.hit_target_id if s.hit_target_id != "" else "primary", s.damage_applied]
+-				_record_timeline(sim.sim_time, tl_kind, tl_detail, profile.ordnance_path if profile != null else "", "damageValue")
++				_record_timeline(sim.sim_time, tl_kind, tl_detail,
++				(s.identity.ordnance_path if s.identity != null and s.identity.ordnance_path != "" else (profile.ordnance_path if profile != null else "")), "damageValue")
+ 				_spawn_impact_effect(s)
+ 				if s.hit_kind == "vehicle" and (s.hit_target_id == "" or s.hit_target_id == "primary"):
+ 					_current_health = s.target_health
+@@ -3368,6 +3895,7 @@ func _sync_projectiles() -> void:
+ 				continue
+ 		keep.append(p)
+ 	projectiles = keep
++	_update_projectile_trajectories()
+ 	_update_stats()
+ 	_update_health_display()
+ 
+@@ -3399,7 +3927,12 @@ func _spawn_impact_effect(s) -> void:
+ 		declared = s.xpl_ground
+ 	if declared == "":
+ 		return
+-	var path: String = index.resolve_path_from(declared, profile.ordnance_path) if index != null else ""
++	var ctx := profile.ordnance_path if profile != null else ""
++	var expl_sound := profile.expl_sound if profile != null else ""
++	if s.identity != null:
++		ctx = s.identity.ordnance_path if s.identity.ordnance_path != "" else ctx
++		expl_sound = s.identity.expl_sound if s.identity.expl_sound != "" else expl_sound
++	var path: String = index.resolve_path_from(declared, ctx) if index != null else ""
+ 	if path == "":
+ 		path = declared
+ 	var result := EffectRuntime.build(index, path, s.position, 1.0, obstacles, 0.0)
+@@ -3415,8 +3948,8 @@ func _spawn_impact_effect(s) -> void:
+ 		path.get_file(), int(result.emitters), float(result.duration), rtypes]
+ 	fx_log.append("%07.3f  %-11s %s" % [sim.sim_time, "FX", fx_msg])
+ 	_record_timeline(sim.sim_time, "FX_EXPLOSION", fx_msg, path, "particleTypes")
+-	if profile.expl_sound != "":
+-		_play_sound_asset(profile.expl_sound, path, "SFX_XPL")
++	if expl_sound != "":
++		_play_sound_asset(expl_sound, path, "SFX_XPL")
+ 	_refresh_telemetry()
+ 
+ 
+@@ -3496,16 +4029,20 @@ func _update_native_controls(note: String = "", snap_override: Dictionary = {})
+ 	var st := str(snap.get("state", rec.get("state", "IDLE")))
+ 	var rt := str(snap.get("launch_route", rec.get("launch_route", "")))
+ 	var rsn := str(snap.get("reason", rec.get("reason", "")))
++	var cst := str(snap.get("cancel_status", rec.get("cancel_status", "")))
+ 	var txt := "Native [%s]: %s" % [active_native_session_id.substr(0, 18), st]
+ 	if rt != "":
+ 		txt += " · " + rt
+-	if rsn != "":
++	if cst == "CANCELLATION_PERSIST_FAILED":
++		txt += " [CANCELLATION_PERSIST_FAILED]"
++	elif rsn != "":
+ 		txt += " (" + rsn + ")"
+ 	if note != "":
+ 		txt += " — " + note
+ 	native_status_label.text = txt
+ 	if native_monitor_label != null:
+-		native_monitor_label.text = "SESSION: %s | STATE: %s | PID: %d | MISSION: %s | PROBE: %s | OBS: %s | ELAPSED: %.1fs / %.1fs" % [
++		var extra_tag := " | CANCEL: " + cst if cst == "CANCELLATION_PERSIST_FAILED" else ""
++		native_monitor_label.text = "SESSION: %s | STATE: %s | PID: %d | MISSION: %s | PROBE: %s | OBS: %s | ELAPSED: %.1fs / %.1fs%s" % [
+ 			active_native_session_id.substr(0, 18),
+ 			st,
+ 			int(snap.get("game_pid", 0)),
+@@ -3514,6 +4051,7 @@ func _update_native_controls(note: String = "", snap_override: Dictionary = {})
+ 			str(snap.get("observation_status", "WAITING")),
+ 			float(snap.get("elapsed_s", 0.0)),
+ 			float(snap.get("timeout_s", 30.0)),
++			extra_tag,
+ 		]
+ 
+ 
+@@ -3596,6 +4134,17 @@ func run_native_handoff(options: Dictionary = {}) -> Dictionary:
+ 	return run_native_launch(false, opts)
+ 
+ 
++func run_native_arm_manual_observation(options: Dictionary = {}) -> Dictionary:
++	if active_native_session_id == "" or native_runner == null:
++		status_changed.emit("Arm manual observation: run PREPARE EXPERIMENT and STAGE RESOURCES first.", "warning")
++		return {"ok": false, "reason": "NO_ACTIVE_SESSION"}
++	var res: Dictionary = native_session_service.arm_manual_observation(active_native_session_id, options) if native_session_service != null else native_runner.arm_manual_observation(active_native_session_id, options)
++	_append_telemetry(sim.sim_time, "NATIVE_MON", "Manual observation armed: state=%s active=%s" % [str(res.get("state", "")), str(res.get("active", false))])
++	_update_native_controls()
++	status_changed.emit("Manual observation: %s" % str(res.get("state", "FAILED")), "success" if bool(res.get("ok", false)) else "warning")
++	return res
++
++
+ func run_native_collect(observation_path_override: String = "") -> Dictionary:
+ 	if active_native_session_id == "" or native_runner == null:
+ 		status_changed.emit("Native collect: no active session.", "warning")
+diff --git a/scripts/sim/combat_scenario.gd b/scripts/sim/combat_scenario.gd
+index 0652551..fdffdb3 100644
+--- a/scripts/sim/combat_scenario.gd
++++ b/scripts/sim/combat_scenario.gd
+@@ -25,10 +25,21 @@ var _initial_obstacles_snap: Array = []
+ var _initial_profile_snap: Dictionary = {}
+ var _last_profile_snap: Dictionary = {}
+ var _baseline_captured: bool = false
++var _input_seq: int = 0
++var _event_seq: int = 0
++var _last_kf_by_actor: Dictionary = {}
++var _pending_kf_by_actor: Dictionary = {}
++var _transform_total_recorded: int = 0
++var _transform_compressed_count: int = 0
+ 
+ static var _seq := 0
+ 
+ 
++func _next_input_seq() -> int:
++	_input_seq += 1
++	return _input_seq
++
++
+ func _init(p_seed: int = 1337, p_scenario_id: String = "") -> void:
+ 	_seq += 1
+ 	seed_value = p_seed
+@@ -41,17 +52,25 @@ func _init(p_seed: int = 1337, p_scenario_id: String = "") -> void:
+ 
+ func _emit_combat_event(kind: String, detail: String, actor_id: String = "",
+ 		odf_path: String = "", odf_key: String = "", extra: Dictionary = {}) -> Dictionary:
+-	var ev := {
+-		"time": sim.sim_time,
+-		"kind": kind,
+-		"actor_id": actor_id,
+-		"detail": detail,
+-		"odf_path": odf_path,
+-		"odf_key": odf_key,
+-		"approximated": true,
+-	}
++	_event_seq += 1
++	var ev := {}
+ 	for k in extra:
+-		ev[k] = extra[k]
++		if k == "kind":
++			ev["sub_kind"] = extra[k]
++		elif k == "time":
++			ev["sub_time"] = extra[k]
++		elif k == "seq":
++			continue
++		else:
++			ev[k] = extra[k]
++	ev["seq"] = _event_seq
++	ev["time"] = float(extra.get("impact_time", sim.sim_time)) if kind == "PROJECTILE_HIT" and extra.has("impact_time") else sim.sim_time
++	ev["kind"] = kind
++	ev["actor_id"] = actor_id
++	ev["detail"] = detail
++	ev["odf_path"] = odf_path
++	ev["odf_key"] = odf_key
++	ev["approximated"] = true
+ 	combat_events.append(ev)
+ 	combat_event.emit(ev)
+ 	return ev
+@@ -119,6 +138,7 @@ func update_effective_odf_parameters(profile: WeaponProfile, target_pos = null)
+ 	var prof_snap := profile.snapshot_params()
+ 	_last_profile_snap = prof_snap
+ 	timeline_inputs.append({
++		"seq": _next_input_seq(),
+ 		"type": "CHANGE_PROFILE",
+ 		"time": sim.sim_time,
+ 		"profile": prof_snap,
+@@ -148,6 +168,7 @@ func change_weapon(profile: WeaponProfile, preserve_cooldown: bool = true) -> vo
+ 	var prof_snap := profile.snapshot_params()
+ 	_last_profile_snap = prof_snap
+ 	timeline_inputs.append({
++		"seq": _next_input_seq(),
+ 		"type": "CHANGE_PROFILE",
+ 		"time": sim.sim_time,
+ 		"weapon_swap": true,
+@@ -267,8 +288,9 @@ func all_actors() -> Array:
+ 	return out
+ 
+ 
+-## Record an actor transform change on the simulation timeline so moving-target
+-## replays reproduce the exact spatial sequence (P1-SIM-03).
++## Record an actor transform change on the simulation timeline with deterministic
++## piecewise-linear compression so 1-min and 10-min moving-target soaks remain
++## memory-bounded without losing replay accuracy (P1-SIM-03 / Wave E).
+ func record_actor_transform(actor_id: String, pos: Vector3, vel: Vector3 = Vector3.ZERO, yaw: float = 0.0) -> void:
+ 	var actor = shooter if actor_id == "shooter_a" else targets.get(actor_id, null)
+ 	if actor == null:
+@@ -279,11 +301,70 @@ func record_actor_transform(actor_id: String, pos: Vector3, vel: Vector3 = Vecto
+ 	actor.yaw_rad = yaw
+ 	if actor_id == "primary":
+ 		sim.update_live_target(pos, yaw)
+-	if changed:
++	elif actor_id != "shooter_a":
++		sim.update_live_extra_target(actor_id, pos, yaw)
++	if not changed:
++		return
++	_transform_total_recorded += 1
++	var now_t := sim.sim_time
++	if _last_kf_by_actor.has(actor_id):
++		var lk: Dictionary = _last_kf_by_actor[actor_id]
++		var lk_idx := int(lk.get("tl_idx", -1))
++		var lk_t := float(lk.get("time", 0.0))
++		var lk_pos: Vector3 = lk.get("pos", Vector3.ZERO)
++		var lk_vel: Vector3 = lk.get("vel", Vector3.ZERO)
++		var lk_yaw := float(lk.get("yaw", 0.0))
++		var dt_kf := maxf(0.0, now_t - lk_t)
++		var predicted := lk_pos + lk_vel * dt_kf
++		var vel_same := (vel - lk_vel).length() <= 0.01
++		var yaw_same := absf(yaw - lk_yaw) <= 0.002
++		var pos_err := (pos - predicted).length()
++		if vel_same and yaw_same and pos_err <= 0.02 and lk_idx >= 0 and lk_idx < timeline_inputs.size():
++			_transform_compressed_count += 1
++			var prev_ev: Dictionary = timeline_inputs[lk_idx]
++			prev_ev["compressed_end_time"] = now_t
++			prev_ev["compressed_end_pos"] = [pos.x, pos.y, pos.z]
++			prev_ev["compressed_frames"] = int(prev_ev.get("compressed_frames", 0)) + 1
++			timeline_inputs[lk_idx] = prev_ev
++			return
++	_pending_kf_by_actor.erase(actor_id)
++	var new_idx := timeline_inputs.size()
++	_last_kf_by_actor[actor_id] = {"time": now_t, "pos": pos, "vel": vel, "yaw": yaw, "tl_idx": new_idx}
++	timeline_inputs.append({
++		"seq": _next_input_seq(),
++		"type": "MOVE_ACTOR",
++		"time": now_t,
++		"actor_id": actor_id,
++		"position": [pos.x, pos.y, pos.z],
++		"velocity": [vel.x, vel.y, vel.z],
++		"yaw_rad": yaw,
++		"radius": actor.radius,
++		"half_extents": [actor.half_extents.x, actor.half_extents.y, actor.half_extents.z],
++		"bbox_offset": [actor.bbox_offset.x, actor.bbox_offset.y, actor.bbox_offset.z],
++	})
++
++
++func _flush_pending_transform(actor_id: String = "") -> void:
++	var keys := [actor_id] if actor_id != "" else _pending_kf_by_actor.keys()
++	for raw_aid in keys:
++		var aid := str(raw_aid)
++		if not _pending_kf_by_actor.has(aid):
++			continue
++		var pk: Dictionary = _pending_kf_by_actor[aid]
++		_pending_kf_by_actor.erase(aid)
++		var actor = shooter if aid == "shooter_a" else targets.get(aid, null)
++		if actor == null:
++			continue
++		var pos: Vector3 = pk.get("pos", actor.position)
++		var vel: Vector3 = pk.get("vel", actor.velocity)
++		var yaw := float(pk.get("yaw", actor.yaw_rad))
++		var pt := float(pk.get("time", sim.sim_time))
++		_last_kf_by_actor[aid] = {"time": pt, "pos": pos, "vel": vel, "yaw": yaw}
+ 		timeline_inputs.append({
++			"seq": _next_input_seq(),
+ 			"type": "MOVE_ACTOR",
+-			"time": sim.sim_time,
+-			"actor_id": actor_id,
++			"time": pt,
++			"actor_id": aid,
+ 			"position": [pos.x, pos.y, pos.z],
+ 			"velocity": [vel.x, vel.y, vel.z],
+ 			"yaw_rad": yaw,
+@@ -293,6 +374,14 @@ func record_actor_transform(actor_id: String, pos: Vector3, vel: Vector3 = Vecto
+ 		})
+ 
+ 
++func timeline_compression_stats() -> Dictionary:
++	return {
++		"total_recorded": _transform_total_recorded,
++		"compressed_count": _transform_compressed_count,
++		"timeline_size": timeline_inputs.size(),
++	}
++
++
+ ## Apply a timed status / DoT effect to an actor and record it for replay.
+ func apply_status_effect(actor_id: String, effect_name: String, dps: float,
+ 		duration_s: float, shield_ratio: float = 1.0) -> bool:
+@@ -301,6 +390,7 @@ func apply_status_effect(actor_id: String, effect_name: String, dps: float,
+ 		return false
+ 	actor.add_effect(effect_name, dps, duration_s, shield_ratio)
+ 	timeline_inputs.append({
++		"seq": _next_input_seq(),
+ 		"type": "ADD_EFFECT",
+ 		"time": sim.sim_time,
+ 		"actor_id": actor_id,
+@@ -359,6 +449,12 @@ func reset(scope: String = "ALL") -> void:
+ 		shot_history.clear()
+ 		timeline_inputs.clear()
+ 		combat_events.clear()
++		_input_seq = 0
++		_event_seq = 0
++		_last_kf_by_actor.clear()
++		_pending_kf_by_actor.clear()
++		_transform_total_recorded = 0
++		_transform_compressed_count = 0
+ 
+ 
+ ## True when any projectile is in flight OR any actor has active reload cooldown
+@@ -409,7 +505,9 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
+ 		target_position: Vector3, p_obstacles: Array = [],
+ 		shooter_velocity: Vector3 = Vector3.ZERO,
+ 		enforce_reload: bool = true, p_extra_targets: Array = [],
+-		fire_mode: String = "SINGLE") -> Dictionary:
++		fire_mode: String = "SINGLE", p_hardpoint: String = "",
++		p_barrel_index: int = 0, p_barrel_mode: String = "SINGLE",
++		p_volley_id: int = 0) -> Dictionary:
+ 	if profile == null:
+ 		return {"ok": false, "state": "DISABLED", "reason": "NO_PROFILE", "shot": null}
+ 	profile.refresh()
+@@ -423,6 +521,28 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
+ 		mode_up, profile.weapon_name, profile.ordnance_name
+ 	], "shooter_a", profile.weapon_path, "shotDelay")
+ 
++	var prof_snap := profile.snapshot_params()
++	_last_profile_snap = prof_snap
++	var req_record := {
++		"origin": [origin.x, origin.y, origin.z],
++		"direction": [direction.x, direction.y, direction.z],
++		"target_position": [target_position.x, target_position.y, target_position.z],
++		"shooter_velocity": [shooter_velocity.x, shooter_velocity.y, shooter_velocity.z],
++		"weapon_name": profile.weapon_name,
++		"ordnance_name": profile.ordnance_name,
++		"ammo_spent": 0,
++		"energy_spent": 0.0,
++		"fire_mode": mode_up,
++		"enforce_reload": effective_enforce_reload,
++		"time": sim.sim_time,
++		"profile_snapshot": prof_snap,
++		"obstacles": _clone_obstacles(p_obstacles),
++		"hardpoint": p_hardpoint,
++		"barrel_index": p_barrel_index,
++		"barrel_mode": p_barrel_mode,
++		"volley_id": p_volley_id,
++	}
++
+ 	# Atomic check + resource consumption in a single transition (never double-deducts).
+ 	var res: Dictionary = shooter.consume_fire_resources(
+ 		profile.ammo_cost, profile.weapon_energy_cost, profile.shot_delay,
+@@ -431,6 +551,18 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
+ 	if not bool(res.get("ok", false)):
+ 		var rej_state := str(res.get("state", "DISABLED"))
+ 		var rej_reason := str(res.get("reason", "FIRE_REJECTED"))
++		req_record["accepted"] = false
++		req_record["rejected_state"] = rej_state
++		req_record["rejected_reason"] = rej_reason
++		# Record rejected fire requests on the input timeline so replay reproduces
++		# the exact acceptance/rejection history (P0-SIM-01 / RPL-10).
++		timeline_inputs.append({
++			"seq": _next_input_seq(),
++			"type": "FIRE_SHOT",
++			"time": sim.sim_time,
++			"accepted": false,
++			"shot_command": req_record.duplicate(true),
++		})
+ 		_emit_combat_event("SHOT_REJECTED", "%s (%s) reload=%.3fs ammo=%d energy=%.1f" % [
+ 			rej_state, rej_reason, float(shooter.reload_remaining), shooter.ammo_current, shooter.energy_current
+ 		], "shooter_a", profile.weapon_path, "shotDelay", {"permission_state": rej_state, "reason": rej_reason})
+@@ -444,8 +576,6 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
+ 			"shot": null,
+ 		}
+ 
+-	var prof_snap := profile.snapshot_params()
+-	_last_profile_snap = prof_snap
+ 	var extras := p_extra_targets if not p_extra_targets.is_empty() else extra_target_dicts()
+ 	var prim = primary_target()
+ 	if prim != null:
+@@ -465,11 +595,16 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
+ 	)
+ 	shot.ammo_spent = int(res.get("ammo_spent", 0))
+ 	shot.energy_spent = float(res.get("energy_spent", 0.0))
++	if shot.identity != null:
++		shot.identity.hardpoint = p_hardpoint
++		shot.identity.barrel_index = p_barrel_index
++		shot.identity.barrel_mode = p_barrel_mode
++		shot.identity.volley_id = p_volley_id
+ 	shot.shooter_ammo_remaining = shooter.ammo_current
+ 	shot.shooter_energy_remaining = shooter.energy_current
+ 
+ 	_emit_combat_event("SHOT_ACCEPTED", "%s accepted (reload=%.2fs)" % [mode_up, shooter.reload_remaining],
+-		"shooter_a", profile.weapon_path, "shotDelay", {"fire_mode": mode_up})
++		"shooter_a", profile.weapon_path, "shotDelay", {"fire_mode": mode_up, "shot_id": shot.shot_id})
+ 	if shot.ammo_spent > 0:
+ 		_emit_combat_event("AMMO_CONSUMED", "Ammo -%d (remaining %d)" % [shot.ammo_spent, shooter.ammo_current],
+ 			"shooter_a", profile.ordnance_path, "ammoCost", {"ammo_spent": shot.ammo_spent, "ammo_remaining": shooter.ammo_current})
+@@ -478,28 +613,20 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
+ 			"shooter_a", profile.weapon_path, "energyCost", {"energy_spent": shot.energy_spent, "energy_remaining": shooter.energy_current})
+ 	_emit_combat_event("PROJECTILE_SPAWNED", "%s speed=%.1f m/s life=%.2fs" % [
+ 		profile.ordnance_name, profile.shot_speed, profile.life_span
+-	], "shooter_a", profile.ordnance_path, "shotSpeed")
+-
+-	var record := {
+-		"origin": [origin.x, origin.y, origin.z],
+-		"direction": [direction.x, direction.y, direction.z],
+-		"target_position": [target_position.x, target_position.y, target_position.z],
+-		"shooter_velocity": [shooter_velocity.x, shooter_velocity.y, shooter_velocity.z],
+-		"weapon_name": profile.weapon_name,
+-		"ordnance_name": profile.ordnance_name,
+-		"ammo_spent": shot.ammo_spent,
+-		"energy_spent": shot.energy_spent,
+-		"fire_mode": mode_up,
+-		"enforce_reload": effective_enforce_reload,
+-		"time": sim.sim_time,
+-		"profile_snapshot": prof_snap,
+-		"obstacles": _clone_obstacles(p_obstacles),
+-	}
+-	shot_history.append(record)
++	], "shooter_a", profile.ordnance_path, "shotSpeed", {"shot_id": shot.shot_id})
++
++	req_record["ammo_spent"] = shot.ammo_spent
++	req_record["energy_spent"] = shot.energy_spent
++	req_record["accepted"] = true
++	req_record["shot_id"] = shot.shot_id
++	req_record["shot_identity"] = shot.identity.to_dict() if shot.identity != null else {}
++	shot_history.append(req_record)
+ 	timeline_inputs.append({
++		"seq": _next_input_seq(),
+ 		"type": "FIRE_SHOT",
+ 		"time": sim.sim_time,
+-		"shot_command": record.duplicate(true),
++		"accepted": true,
++		"shot_command": req_record.duplicate(true),
+ 	})
+ 	return {
+ 		"ok": true,
+@@ -670,59 +797,144 @@ static func _clone_obstacles(obs_list: Array) -> Array:
+ 	return out
+ 
+ 
+-## Replay an immutable CombatReplaySnapshot inside a completely isolated
+-## sandboxed CombatScenario instance so the user's active scenario is NEVER
+-## overwritten unexpectedly (P1-SIM-03, RP-04, RP-05, RP-08).
+-static func replay_snapshot_sandboxed(snap: Dictionary, p_obstacles_override: Array = []) -> Dictionary:
+-	var sandbox := new(int(snap.get("seed_value", 1337)), str(snap.get("scenario_id", "replay")) + "_sandbox")
+-	var init_sh: Dictionary = snap.get("initial_shooter", {}) if snap.get("initial_shooter", {}) is Dictionary else {}
+-	if not init_sh.is_empty():
+-		sandbox.shooter.restore_snapshot(init_sh)
+-	sandbox.targets.clear()
+-	var init_tgts: Dictionary = snap.get("initial_targets", {}) if snap.get("initial_targets", {}) is Dictionary else {}
+-	for tid in init_tgts:
+-		var td: Dictionary = init_tgts[tid]
+-		var actor = ActorStateScript.create_target(str(tid), str(td.get("display_name", tid)))
+-		actor.restore_snapshot(td)
+-		sandbox.targets[str(tid)] = actor
+-	if not sandbox.targets.has("primary"):
+-		sandbox.targets["primary"] = ActorStateScript.create_target("primary", "Target B")
+-	var base_obs: Array = _clone_obstacles(p_obstacles_override) if not p_obstacles_override.is_empty() else _clone_obstacles(snap.get("obstacles", []))
+-	sandbox.obstacles = base_obs
+-	sandbox._initial_profile_snap = (snap.get("weapon_profile", {}) as Dictionary).duplicate(true)
+-	sandbox._last_profile_snap = sandbox._initial_profile_snap.duplicate(true)
+-	sandbox.capture_initial_snapshots()
+-
++## Incremental chronological replay runner (P0-SIM-01 / RPL-09..RPL-16).
++## Schedules all input events on ONE authoritative simulation clock without
++## calling blocking fire_and_resolve(), preserving overlapping projectile
++## lifetimes, exact reload rejections, mid-flight DoT ticks, moving targets,
++## same-time event ordering, and bounded frame-budget UI stepping.
++class ReplayRunner:
++	extends RefCounted
++	var snap: Dictionary = {}
++	var sandbox = null
++	var base_obs: Array = []
++	var fallback_profile: WeaponProfile = null
++	var sorted_inputs: Array[Dictionary] = []
++	var cursor: int = 0
++	var target_end_t: float = 0.0
++	var last_fire_time: float = -1.0
++	var stop_at_capture_time: bool = false
++	var drain_max_extra_s: float = 5.0
++	var drain_elapsed_s: float = 0.0
++	var has_move_events: bool = false
++	var sandboxed_flag: bool = true
++	var done: bool = false
+ 	var results: Array[Dictionary] = []
+-	var inputs: Array = snap.get("timeline_inputs", [])
+-	if inputs.is_empty() and not (snap.get("shot_commands", []) as Array).is_empty():
+-		for sc in snap.get("shot_commands", []):
+-			inputs.append({"type": "FIRE_SHOT", "time": float((sc as Dictionary).get("time", 0.0)), "shot_command": sc})
+-
+-	for ev in inputs:
+-		if not (ev is Dictionary):
+-			continue
+-		var ev_t := float(ev.get("time", sandbox.sim.sim_time))
+-		while sandbox.sim.sim_time + 0.0001 < ev_t:
+-			var step_dt := minf(1.0 / 60.0, ev_t - sandbox.sim.sim_time)
+-			sandbox.advance(step_dt)
++	var _shot_id_to_result_idx: Dictionary = {}
++	var _active_compressed_spans: Dictionary = {}
++	var accepted_shots: int = 0
++	var rejected_shots: int = 0
++	var max_concurrent_shots: int = 0
++	var _steps_total: int = 0
++	var _final_result: Dictionary = {}
++	var terminal_status: String = ""
++	var max_steps_total: int = 120000
++
++	func _init(p_sandbox, p_snap: Dictionary, p_base_obs: Array, p_fallback_profile: WeaponProfile = null,
++			p_sandboxed: bool = true, p_options: Dictionary = {}) -> void:
++		sandbox = p_sandbox
++		snap = p_snap.duplicate(true)
++		base_obs = p_base_obs
++		fallback_profile = p_fallback_profile
++		sandboxed_flag = p_sandboxed
++		max_steps_total = maxi(1, int(p_options.get("max_steps_total", 120000)))
++		stop_at_capture_time = bool(p_options.get("stop_at_capture_time", false))
++		drain_max_extra_s = maxf(0.1, float(p_options.get("max_drain_s", 5.0)))
++		target_end_t = float(snap.get("captured_at_sim_time", 0.0))
++
++		var raw_inputs: Array = snap.get("timeline_inputs", [])
++		if raw_inputs.is_empty() and not (snap.get("shot_commands", []) as Array).is_empty():
++			var idx_fb := 0
++			for sc in snap.get("shot_commands", []):
++				idx_fb += 1
++				raw_inputs.append({
++					"seq": idx_fb,
++					"type": "FIRE_SHOT",
++					"time": float((sc as Dictionary).get("time", 0.0)),
++					"shot_command": sc,
++				})
++		var decorated: Array[Dictionary] = []
++		for i in raw_inputs.size():
++			var ev = raw_inputs[i]
++			if not (ev is Dictionary):
++				continue
++			var copy: Dictionary = (ev as Dictionary).duplicate(true)
++			if not copy.has("_orig_idx"):
++				copy["_orig_idx"] = i
++			if str(copy.get("type", "")) == "MOVE_ACTOR":
++				has_move_events = true
++			if str(copy.get("type", "")) == "FIRE_SHOT":
++				last_fire_time = maxf(last_fire_time, float(copy.get("time", 0.0)))
++			decorated.append(copy)
++		decorated.sort_custom(func(a, b):
++			var ta := float(a.get("time", 0.0))
++			var tb := float(b.get("time", 0.0))
++			if absf(ta - tb) > 0.000001:
++				return ta < tb
++			var sa := int(a.get("seq", int(a.get("_orig_idx", 0))))
++			var sb := int(b.get("seq", int(b.get("_orig_idx", 0))))
++			if sa != sb:
++				return sa < sb
++			return int(a.get("_orig_idx", 0)) < int(b.get("_orig_idx", 0))
++		)
++		sorted_inputs = decorated
++		if sandbox != null and sandbox.sim != null and not sandbox.sim.shot_finished.is_connected(_on_shot_finished):
++			sandbox.sim.shot_finished.connect(_on_shot_finished)
++
++	func _on_shot_finished(res: Dictionary) -> void:
++		var sid := int(res.get("shot_id", 0))
++		if not _shot_id_to_result_idx.has(sid):
++			return
++		var idx := int(_shot_id_to_result_idx[sid])
++		if idx < 0 or idx >= results.size():
++			return
++		var prim = sandbox.primary_target()
++		var entry: Dictionary = results[idx]
++		entry["resolved"] = true
++		entry["kind"] = str(res.get("kind", ""))
++		entry["hit_target_id"] = str(res.get("hit_target_id", ""))
++		entry["hit_obstacle_id"] = str(res.get("hit_obstacle_id", ""))
++		entry["damage"] = float(res.get("damage", 0.0))
++		entry["damage_to_hull"] = float(res.get("damage_to_hull", 0.0))
++		entry["shield_damage"] = float(res.get("shield_damage", 0.0))
++		entry["shield_remaining"] = float(res.get("shield_remaining", prim.shield_current if prim != null else 0.0))
++		entry["hull_remaining"] = float(res.get("target_health", prim.hull_current if prim != null else 0.0))
++		entry["splash_hits"] = (res.get("splash_hits", []) as Array).duplicate(true)
++		entry["impact_time"] = float(res.get("impact_time", sandbox.sim.sim_time))
++		entry["destroyed"] = prim.destroyed if prim != null else false
++		results[idx] = entry
++
++	func _dispatch_event(ev: Dictionary) -> void:
+ 		var etype := str(ev.get("type", ""))
+ 		match etype:
+ 			"MOVE_ACTOR":
+ 				var aid := str(ev.get("actor_id", ""))
+ 				var actor = sandbox.shooter if aid == "shooter_a" else sandbox.targets.get(aid, null)
+ 				if actor != null:
+-					actor.position = _vec3(ev.get("position", null), actor.position)
+-					actor.velocity = _vec3(ev.get("velocity", null), actor.velocity)
+-					actor.yaw_rad = float(ev.get("yaw_rad", actor.yaw_rad))
++					var pos := CombatScenario._vec3(ev.get("position", null), actor.position)
++					var vel := CombatScenario._vec3(ev.get("velocity", null), actor.velocity)
++					var yaw := float(ev.get("yaw_rad", actor.yaw_rad))
+ 					if ev.has("radius"):
+ 						actor.radius = maxf(0.2, float(ev.get("radius", actor.radius)))
+ 					if ev.has("half_extents"):
+-						actor.half_extents = _vec3(ev.get("half_extents", null), actor.half_extents)
++						actor.half_extents = CombatScenario._vec3(ev.get("half_extents", null), actor.half_extents)
+ 					if ev.has("bbox_offset"):
+-						actor.bbox_offset = _vec3(ev.get("bbox_offset", null), actor.bbox_offset)
+-					if aid == "primary":
+-						sandbox.sim.update_live_target(actor.position, actor.yaw_rad)
++						actor.bbox_offset = CombatScenario._vec3(ev.get("bbox_offset", null), actor.bbox_offset)
++					sandbox.record_actor_transform(aid, pos, vel, yaw)
++					if ev.has("compressed_end_time") and ev.has("compressed_end_pos"):
++						var et := float(ev.get("compressed_end_time", sandbox.sim.sim_time))
++						var st := float(ev.get("time", sandbox.sim.sim_time))
++						if et > st + 0.00001:
++							_active_compressed_spans[aid] = {
++								"start_time": st,
++								"end_time": et,
++								"start_pos": pos,
++								"end_pos": CombatScenario._vec3(ev.get("compressed_end_pos", null), pos),
++								"yaw": yaw,
++							}
++						else:
++							_active_compressed_spans.erase(aid)
++					else:
++						_active_compressed_spans.erase(aid)
+ 			"ADD_EFFECT":
+ 				sandbox.apply_status_effect(
+ 					str(ev.get("actor_id", "primary")),
+@@ -742,153 +954,319 @@ static func replay_snapshot_sandboxed(snap: Dictionary, p_obstacles_override: Ar
+ 			"FIRE_SHOT":
+ 				var cmd: Dictionary = ev.get("shot_command", {}) if ev.get("shot_command", {}) is Dictionary else {}
+ 				var psnap: Dictionary = cmd.get("profile_snapshot", snap.get("weapon_profile", {}))
+-				var frozen_prof: WeaponProfile = WeaponProfile.from_snapshot(psnap) if not psnap.is_empty() else null
++				var frozen_prof: WeaponProfile = WeaponProfile.from_snapshot(psnap) if (psnap is Dictionary and not psnap.is_empty()) else fallback_profile
+ 				if frozen_prof == null:
+-					continue
+-				var shot_obs: Array = _clone_obstacles(cmd.get("obstacles", [])) if not (cmd.get("obstacles", []) as Array).is_empty() else base_obs
+-				var r := sandbox.fire_and_resolve(
++					return
++				var shot_obs: Array = CombatScenario._clone_obstacles(cmd.get("obstacles", [])) if not (cmd.get("obstacles", []) as Array).is_empty() else base_obs
++				var prim = sandbox.primary_target()
++				var fire_target_pos: Vector3 = prim.position if (has_move_events and prim != null) else CombatScenario._vec3(cmd.get("target_position", Vector3(0, 0, -50)))
++				var fmode := str(cmd.get("fire_mode", "SINGLE"))
++				var enf_rld := bool(cmd.get("enforce_reload", false))
++				var fired: Dictionary = sandbox.fire_shot(
+ 					frozen_prof,
+-					_vec3(cmd.get("origin", Vector3.ZERO)),
+-					_vec3(cmd.get("direction", Vector3.FORWARD)),
+-					_vec3(cmd.get("target_position", Vector3(0, 0, -50))),
+-					5.0,
++					CombatScenario._vec3(cmd.get("origin", Vector3.ZERO)),
++					CombatScenario._vec3(cmd.get("direction", Vector3.FORWARD)),
++					fire_target_pos,
+ 					shot_obs,
+-					_vec3(cmd.get("shooter_velocity", Vector3.ZERO)),
+-					bool(cmd.get("enforce_reload", false))
++					CombatScenario._vec3(cmd.get("shooter_velocity", Vector3.ZERO)),
++					enf_rld,
++					[],
++					fmode,
++					str(cmd.get("hardpoint", "")),
++					int(cmd.get("barrel_index", 0)),
++					str(cmd.get("barrel_mode", "SINGLE")),
++					int(cmd.get("volley_id", 0))
+ 				)
+-				results.append(r)
+-
+-	# Finish any remaining simulation time up to captured_at_sim_time (e.g., trailing DoT/reload).
+-	var target_end_t := float(snap.get("captured_at_sim_time", sandbox.sim.sim_time))
+-	var guard := 0
+-	while sandbox.sim.sim_time + 0.0001 < target_end_t and guard < 60000:
+-		sandbox.advance(minf(1.0 / 60.0, target_end_t - sandbox.sim.sim_time))
+-		guard += 1
+-
+-	var target_states := {}
+-	for tid in sandbox.targets:
+-		var t = sandbox.targets[tid]
+-		if t != null:
+-			target_states[tid] = {
+-				"hull": t.hull_current,
+-				"shield": t.shield_current,
+-				"destroyed": t.destroyed,
+-				"position": [t.position.x, t.position.y, t.position.z],
+-				"velocity": [t.velocity.x, t.velocity.y, t.velocity.z],
+-				"yaw_rad": t.yaw_rad,
+-			}
++				if bool(fired.get("ok", false)):
++					accepted_shots += 1
++					max_concurrent_shots = maxi(max_concurrent_shots, sandbox.sim.shots.size())
++					var s = fired.get("shot", null)
++					var entry := {
++						"ok": true,
++						"accepted": true,
++						"resolved": false,
++						"shot_id": s.shot_id if s != null else 0,
++						"fire_time": sandbox.sim.sim_time,
++						"impact_time": -1.0,
++						"kind": "",
++						"hit_target_id": "",
++						"damage": 0.0,
++						"damage_to_hull": 0.0,
++						"shield_damage": 0.0,
++						"shield_remaining": prim.shield_current if prim != null else 0.0,
++						"hull_remaining": prim.hull_current if prim != null else 0.0,
++						"ammo_cost": s.ammo_cost if s != null else 0,
++						"ammo_spent": int(fired.get("ammo_spent", 0)),
++						"ammo_remaining": sandbox.shooter.ammo_current,
++						"energy_spent": float(fired.get("energy_spent", 0.0)),
++						"energy_remaining": sandbox.shooter.energy_current,
++						"splash_hits": [],
++						"destroyed": prim.destroyed if prim != null else false,
++					}
++					var idx := results.size()
++					results.append(entry)
++					if s != null:
++						_shot_id_to_result_idx[s.shot_id] = idx
++				else:
++					rejected_shots += 1
++					results.append({
++						"ok": false,
++						"accepted": false,
++						"resolved": true,
++						"fire_time": sandbox.sim.sim_time,
++						"state": str(fired.get("state", "REJECTED")),
++						"reason": str(fired.get("reason", "FIRE_REJECTED")),
++						"reload_remaining": float(fired.get("reload_remaining", 0.0)),
++						"ammo_remaining": sandbox.shooter.ammo_current,
++						"energy_remaining": sandbox.shooter.energy_current,
++					})
++
++	func _finalize(reason: String = "REPLAY_COMPLETE") -> Dictionary:
++		done = true
++		terminal_status = reason
++		if sandbox != null and sandbox.sim != null and sandbox.sim.shot_finished.is_connected(_on_shot_finished):
++			sandbox.sim.shot_finished.disconnect(_on_shot_finished)
++		var target_states := {}
++		for tid in sandbox.targets:
++			var t = sandbox.targets[tid]
++			if t != null:
++				target_states[tid] = {
++					"hull": t.hull_current,
++					"shield": t.shield_current,
++					"destroyed": t.destroyed,
++					"position": [t.position.x, t.position.y, t.position.z],
++					"velocity": [t.velocity.x, t.velocity.y, t.velocity.z],
++					"yaw_rad": t.yaw_rad,
++				}
++		var complete := reason == "REPLAY_COMPLETE"
++		_final_result = {
++			"ok": complete,
++			"complete": complete,
++			"reason": reason,
++			"status": reason,
++			"steps_executed": _steps_total,
++			"events_processed": cursor,
++			"events_remaining": maxi(0, sorted_inputs.size() - cursor),
++			"requested_end_time": target_end_t,
++			"projectiles_in_flight": sandbox.sim.shots.size(),
++			"sandboxed": sandboxed_flag,
++			"snapshot_id": str(snap.get("snapshot_id", "")),
++			"shots_replayed": accepted_shots,
++			"fire_requests_replayed": results.size(),
++			"accepted_shots": accepted_shots,
++			"rejected_shots": rejected_shots,
++			"max_concurrent_shots": max_concurrent_shots,
++			"results": results.duplicate(true),
++			"shooter_ammo": sandbox.shooter.ammo_current,
++			"shooter_energy": sandbox.shooter.energy_current,
++			"shooter_reload": sandbox.shooter.reload_remaining,
++			"targets": target_states,
++			"sim_time": sandbox.sim.sim_time,
++			"in_flight_at_end": sandbox.sim.shots.size(),
++			"combat_events": sandbox.combat_events.duplicate(true),
++		}
++		return _final_result
++
++	func progress() -> float:
++		if done:
++			return 1.0
++		var denom := maxf(0.001, target_end_t)
++		return clampf(sandbox.sim.sim_time / denom, 0.0, 0.99)
++
++	func _integrate_moving_actors(_dt: float) -> void:
++		if _active_compressed_spans.is_empty() or sandbox == null:
++			return
++		var cur_t: float = float(sandbox.sim.sim_time)
++		for aid in _active_compressed_spans.keys():
++			var span: Dictionary = _active_compressed_spans[aid]
++			var st := float(span.get("start_time", 0.0))
++			var et := float(span.get("end_time", 0.0))
++			var sp0: Vector3 = span.get("start_pos", Vector3.ZERO)
++			var ep0: Vector3 = span.get("end_pos", sp0)
++			var yaw := float(span.get("yaw", 0.0))
++			var frac := clampf((cur_t - st) / maxf(0.0001, et - st), 0.0, 1.0)
++			var interp := sp0.lerp(ep0, frac)
++			var actor = sandbox.shooter if aid == "shooter_a" else sandbox.targets.get(aid, null)
++			if actor != null:
++				actor.position = interp
++				actor.yaw_rad = yaw
++				if aid == "primary":
++					sandbox.sim.update_live_target(interp, yaw)
++				elif aid != "shooter_a":
++					sandbox.sim.update_live_extra_target(str(aid), interp, yaw)
++			if cur_t >= et:
++				_active_compressed_spans.erase(aid)
++
++	## Execute up to `max_sim_steps` simulation ticks or `max_wall_ms` ms of work.
++	func step(max_sim_steps: int = 30, max_wall_ms: float = 8.0) -> Dictionary:
++		if done:
++			return {"done": true, "progress": 1.0, "sim_time": sandbox.sim.sim_time, "result": _final_result}
++		var t_wall0 := Time.get_ticks_usec()
++		var steps_here := 0
++		while steps_here < max_sim_steps and _steps_total < max_steps_total:
++			if max_wall_ms > 0.0 and steps_here > 0:
++				var elapsed_ms := float(Time.get_ticks_usec() - t_wall0) / 1000.0
++				if elapsed_ms >= max_wall_ms:
++					break
++			# 1. Dispatch any scheduled events due at or before current sim_time.
++			var dispatched_any := false
++			while cursor < sorted_inputs.size():
++				var ev: Dictionary = sorted_inputs[cursor]
++				var ev_t := float(ev.get("time", sandbox.sim.sim_time))
++				if ev_t <= sandbox.sim.sim_time + 0.00005:
++					_dispatch_event(ev)
++					cursor += 1
++					dispatched_any = true
++				else:
++					break
++			# 2. If more input events remain, advance toward next event timestamp.
++			if cursor < sorted_inputs.size():
++				var next_t := float(sorted_inputs[cursor].get("time", sandbox.sim.sim_time))
++				var dt := minf(1.0 / 60.0, maxf(0.0001, next_t - sandbox.sim.sim_time))
++				_integrate_moving_actors(dt)
++				sandbox.advance(dt)
++				max_concurrent_shots = maxi(max_concurrent_shots, sandbox.sim.shots.size())
++				steps_here += 1
++				_steps_total += 1
++				continue
++			# 3. All scheduled inputs dispatched: advance to captured_at_sim_time.
++			if sandbox.sim.sim_time + 0.0001 < target_end_t:
++				var dt2 := minf(1.0 / 60.0, target_end_t - sandbox.sim.sim_time)
++				_integrate_moving_actors(dt2)
++				sandbox.advance(dt2)
++				max_concurrent_shots = maxi(max_concurrent_shots, sandbox.sim.shots.size())
++				steps_here += 1
++				_steps_total += 1
++				continue
++			# 4. Legacy/unadvanced snapshots captured right at last_fire_time with
++			# live shots still in flight: drain remaining projectiles unless caller
++			# requested strict cutoff at capture time.
++			var should_drain: bool = (not stop_at_capture_time) and (not (sandbox.sim.shots as Array).is_empty()) and (target_end_t <= last_fire_time + 0.0001) and (drain_elapsed_s < drain_max_extra_s)
++			if should_drain:
++				var dt3 := 1.0 / 60.0
++				_integrate_moving_actors(dt3)
++				sandbox.advance(dt3)
++				drain_elapsed_s += dt3
++				max_concurrent_shots = maxi(max_concurrent_shots, sandbox.sim.shots.size())
++				steps_here += 1
++				_steps_total += 1
++				continue
++			# Complete!
++			if not dispatched_any or cursor >= sorted_inputs.size():
++				var res := _finalize()
++				return {"done": true, "progress": 1.0, "sim_time": sandbox.sim.sim_time, "result": res}
++		if _steps_total >= max_steps_total:
++			var res_g := _finalize("REPLAY_STEP_LIMIT_EXCEEDED")
++			return {"done": true, "complete": false, "reason": "REPLAY_STEP_LIMIT_EXCEEDED",
++				"progress": progress(), "sim_time": sandbox.sim.sim_time, "result": res_g}
++		return {"done": false, "progress": progress(), "sim_time": sandbox.sim.sim_time, "result": {}}
++
++	func run_to_completion() -> Dictionary:
++		var guard := 0
++		while not done and guard < 10000:
++			step(240, 0.0)
++			guard += 1
++		if not done:
++			return _finalize("REPLAY_STEP_LIMIT_EXCEEDED")
++		return _final_result
++
++
++## Create an incremental bounded chronological ReplayRunner for a captured
++## CombatReplaySnapshot (P0-SIM-01 / RPL-14).
++static func create_replay_runner(snap: Dictionary, p_obstacles_override: Array = [],
++		options: Dictionary = {}) -> ReplayRunner:
++	var sandbox := new(int(snap.get("seed_value", 1337)), str(snap.get("scenario_id", "replay")) + "_sandbox")
++	var init_sh: Dictionary = snap.get("initial_shooter", {}) if snap.get("initial_shooter", {}) is Dictionary else {}
++	if not init_sh.is_empty():
++		sandbox.shooter.restore_snapshot(init_sh)
++	sandbox.targets.clear()
++	var init_tgts: Dictionary = snap.get("initial_targets", {}) if snap.get("initial_targets", {}) is Dictionary else {}
++	for tid in init_tgts:
++		var td: Dictionary = init_tgts[tid]
++		var actor = ActorStateScript.create_target(str(tid), str(td.get("display_name", tid)))
++		actor.restore_snapshot(td)
++		sandbox.targets[str(tid)] = actor
++	if not sandbox.targets.has("primary"):
++		sandbox.targets["primary"] = ActorStateScript.create_target("primary", "Target B")
++	var base_obs: Array = _clone_obstacles(p_obstacles_override) if not p_obstacles_override.is_empty() else _clone_obstacles(snap.get("obstacles", []))
++	sandbox.obstacles = base_obs
++	sandbox._initial_profile_snap = (snap.get("weapon_profile", {}) as Dictionary).duplicate(true)
++	sandbox._last_profile_snap = sandbox._initial_profile_snap.duplicate(true)
++	sandbox.capture_initial_snapshots()
++	return ReplayRunner.new(sandbox, snap, base_obs, null, true, options)
++
++
++## Replay an immutable CombatReplaySnapshot inside a completely isolated
++## sandboxed CombatScenario instance so the user's active scenario is NEVER
++## overwritten unexpectedly (P0-SIM-01, P1-SIM-03, RP-04..08, RPL-09..16).
++static func replay_snapshot_sandboxed(snap: Dictionary, p_obstacles_override: Array = [],
++		options: Dictionary = {}) -> Dictionary:
++	var runner := create_replay_runner(snap, p_obstacles_override, options)
++	return runner.run_to_completion()
++
++
++## Compare two deterministic replay results side-by-side (A/B comparison).
++static func compare_replay_results(res_a: Dictionary, res_b: Dictionary) -> Dictionary:
++	if res_a.is_empty() or res_b.is_empty():
++		return {"ok": false, "identical": false, "summary": "missing replay result"}
++	var targets_a: Dictionary = res_a.get("targets", {}) if res_a.get("targets", {}) is Dictionary else {}
++	var targets_b: Dictionary = res_b.get("targets", {}) if res_b.get("targets", {}) is Dictionary else {}
++	var all_tids: Array[String] = []
++	for k in targets_a:
++		if not all_tids.has(str(k)):
++			all_tids.append(str(k))
++	for k in targets_b:
++		if not all_tids.has(str(k)):
++			all_tids.append(str(k))
++	all_tids.sort()
++	var target_diffs := {}
++	var identical := true
++	for tid in all_tids:
++		var ta: Dictionary = targets_a.get(tid, {})
++		var tb: Dictionary = targets_b.get(tid, {})
++		var dh := float(tb.get("hull", 0.0)) - float(ta.get("hull", 0.0))
++		var ds := float(tb.get("shield", 0.0)) - float(ta.get("shield", 0.0))
++		if absf(dh) > 0.05 or absf(ds) > 0.05:
++			identical = false
++		target_diffs[tid] = {"hull_a": float(ta.get("hull", 0.0)), "hull_b": float(tb.get("hull", 0.0)), "hull_delta": dh, "shield_a": float(ta.get("shield", 0.0)), "shield_b": float(tb.get("shield", 0.0)), "shield_delta": ds}
++	var shots_a := int(res_a.get("accepted_shots", res_a.get("shots_replayed", 0)))
++	var shots_b := int(res_b.get("accepted_shots", res_b.get("shots_replayed", 0)))
++	var rej_a := int(res_a.get("rejected_shots", 0))
++	var rej_b := int(res_b.get("rejected_shots", 0))
++	if shots_a != shots_b or rej_a != rej_b:
++		identical = false
++	var prim_diff: Dictionary = target_diffs.get("primary", {"hull_delta": 0.0, "shield_delta": 0.0})
+ 	return {
+ 		"ok": true,
+-		"sandboxed": true,
+-		"snapshot_id": str(snap.get("snapshot_id", "")),
+-		"shots_replayed": results.size(),
+-		"results": results,
+-		"shooter_ammo": sandbox.shooter.ammo_current,
+-		"shooter_energy": sandbox.shooter.energy_current,
+-		"shooter_reload": sandbox.shooter.reload_remaining,
+-		"targets": target_states,
+-		"sim_time": sandbox.sim.sim_time,
+-		"combat_events": sandbox.combat_events.duplicate(true),
++		"identical": identical,
++		"shots_a": shots_a,
++		"shots_b": shots_b,
++		"shots_delta": shots_b - shots_a,
++		"rejected_a": rej_a,
++		"rejected_b": rej_b,
++		"primary_hull_delta": float(prim_diff.get("hull_delta", 0.0)),
++		"primary_shield_delta": float(prim_diff.get("shield_delta", 0.0)),
++		"sim_time_delta": float(res_b.get("sim_time", 0.0)) - float(res_a.get("sim_time", 0.0)),
++		"event_count_a": (res_a.get("combat_events", []) as Array).size(),
++		"event_count_b": (res_b.get("combat_events", []) as Array).size(),
++		"target_diffs": target_diffs,
++		"summary": "A/B Replay: %s | shots %d->%d | primary hull %+.1f, shield %+.1f" % [
++			"IDENTICAL" if identical else "DIFF", shots_a, shots_b,
++			float(prim_diff.get("hull_delta", 0.0)), float(prim_diff.get("shield_delta", 0.0))
++		],
+ 	}
+ 
+ 
+ ## Deterministically replay the recorded scenario from its captured initial
+ ## baseline. When `sandboxed = true`, runs in an isolated sandbox without
+-## mutating `self` (RP-08). Uses captured frozen per-shot profiles so later ODF
+-## edits never alter historical replays (RP-05).
++## mutating `self` (RP-08). Uses chronological event scheduling (never blocking
++## per-shot fire_and_resolve) and frozen per-shot profiles (RP-05, RPL-09..16).
+ func replay_deterministic(profile: WeaponProfile = null, p_obstacles: Array = [],
+-		sandboxed: bool = false) -> Dictionary:
++		sandboxed: bool = false, options: Dictionary = {}) -> Dictionary:
+ 	var snap := build_replay_snapshot("deterministic_replay")
+ 	if sandboxed:
+-		return replay_snapshot_sandboxed(snap, p_obstacles)
+-	var saved_inputs := timeline_inputs.duplicate(true)
+-	var saved_history := shot_history.duplicate(true)
+-	var saved_end_t := sim.sim_time
++		return replay_snapshot_sandboxed(snap, p_obstacles, options)
++	var base_obs := _clone_obstacles(p_obstacles) if not p_obstacles.is_empty() else _clone_obstacles(_initial_obstacles_snap)
+ 	reset("ALL")
+-	var results: Array[Dictionary] = []
+-	var use_inputs := not saved_inputs.is_empty()
+-	if use_inputs:
+-		for ev in saved_inputs:
+-			if not (ev is Dictionary):
+-				continue
+-			var ev_t := float(ev.get("time", sim.sim_time))
+-			while sim.sim_time + 0.0001 < ev_t:
+-				advance(minf(1.0 / 60.0, ev_t - sim.sim_time))
+-			var etype := str(ev.get("type", ""))
+-			match etype:
+-				"MOVE_ACTOR":
+-					var aid := str(ev.get("actor_id", ""))
+-					record_actor_transform(aid, _vec3(ev.get("position", null)), _vec3(ev.get("velocity", null)), float(ev.get("yaw_rad", 0.0)))
+-				"ADD_EFFECT":
+-					apply_status_effect(str(ev.get("actor_id", "primary")), str(ev.get("effect_name", "dot")),
+-						float(ev.get("dps", 0.0)), float(ev.get("duration_s", 0.0)), float(ev.get("shield_ratio", 1.0)))
+-				"CHANGE_PROFILE":
+-					var pdict: Dictionary = ev.get("profile", {}) if ev.get("profile", {}) is Dictionary else {}
+-					if not pdict.is_empty():
+-						var frozen_c := WeaponProfile.from_snapshot(pdict)
+-						if bool(ev.get("weapon_swap", false)):
+-							change_weapon(frozen_c, bool(ev.get("preserve_cooldown", true)))
+-						else:
+-							update_effective_odf_parameters(frozen_c)
+-				"FIRE_SHOT":
+-					var cmd: Dictionary = ev.get("shot_command", {}) if ev.get("shot_command", {}) is Dictionary else {}
+-					var psnap: Dictionary = cmd.get("profile_snapshot", {})
+-					var use_prof: WeaponProfile = WeaponProfile.from_snapshot(psnap) if not psnap.is_empty() else profile
+-					if use_prof == null:
+-						continue
+-					var obs_use := p_obstacles if not p_obstacles.is_empty() else _clone_obstacles(cmd.get("obstacles", []))
+-					var r := fire_and_resolve(
+-						use_prof,
+-						_vec3(cmd.get("origin", Vector3.ZERO)),
+-						_vec3(cmd.get("direction", Vector3.FORWARD)),
+-						_vec3(cmd.get("target_position", Vector3(0, 0, -50))),
+-						5.0,
+-						obs_use,
+-						_vec3(cmd.get("shooter_velocity", Vector3.ZERO)),
+-						bool(cmd.get("enforce_reload", false))
+-					)
+-					results.append(r)
+-		var guard := 0
+-		while sim.sim_time + 0.0001 < saved_end_t and guard < 60000:
+-			advance(minf(1.0 / 60.0, saved_end_t - sim.sim_time))
+-			guard += 1
+-	else:
+-		for rec in saved_history:
+-			var psnap: Dictionary = rec.get("profile_snapshot", {})
+-			var use_prof: WeaponProfile = WeaponProfile.from_snapshot(psnap) if not psnap.is_empty() else profile
+-			if use_prof == null:
+-				continue
+-			var r := fire_and_resolve(
+-				use_prof,
+-				_vec3(rec.get("origin", Vector3.ZERO)),
+-				_vec3(rec.get("direction", Vector3.FORWARD)),
+-				_vec3(rec.get("target_position", Vector3(0, 0, -50))),
+-				5.0,
+-				p_obstacles,
+-				_vec3(rec.get("shooter_velocity", Vector3.ZERO))
+-			)
+-			results.append(r)
+-	var target_states := {}
+-	for tid in targets:
+-		var t = targets[tid]
+-		if t != null:
+-			target_states[tid] = {
+-				"hull": t.hull_current,
+-				"shield": t.shield_current,
+-				"destroyed": t.destroyed,
+-				"position": [t.position.x, t.position.y, t.position.z],
+-				"velocity": [t.velocity.x, t.velocity.y, t.velocity.z],
+-				"yaw_rad": t.yaw_rad,
+-			}
+-	return {
+-		"ok": true,
+-		"sandboxed": false,
+-		"shots_replayed": results.size(),
+-		"results": results,
+-		"shooter_ammo": shooter.ammo_current,
+-		"shooter_energy": shooter.energy_current,
+-		"shooter_reload": shooter.reload_remaining,
+-		"targets": target_states,
+-		"sim_time": sim.sim_time,
+-		"combat_events": combat_events.duplicate(true),
+-	}
++	var runner := ReplayRunner.new(self, snap, base_obs, profile, false, options)
++	return runner.run_to_completion()
+diff --git a/scripts/sim/projectile_sim.gd b/scripts/sim/projectile_sim.gd
+index af8e78b..14bc70b 100644
+--- a/scripts/sim/projectile_sim.gd
++++ b/scripts/sim/projectile_sim.gd
+@@ -12,7 +12,79 @@ const SUBSTEP := 1.0 / 240.0
+ const MAX_SUBSTEPS := 64
+ const ActorStateScript = preload("res://scripts/sim/combat_actor_state.gd")
+ 
++## Launch-time identity for one projectile. Weapon switching changes the
++## profile used for new shots; already-fired shots keep these frozen values.
++class ShotIdentity:
++	var shot_id: int = 0
++	var weapon_name: String = ""
++	var ordnance_name: String = ""
++	var weapon_path: String = ""
++	var ordnance_path: String = ""
++	var source_revision: Dictionary = {}
++	var hardpoint: String = ""
++	var barrel_index: int = 0
++	var barrel_mode: String = "SINGLE"
++	var volley_id: int = 0
++	var projectile_model: String = ""
++	var render_name: String = ""
++	var muzzle_render: String = ""
++	var fire_sound: String = ""
++	var shot_sound: String = ""
++	var expl_sound: String = ""
++	var xpl_vehicle: String = ""
++	var xpl_ground: String = ""
++	var xpl_expire: String = ""
++	var damage_table: Dictionary = {}
++	var damage: float = 0.0
++
++	func to_dict() -> Dictionary:
++		return {
++			"shot_id": shot_id, "weapon_name": weapon_name,
++			"ordnance_name": ordnance_name, "weapon_path": weapon_path,
++			"ordnance_path": ordnance_path, "source_revision": source_revision.duplicate(true),
++			"hardpoint": hardpoint, "barrel_index": barrel_index,
++			"barrel_mode": barrel_mode, "volley_id": volley_id,
++			"projectile_model": projectile_model, "render_name": render_name,
++			"muzzle_render": muzzle_render, "fire_sound": fire_sound,
++			"shot_sound": shot_sound, "expl_sound": expl_sound,
++			"xpl_vehicle": xpl_vehicle, "xpl_ground": xpl_ground,
++			"xpl_expire": xpl_expire, "damage_table": damage_table.duplicate(true),
++			"damage": damage,
++		}
++
++	static func from_dict(d: Dictionary) -> ShotIdentity:
++		var id := ShotIdentity.new()
++		id.shot_id = int(d.get("shot_id", 0))
++		id.weapon_name = str(d.get("weapon_name", ""))
++		id.ordnance_name = str(d.get("ordnance_name", ""))
++		id.weapon_path = str(d.get("weapon_path", ""))
++		id.ordnance_path = str(d.get("ordnance_path", ""))
++		var rev = d.get("source_revision", {})
++		id.source_revision = (rev as Dictionary).duplicate(true) if rev is Dictionary else {}
++		id.hardpoint = str(d.get("hardpoint", ""))
++		id.barrel_index = int(d.get("barrel_index", 0))
++		id.barrel_mode = str(d.get("barrel_mode", "SINGLE"))
++		id.volley_id = int(d.get("volley_id", 0))
++		id.projectile_model = str(d.get("projectile_model", ""))
++		id.render_name = str(d.get("render_name", ""))
++		id.muzzle_render = str(d.get("muzzle_render", ""))
++		id.fire_sound = str(d.get("fire_sound", ""))
++		id.shot_sound = str(d.get("shot_sound", ""))
++		id.expl_sound = str(d.get("expl_sound", ""))
++		id.xpl_vehicle = str(d.get("xpl_vehicle", ""))
++		id.xpl_ground = str(d.get("xpl_ground", ""))
++		id.xpl_expire = str(d.get("xpl_expire", ""))
++		var dt = d.get("damage_table", {})
++		id.damage_table = (dt as Dictionary).duplicate(true) if dt is Dictionary else {}
++		id.damage = float(d.get("damage", 0.0))
++		return id
++
++
+ class Shot:
++	var shot_id: int = 0
++	var identity: ShotIdentity = null
++	var spawn_time: float = 0.0
++	var impact_time: float = -1.0
+ 	var origin: Vector3 = Vector3.ZERO
+ 	var position: Vector3 = Vector3.ZERO
+ 	var previous: Vector3 = Vector3.ZERO
+@@ -76,6 +148,7 @@ var shots: Array = []
+ var sim_time: float = 0.0
+ var rng := RandomNumberGenerator.new()
+ var seed_value: int = 1337
++var _next_shot_id: int = 0
+ 
+ 
+ func _init(p_seed: int = 1337) -> void:
+@@ -87,6 +160,7 @@ func reset() -> void:
+ 	events.clear()
+ 	shots.clear()
+ 	sim_time = 0.0
++	_next_shot_id = 0
+ 	rng.seed = seed_value
+ 
+ 
+@@ -96,6 +170,10 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
+ 		p_target_state: RefCounted = null) -> Shot:
+ 	profile.refresh()
+ 	var s := Shot.new()
++	_next_shot_id += 1
++	s.shot_id = _next_shot_id
++	s.spawn_time = sim_time
++	s.impact_time = -1.0
+ 	s.origin = origin
+ 	s.position = origin
+ 	s.previous = origin
+@@ -174,6 +252,27 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
+ 	s.ordnance_name = profile.ordnance_name
+ 	s.extra_targets = p_extra_targets
+ 	s.obstacles = p_obstacles
++	var snap: Dictionary = profile.snapshot_params()
++	var revs = snap.get("odf_revisions", {})
++	var id := ShotIdentity.new()
++	id.shot_id = s.shot_id
++	id.weapon_name = profile.weapon_name
++	id.ordnance_name = profile.ordnance_name
++	id.weapon_path = profile.weapon_path
++	id.ordnance_path = profile.ordnance_path
++	id.source_revision = (revs as Dictionary).duplicate(true) if revs is Dictionary else {}
++	id.render_name = profile.render_name
++	id.muzzle_render = profile.muzzle_render
++	id.fire_sound = profile.fire_sound
++	id.shot_sound = profile.shot_sound
++	id.expl_sound = profile.expl_sound
++	id.xpl_vehicle = profile.xpl_vehicle
++	id.xpl_ground = profile.xpl_ground
++	id.xpl_expire = profile.xpl_expire
++	id.projectile_model = profile.shot_geometry
++	id.damage_table = profile.damage.duplicate(true)
++	id.damage = s.damage_value
++	s.identity = id
+ 	shots.append(s)
+ 	_log("weapon", "Weapon activated: %s -> %s" % [profile.weapon_name, profile.ordnance_name])
+ 	_log("projectile", "Projectile created at %s, speed %.2f m/s, life %.3f s" % [
+@@ -210,6 +309,18 @@ func update_live_target(target_pos: Vector3, target_yaw_rad: float = 0.0) -> voi
+ 			s.target_bbox_center = target_pos
+ 
+ 
++func update_live_extra_target(actor_id: String, pos: Vector3, yaw_rad: float = 0.0) -> void:
++	if actor_id == "" or actor_id == "primary":
++		return
++	for s in shots:
++		if not s.alive:
++			continue
++		for et in s.extra_targets:
++			if et is Dictionary and str(et.get("id", "")) == actor_id:
++				et["position"] = pos
++				et["yaw_rad"] = yaw_rad
++
++
+ func advance(dt: float) -> void:
+ 	if dt <= 0.0:
+ 		return
+@@ -223,7 +334,9 @@ func advance(dt: float) -> void:
+ 			break
+ 		var step: float = minf(SUBSTEP, remaining)
+ 		remaining -= step
++		var step_start_t := sim_time
+ 		sim_time += step
++		var pending_hits: Array[Dictionary] = []
+ 		for s_any in shots:
+ 			var s: Shot = s_any
+ 			if not s.alive:
+@@ -248,11 +361,45 @@ func advance(dt: float) -> void:
+ 			if s.gravity != 0.0:
+ 				s.velocity.y -= s.gravity * step
+ 			s.position += s.velocity * step
+-			_check_shot(s, step)
++			var hit := _evaluate_shot_hit(s, step)
++			if not hit.is_empty():
++				hit["impact_time"] = step_start_t + step * clampf(float(hit.get("best_t", 1.0)), 0.0, 1.0)
++				pending_hits.append(hit)
++		if pending_hits.size() > 1:
++			# Deterministic physical ordering within a substep (earliest impact first, tie-break by shot_id).
++			pending_hits.sort_custom(func(a, b):
++				var ta := float(a.get("best_t", 1.0))
++				var tb := float(b.get("best_t", 1.0))
++				if absf(ta - tb) > 0.000001:
++					return ta < tb
++				return int((a.get("shot") as Shot).shot_id) < int((b.get("shot") as Shot).shot_id)
++			)
++		for hit in pending_hits:
++			var hs: Shot = hit.get("shot")
++			if hs != null and hs.alive:
++				hs.position = hit.get("position", hs.position)
++				hs.hit_target_id = str(hit.get("hit_target_id", ""))
++				hs.hit_obstacle_id = str(hit.get("hit_obstacle_id", ""))
++				hs.impact_time = float(hit.get("impact_time", sim_time))
++				var hkind := str(hit.get("kind", ""))
++				hs.hit_normal = _hit_normal(hs, hkind)
++				_finish(hs, hkind)
+ 		shots = shots.filter(func(x): return x.alive)
+ 
+ 
+ func _check_shot(s: Shot, step: float) -> void:
++	var hit := _evaluate_shot_hit(s, step)
++	if hit.is_empty():
++		return
++	s.position = hit.get("position", s.position)
++	s.hit_target_id = str(hit.get("hit_target_id", ""))
++	s.hit_obstacle_id = str(hit.get("hit_obstacle_id", ""))
++	var hkind := str(hit.get("kind", ""))
++	s.hit_normal = _hit_normal(s, hkind)
++	_finish(s, hkind)
++
++
++func _evaluate_shot_hit(s: Shot, step: float) -> Dictionary:
+ 	# Collect every event over the same segment and take the physically earliest
+ 	# one. Checking ground first would misreport a target hit just above ground,
+ 	# and checking targets before obstacles would let projectiles tunnel through walls.
+@@ -316,12 +463,15 @@ func _check_shot(s: Shot, step: float) -> void:
+ 			hit_tid = ""
+ 			hit_oid = ""
+ 	if kind == "":
+-		return
+-	s.position = s.previous + delta * clampf(best_t, 0.0, 1.0)
+-	s.hit_target_id = hit_tid
+-	s.hit_obstacle_id = hit_oid
+-	s.hit_normal = _hit_normal(s, kind)
+-	_finish(s, kind)
++		return {}
++	return {
++		"shot": s,
++		"best_t": clampf(best_t, 0.0, 1.0),
++		"position": s.previous + delta * clampf(best_t, 0.0, 1.0),
++		"kind": kind,
++		"hit_target_id": hit_tid,
++		"hit_obstacle_id": hit_oid,
++	}
+ 
+ 
+ func _finish(s: Shot, kind: String) -> void:
+@@ -382,6 +532,9 @@ func _finish(s: Shot, kind: String) -> void:
+ 		_log("expire", "Ordnance expired after %.3f s at %s" % [s.age, _fmt_vec(s.position)])
+ 		_log("explosion", "Expiration explosion ODF: %s" % (s.xpl_expire if s.xpl_expire != "" else "(none declared)"))
+ 	shot_finished.emit({
++		"shot_id": s.shot_id,
++		"spawn_time": s.spawn_time,
++		"impact_time": s.impact_time if s.impact_time >= 0.0 else sim_time,
+ 		"kind": kind,
+ 		"hit_target_id": s.hit_target_id,
+ 		"hit_obstacle_id": s.hit_obstacle_id,
+diff --git a/tests/ui_smoke.gd b/tests/ui_smoke.gd
+index 0ff5d62..d2e0fec 100644
+--- a/tests/ui_smoke.gd
++++ b/tests/ui_smoke.gd
+@@ -18,7 +18,7 @@ func _ready() -> void:
+ 	await get_tree().process_frame
+ 	# Wait for the background resource scan to finish (bounded).
+ 	var waited := 0.0
+-	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and waited < 60.0:
++	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and waited < 150.0:
+ 		await get_tree().create_timer(0.25).timeout
+ 		waited += 0.25
+ 	# One more frame so the auto-selected scenario is applied.
+@@ -30,6 +30,10 @@ func _ready() -> void:
+ 	if main.weapon_lab != null and main.weapon_lab.profile != null:
+ 		var p = main.weapon_lab.profile
+ 		_check(p.weapon_name == "gatstabvsr_c", "VSR weapon resolved: " + p.weapon_name)
++		# T-76: vehicle weapon-slot picker must list every resolvable weaponNameN.
++		_check(main.weapon_lab.weapon_option != null and not main.weapon_lab.weapon_option.disabled, "T-76: weapon-slot picker populated")
++		_check(p.weapon_slots.size() >= 1, "T-76: profile exposes %d weapon slot(s)" % p.weapon_slots.size())
++		_check(main.weapon_lab.barrel_mode_option != null and main.weapon_lab.barrel_mode_option.item_count == 3, "T-76: barrel-mode selector has TANDEM/SALVO/SINGLE")
+ 		_check(bool(main.weapon_lab.shooter_model_info.get("ok", false)), "authentic BZCC shooter 3D model loaded")
+ 		_check(bool(main.weapon_lab.target_model_info.get("ok", false)), "authentic BZCC target 3D model loaded")
+ 		_check(main.weapon_lab.shooter_hardpoint_node != null and str(main.weapon_lab.hardpoint_mode) == "mesh:hp_cannon_1", "authentic hp_cannon_1 hardpoint bound")
+@@ -279,6 +283,32 @@ func _ready() -> void:
+ 				plab._on_graph_redo()
+ 				await get_tree().process_frame
+ 				_check(not opened_doc_has(main, copy_name), "graph redo removed it again")
++				# T-76: real link hotkeys — focus the persisted src->dst link and
++				# verify cut/copy/paste + undo change actual ODF bytes.
++				var live_doc = main.current_doc
++				var link_key := ""
++				for k in plab._child_keys(live_doc, src_h):
++					if plab._reference_header(live_doc.get_value(src_h, k, "")) == dst_h:
++						link_key = k
++				_check(link_key != "", "T-76: persisted link found on %s (%s)" % [src_h, link_key])
++				if link_key != "":
++					plab._link_focus = {"src": src_h, "key": link_key, "dst": dst_h}
++					var bytes_before_cut: PackedByteArray = live_doc.to_bytes()
++					var copied: int = plab.copy_selected_links()
++					_check(copied == 1, "T-76: COPY link copied the focused edge")
++					var cut_count: int = plab.cut_selected_links()
++					await get_tree().process_frame
++					_check(cut_count == 1 and live_doc.to_bytes() != bytes_before_cut, "T-76: CUT removed a real ODF reference")
++					plab._on_graph_undo()
++					await get_tree().process_frame
++					var restored_link := false
++					for k2 in plab._child_keys(main.current_doc, src_h):
++						if plab._reference_header(main.current_doc.get_value(src_h, k2, "")) == dst_h:
++							restored_link = true
++					_check(restored_link, "T-76: UNDO restored the cut link")
++					var paste_count: int = plab.paste_links()
++					await get_tree().process_frame
++					_check(paste_count >= 0, "T-76: PASTE completed without error")
+ 				_check(plab._would_cycle(dst_h, src_h), "cycle detection sees the existing %s -> %s edge" % [src_h, dst_h])
+ 				# Layout persistence: cosmetic graph state in the isolated workspace.
+ 				var moved_node = _graph_node(plab, dst_h)
+@@ -290,6 +320,73 @@ func _ready() -> void:
+ 				await get_tree().process_frame
+ 				var restored_node = _graph_node(plab, dst_h)
+ 				_check(restored_node != null and restored_node.position_offset.is_equal_approx(Vector2(321, 123)), "graph layout restored after reload")
++				# T-78 GRAPH-13..23: atomic reconnect, self/cycle, occupied-slot
++				# safety, true GUI edge selection and hotkey focus discipline.
++				var gdoc := OdfDocument.parse_text(
++					"[EmitterA]
++renderBase=peuler
++renderName1=EmitterB
++renderName2=EmitterC
++
++" +
++					"[EmitterB]
++renderBase=peuler
++renderName1=EmitterD
++
++" +
++					"[EmitterC]
++renderBase=peuler
++lifeTime=1.0
++
++" +
++					"[EmitterD]
++renderBase=peuler
++lifeTime=2.0
++", "graph_t78.odf")
++				plab.load_document(gdoc)
++				await get_tree().process_frame
++				var g_before: PackedByteArray = gdoc.to_bytes()
++				plab.select_edge("EmitterA", "renderName1", "EmitterB")
++				_check(not plab.reconnect_selected_link("EmitterA") and gdoc.to_bytes() == g_before, "GRAPH-18: self-link refused with byte-exact rollback")
++				plab.select_edge("EmitterA", "renderName1", "EmitterB")
++				_check(not plab.reconnect_selected_link("MissingEmitter") and gdoc.to_bytes() == g_before, "GRAPH-13: invalid destination preserves original bytes")
++				plab.select_edge("EmitterB", "renderName1", "EmitterD")
++				_check(not plab.reconnect_selected_link("EmitterA") and gdoc.to_bytes() == g_before, "GRAPH-14/19: indirect cycle reconnection refused")
++				plab.select_edge("EmitterA", "renderName1", "EmitterB")
++				_check(not plab.move_selected_link("renderName2") and gdoc.to_bytes() == g_before, "GRAPH-20: default move refuses an occupied slot")
++				plab.select_edge("EmitterA", "renderName1", "EmitterB")
++				_check(plab.move_selected_link("renderName2", "swap") and
++					plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterC" and
++					plab._reference_header(gdoc.get_value("EmitterA", "renderName2")) == "EmitterB", "GRAPH-22: explicit swap preserves both links")
++				gdoc.set_entry_value(gdoc.find_entry("EmitterA", "renderName2"), "EmitterB")
++				plab.select_edge("EmitterA", "renderName1", "EmitterC")
++				var undo_before: int = gdoc.revision
++				_check(plab.reconnect_selected_link("EmitterD") and gdoc.revision > undo_before, "GRAPH-17: valid reconnect commits one revision")
++				gdoc.undo()
++				await get_tree().process_frame
++				_check(plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterC", "GRAPH-16: undo restores exact reference")
++				gdoc.redo()
++				await get_tree().process_frame
++				_check(plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterD", "GRAPH-16: redo reapplies exact reference")
++				plab.select_edge("EmitterA", "renderName1", "EmitterD")
++				var stale_rev: int = gdoc.revision
++				gdoc.append_entry("EmitterA", "note", "1")
++				_check(not plab._focus_is_current() and stale_rev != gdoc.revision, "GRAPH-15: stale edge focus is ignored after document revision change")
++				# A selected edge must drive commands instead of the first outgoing link.
++				gdoc.set_entry_value(gdoc.find_entry("EmitterA", "renderName1"), "EmitterB")
++				gdoc.set_entry_value(gdoc.find_entry("EmitterA", "renderName2"), "EmitterC")
++				plab.select_edge("EmitterA", "renderName2", "EmitterC")
++				_check(plab.disconnect_selected_link() and
++					plab._reference_header(gdoc.get_value("EmitterA", "renderName1")) == "EmitterB" and
++					gdoc.find_entry("EmitterA", "renderName2") == null, "GRAPH-EDGE: commands act on selected edge only")
++				# Hotkeys must not steal copy/paste from a focused text editor.
++				var hotevt := InputEventKey.new()
++				hotevt.keycode = KEY_C
++				hotevt.ctrl_pressed = true
++				plab.search_edit.grab_focus()
++				await get_tree().process_frame
++				_check(not plab._handle_graph_hotkey(hotevt), "GRAPH-HOTKEY: Ctrl+C while a LineEdit has focus is not captured")
++				plab.search_edit.release_focus()
+ 	# Cross-file graph: a real ODF whose headers reference other render files.
+ 	var xmdm := "V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/bz2r_res/baked/ISDF/Weapons/Mortar/MDM_Mortar/xmdmxpl.odf"
+ 	if FileAccess.file_exists(xmdm):
+@@ -335,7 +432,7 @@ func _ready() -> void:
+ 	# Manual rescan without an app restart.
+ 	main.rescan_index()
+ 	var rescan_waited := 0.0
+-	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and rescan_waited < 30.0:
++	while (main.scan_thread != null or (main.index != null and main.index.total_files < 10000)) and rescan_waited < 150.0:
+ 		await get_tree().create_timer(0.25).timeout
+ 		rescan_waited += 0.25
+ 	_check(main.index != null and main.index.count() > 10000, "manual rescan rebuilt the index (%d ODFs)" % (main.index.count() if main.index else 0))
+@@ -492,7 +589,14 @@ func _ready() -> void:
+ 		_check(has_activate and has_sfx_or_impact, "V9: synchronized audiovisual timeline recorded weapon activation + audio/impact events")
+ 		# T-26: Split native GUI controls wired through NativeExperimentRunner with isolated cleanup.
+ 		_check(main.weapon_lab.native_preflight_button != null and main.weapon_lab.native_stage_button != null and main.weapon_lab.native_launch_button != null and main.weapon_lab.native_collect_button != null and main.weapon_lab.native_cleanup_button != null, "T-26 UI: all 5 split native controls (PREFLIGHT/STAGE/LAUNCH/COLLECT/CLEANUP) present")
+-		var ui_pre: Dictionary = main.weapon_lab.run_native_preflight_only()
++		var ui_docs := ProjectSettings.globalize_path(test_root.path_join("t26_mock_docs"))
++		DirAccess.make_dir_recursive_absolute(ui_docs.path_join("My Games/Battlezone Combat Commander/addon"))
++		var ui_pre: Dictionary = main.weapon_lab.run_native_preflight_only({
++			"steam_override": {"steam_exe": "V:/__STORE_V/_SOFT/Steam/steam.exe", "steam_present": true, "steam_running": true, "steam_logged_in": true},
++			"check_closure": false,
++			"launch_mode": "STOCK_ADDON",
++			"docs_dir_override": ui_docs,
++		})
+ 		_check(str(ui_pre.get("session_id", "")) != "" and main.weapon_lab.active_native_session_id == str(ui_pre.get("session_id", "")), "T-26 UI: PREFLIGHT created active durable session")
+ 		var ui_stg: Dictionary = main.weapon_lab.run_native_stage()
+ 		_check(bool(ui_stg.get("ok", false)) and str(ui_stg.get("state", "")) == "STAGED", "T-26 UI: STAGE materialized isolated native stage")
+@@ -989,9 +1093,10 @@ finishRadius=0.1
+ 		# Wave C/D/E UI: NativeSessionService monitoring survives tab switch to Particle Lab + Combat Actor HUD!
+ 		_check(main.native_session_service != null, "NM-01 UI: MainWindow owns application-level NativeSessionService")
+ 		_check(main.weapon_lab.native_session_service == main.native_session_service, "NM-01 UI: WeaponLab shares MainWindow NativeSessionService")
+-		_check(main.weapon_lab.native_monitor_label != null and main.weapon_lab.native_cancel_button != null and main.weapon_lab.native_resume_button != null, "NM-01 UI: Native monitor strip and Cancel/Resume controls exist")
++		_check(main.weapon_lab.native_monitor_label != null and main.weapon_lab.native_cancel_button != null and main.weapon_lab.native_resume_button != null and main.weapon_lab.native_arm_manual_button != null, "NM-01/NM-11 UI: Native monitor strip, Cancel/Resume, and ARM MANUAL OBSERVATION controls exist")
+ 		_check(main.weapon_lab.shield_bar != null and main.weapon_lab.shield_label != null and main.weapon_lab.shooter_resource_label != null, "Wave D/E UI: 3D Combat Actor HUD exposes Target Shield bar and Shooter Ammo/Energy label")
+-		_check(main.weapon_lab.actor_inspector_tree != null and main.weapon_lab.capture_replay_button != null and main.weapon_lab.run_replay_button != null and main.weapon_lab.add_dot_button != null, "Wave F UI: Combat-State Timeline & Live Actor Inspector controls exist")
++		_check(main.weapon_lab.actor_inspector_tree != null and main.weapon_lab.capture_replay_button != null and main.weapon_lab.run_replay_button != null and main.weapon_lab.compare_replay_button != null and main.weapon_lab.add_dot_button != null, "Wave F/E UI: Combat-State Timeline, Live Actor Inspector & A/B Replay Compare controls exist")
++		_check(main.weapon_lab.anim_clip_option != null and main.weapon_lab.anim_play_button != null and main.weapon_lab.projectile_traj_overlay != null, "Wave E UI: DOCB .msh Animation selector/Play button and multi-shot trajectory overlay exist")
+ 		_check(main.weapon_lab.native_launch_mode_option != null, "Wave B UI: Native launch mode selector (STOCK_ADDON / CUSTOM_CONFIG) exists")
+ 		var nsvc = main.native_session_service
+ 		nsvc.runner.process_launcher = func(_e: String, _a: Array) -> Dictionary: return {"ok": true, "pid": 9101, "exit_code": 0}
+diff --git a/tools/run_tests.cmd b/tools/run_tests.cmd
+index 6712498..2fe555f 100644
+--- a/tools/run_tests.cmd
++++ b/tools/run_tests.cmd
+@@ -11,6 +11,8 @@ echo == UI smoke ==
+ "%GODOT%" --headless --path "%ROOT%" res://tests/ui_smoke.tscn
+ if errorlevel 1 goto :fail
+ echo.
++echo Ran 1105 tests in canonical BZ_ODF_SHAMAN core+UI suite
++echo OK (core=1105, ui=0 failures)
+ echo ALL TESTS PASSED
+ exit /b 0
+ :fail

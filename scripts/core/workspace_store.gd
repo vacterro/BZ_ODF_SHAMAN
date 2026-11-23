@@ -659,6 +659,11 @@ static func _recover_one(journal: Dictionary) -> String:
 
 
 static func _md5_bytes(bytes: PackedByteArray) -> String:
+	# HashingContext.update() fails on a zero-length buffer, and an empty
+	# override file is a legitimate state whose hash must still be stable:
+	# an empty input gets the canonical MD5 of the empty string.
+	if bytes.is_empty():
+		return "d41d8cd98f00b204e9800998ecf8427e"
 	var ctx := HashingContext.new()
 	ctx.start(HashingContext.HASH_MD5)
 	ctx.update(bytes)

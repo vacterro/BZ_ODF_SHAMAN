@@ -1,0 +1,15 @@
+{
+  "op_id": "scope-34d5fda6f7494d4497977d0f90589792",
+  "paths": {
+    "tests/verify_t128_cleanup_contract.gd.uid": "dc8351b9a4fda7de53f34d692ffea5f76d6d9253723099b87d03a6f73fc4473c",
+    "tests/verify_t73_native_safety.gd": "453fe5da4cb05689ba5045362cbfeb30243cb0246010e7e907de43b2ed1d022f",
+    "tests/verify_t80_identity.gd": "bf27bcbabda4ccedbe3abf47982c8a0610b934522d6f4c37e60e055a4e57fc60"
+  },
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "recorded_at": "2026-11-23T20:30:54Z",
+  "schema_version": 2,
+  "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+  "source_tree_fingerprint": "git-delta-v1:e04b8a9e3023b230e5fe7f44c132674f41a3915896701ee608912583250e9d22",
+  "ticket": "T-146"
+}

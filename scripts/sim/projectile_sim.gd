@@ -12,7 +12,79 @@ const SUBSTEP := 1.0 / 240.0
 const MAX_SUBSTEPS := 64
 const ActorStateScript = preload("res://scripts/sim/combat_actor_state.gd")
 
+## Launch-time identity for one projectile. Weapon switching changes the
+## profile used for new shots; already-fired shots keep these frozen values.
+class ShotIdentity:
+	var shot_id: int = 0
+	var weapon_name: String = ""
+	var ordnance_name: String = ""
+	var weapon_path: String = ""
+	var ordnance_path: String = ""
+	var source_revision: Dictionary = {}
+	var hardpoint: String = ""
+	var barrel_index: int = 0
+	var barrel_mode: String = "SINGLE"
+	var volley_id: int = 0
+	var projectile_model: String = ""
+	var render_name: String = ""
+	var muzzle_render: String = ""
+	var fire_sound: String = ""
+	var shot_sound: String = ""
+	var expl_sound: String = ""
+	var xpl_vehicle: String = ""
+	var xpl_ground: String = ""
+	var xpl_expire: String = ""
+	var damage_table: Dictionary = {}
+	var damage: float = 0.0
+
+	func to_dict() -> Dictionary:
+		return {
+			"shot_id": shot_id, "weapon_name": weapon_name,
+			"ordnance_name": ordnance_name, "weapon_path": weapon_path,
+			"ordnance_path": ordnance_path, "source_revision": source_revision.duplicate(true),
+			"hardpoint": hardpoint, "barrel_index": barrel_index,
+			"barrel_mode": barrel_mode, "volley_id": volley_id,
+			"projectile_model": projectile_model, "render_name": render_name,
+			"muzzle_render": muzzle_render, "fire_sound": fire_sound,
+			"shot_sound": shot_sound, "expl_sound": expl_sound,
+			"xpl_vehicle": xpl_vehicle, "xpl_ground": xpl_ground,
+			"xpl_expire": xpl_expire, "damage_table": damage_table.duplicate(true),
+			"damage": damage,
+		}
+
+	static func from_dict(d: Dictionary) -> ShotIdentity:
+		var id := ShotIdentity.new()
+		id.shot_id = int(d.get("shot_id", 0))
+		id.weapon_name = str(d.get("weapon_name", ""))
+		id.ordnance_name = str(d.get("ordnance_name", ""))
+		id.weapon_path = str(d.get("weapon_path", ""))
+		id.ordnance_path = str(d.get("ordnance_path", ""))
+		var rev = d.get("source_revision", {})
+		id.source_revision = (rev as Dictionary).duplicate(true) if rev is Dictionary else {}
+		id.hardpoint = str(d.get("hardpoint", ""))
+		id.barrel_index = int(d.get("barrel_index", 0))
+		id.barrel_mode = str(d.get("barrel_mode", "SINGLE"))
+		id.volley_id = int(d.get("volley_id", 0))
+		id.projectile_model = str(d.get("projectile_model", ""))
+		id.render_name = str(d.get("render_name", ""))
+		id.muzzle_render = str(d.get("muzzle_render", ""))
+		id.fire_sound = str(d.get("fire_sound", ""))
+		id.shot_sound = str(d.get("shot_sound", ""))
+		id.expl_sound = str(d.get("expl_sound", ""))
+		id.xpl_vehicle = str(d.get("xpl_vehicle", ""))
+		id.xpl_ground = str(d.get("xpl_ground", ""))
+		id.xpl_expire = str(d.get("xpl_expire", ""))
+		var dt = d.get("damage_table", {})
+		id.damage_table = (dt as Dictionary).duplicate(true) if dt is Dictionary else {}
+		id.damage = float(d.get("damage", 0.0))
+		return id
+
+
 class Shot:
+	var shot_id: int = 0
+	var identity: ShotIdentity = null
+	var spawn_time: float = 0.0
+	var impact_time: float = -1.0
 	var origin: Vector3 = Vector3.ZERO
 	var position: Vector3 = Vector3.ZERO
 	var previous: Vector3 = Vector3.ZERO
@@ -76,6 +148,7 @@ var shots: Array = []
 var sim_time: float = 0.0
 var rng := RandomNumberGenerator.new()
 var seed_value: int = 1337
+var _next_shot_id: int = 0
 
 
 func _init(p_seed: int = 1337) -> void:
@@ -87,6 +160,7 @@ func reset() -> void:
 	events.clear()
 	shots.clear()
 	sim_time = 0.0
+	_next_shot_id = 0
 	rng.seed = seed_value
 
 
@@ -96,6 +170,10 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
 		p_target_state: RefCounted = null) -> Shot:
 	profile.refresh()
 	var s := Shot.new()
+	_next_shot_id += 1
+	s.shot_id = _next_shot_id
+	s.spawn_time = sim_time
+	s.impact_time = -1.0
 	s.origin = origin
 	s.position = origin
 	s.previous = origin
@@ -174,6 +252,27 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
 	s.ordnance_name = profile.ordnance_name
 	s.extra_targets = p_extra_targets
 	s.obstacles = p_obstacles
+	var snap: Dictionary = profile.snapshot_params()
+	var revs = snap.get("odf_revisions", {})
+	var id := ShotIdentity.new()
+	id.shot_id = s.shot_id
+	id.weapon_name = profile.weapon_name
+	id.ordnance_name = profile.ordnance_name
+	id.weapon_path = profile.weapon_path
+	id.ordnance_path = profile.ordnance_path
+	id.source_revision = (revs as Dictionary).duplicate(true) if revs is Dictionary else {}
+	id.render_name = profile.render_name
+	id.muzzle_render = profile.muzzle_render
+	id.fire_sound = profile.fire_sound
+	id.shot_sound = profile.shot_sound
+	id.expl_sound = profile.expl_sound
+	id.xpl_vehicle = profile.xpl_vehicle
+	id.xpl_ground = profile.xpl_ground
+	id.xpl_expire = profile.xpl_expire
+	id.projectile_model = profile.shot_geometry
+	id.damage_table = profile.damage.duplicate(true)
+	id.damage = s.damage_value
+	s.identity = id
 	shots.append(s)
 	_log("weapon", "Weapon activated: %s -> %s" % [profile.weapon_name, profile.ordnance_name])
 	_log("projectile", "Projectile created at %s, speed %.2f m/s, life %.3f s" % [
@@ -210,6 +309,18 @@ func update_live_target(target_pos: Vector3, target_yaw_rad: float = 0.0) -> voi
 			s.target_bbox_center = target_pos
 
 
+func update_live_extra_target(actor_id: String, pos: Vector3, yaw_rad: float = 0.0) -> void:
+	if actor_id == "" or actor_id == "primary":
+		return
+	for s in shots:
+		if not s.alive:
+			continue
+		for et in s.extra_targets:
+			if et is Dictionary and str(et.get("id", "")) == actor_id:
+				et["position"] = pos
+				et["yaw_rad"] = yaw_rad
+
+
 func advance(dt: float) -> void:
 	if dt <= 0.0:
 		return
@@ -223,7 +334,9 @@ func advance(dt: float) -> void:
 			break
 		var step: float = minf(SUBSTEP, remaining)
 		remaining -= step
+		var step_start_t := sim_time
 		sim_time += step
+		var pending_hits: Array[Dictionary] = []
 		for s_any in shots:
 			var s: Shot = s_any
 			if not s.alive:
@@ -248,11 +361,45 @@ func advance(dt: float) -> void:
 			if s.gravity != 0.0:
 				s.velocity.y -= s.gravity * step
 			s.position += s.velocity * step
-			_check_shot(s, step)
+			var hit := _evaluate_shot_hit(s, step)
+			if not hit.is_empty():
+				hit["impact_time"] = step_start_t + step * clampf(float(hit.get("best_t", 1.0)), 0.0, 1.0)
+				pending_hits.append(hit)
+		if pending_hits.size() > 1:
+			# Deterministic physical ordering within a substep (earliest impact first, tie-break by shot_id).
+			pending_hits.sort_custom(func(a, b):
+				var ta := float(a.get("best_t", 1.0))
+				var tb := float(b.get("best_t", 1.0))
+				if absf(ta - tb) > 0.000001:
+					return ta < tb
+				return int((a.get("shot") as Shot).shot_id) < int((b.get("shot") as Shot).shot_id)
+			)
+		for hit in pending_hits:
+			var hs: Shot = hit.get("shot")
+			if hs != null and hs.alive:
+				hs.position = hit.get("position", hs.position)
+				hs.hit_target_id = str(hit.get("hit_target_id", ""))
+				hs.hit_obstacle_id = str(hit.get("hit_obstacle_id", ""))
+				hs.impact_time = float(hit.get("impact_time", sim_time))
+				var hkind := str(hit.get("kind", ""))
+				hs.hit_normal = _hit_normal(hs, hkind)
+				_finish(hs, hkind)
 		shots = shots.filter(func(x): return x.alive)
 
 
 func _check_shot(s: Shot, step: float) -> void:
+	var hit := _evaluate_shot_hit(s, step)
+	if hit.is_empty():
+		return
+	s.position = hit.get("position", s.position)
+	s.hit_target_id = str(hit.get("hit_target_id", ""))
+	s.hit_obstacle_id = str(hit.get("hit_obstacle_id", ""))
+	var hkind := str(hit.get("kind", ""))
+	s.hit_normal = _hit_normal(s, hkind)
+	_finish(s, hkind)
+
+
+func _evaluate_shot_hit(s: Shot, step: float) -> Dictionary:
 	# Collect every event over the same segment and take the physically earliest
 	# one. Checking ground first would misreport a target hit just above ground,
 	# and checking targets before obstacles would let projectiles tunnel through walls.
@@ -316,12 +463,15 @@ func _check_shot(s: Shot, step: float) -> void:
 			hit_tid = ""
 			hit_oid = ""
 	if kind == "":
-		return
-	s.position = s.previous + delta * clampf(best_t, 0.0, 1.0)
-	s.hit_target_id = hit_tid
-	s.hit_obstacle_id = hit_oid
-	s.hit_normal = _hit_normal(s, kind)
-	_finish(s, kind)
+		return {}
+	return {
+		"shot": s,
+		"best_t": clampf(best_t, 0.0, 1.0),
+		"position": s.previous + delta * clampf(best_t, 0.0, 1.0),
+		"kind": kind,
+		"hit_target_id": hit_tid,
+		"hit_obstacle_id": hit_oid,
+	}
 
 
 func _finish(s: Shot, kind: String) -> void:
@@ -382,6 +532,9 @@ func _finish(s: Shot, kind: String) -> void:
 		_log("expire", "Ordnance expired after %.3f s at %s" % [s.age, _fmt_vec(s.position)])
 		_log("explosion", "Expiration explosion ODF: %s" % (s.xpl_expire if s.xpl_expire != "" else "(none declared)"))
 	shot_finished.emit({
+		"shot_id": s.shot_id,
+		"spawn_time": s.spawn_time,
+		"impact_time": s.impact_time if s.impact_time >= 0.0 else sim_time,
 		"kind": kind,
 		"hit_target_id": s.hit_target_id,
 		"hit_obstacle_id": s.hit_obstacle_id,

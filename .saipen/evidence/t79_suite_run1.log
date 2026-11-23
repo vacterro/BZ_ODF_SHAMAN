@@ -1,0 +1,1660 @@
+== Core tests ==
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+BZ_ODF_SHAMAN test runner
+
+[explosion effect runtime]
+  ✓ real explosion ODF builds a burst
+  ✓ no effect build errors (expected 0, got 0)
+  ✓ four particle classes resolved (expected 4, got 4)
+  ✓ four emitters created (expected 4, got 4)
+  ✓ duration follows the longest class lifetime (chunks 8 s)
+  ✓ four emitters + one light node (expected 5, got 5)
+  ✓ draw_light class produces a real light
+  ✓ missing explosion ODF is reported, not silently skipped
+  ✓ composite multi-class explosion built
+  ✓ V5: render vocabulary handled: draw_emit
+  ✓ V5: render vocabulary handled: draw_multi
+  ✓ V5: render vocabulary handled: draw_sprite
+  ✓ V5: render vocabulary handled: draw_twirl_trail
+  ✓ V5: render vocabulary handled: draw_bolt
+  ✓ V5: render vocabulary handled: draw_tracer
+  ✓ V5: render vocabulary handled: draw_geom
+  ✓ V5: render vocabulary handled: draw_light
+  ✓ draw_bolt uses elongated BoxMesh
+  ✓ draw_sprite uses QuadMesh
+  ✓ V7: external file.header resolved with blue startColor
+  ✓ V5: lifeTime edit immediately updates burst duration
+  ✓ V7: edited external startColor visible immediately
+
+[ODF parser / no-op roundtrip]
+  ✓ parsed 3 entries (expected 3, got 3)
+  ✓ parsed 2 headers (expected 2, got 2)
+  ✓ quoted value unquoted for reading (expected ord_a, got ord_a)
+  ✓ numeric raw preserved (expected 1.0, got 1.0)
+  ✓ no-op serialization is byte-identical (expected [91, 87, 101, 97, 112, 111, 110, 67, 108, 97, 115, 115, 93, 13, 10, 99, 108, 97, 115, 115, 76, 97, 98, 101, 108, 61, 34, 120, 34, 32, 47, 47, 32, 107, 101, 101, 112, 32, 109, 101, 13, 10, 111, 114, 100, 78, 97, 109, 101, 32, 61, 32, 34, 111, 114, 100, 95, 97, 34, 13, 10, 13, 10, 91, 67, 97, 110, 110, 111, 110, 67, 108, 97, 115, 115, 93, 13, 10, 115, 104, 111, 116, 68, 101, 108, 97, 121, 61, 49, 46, 48, 13, 10], got [91, 87, 101, 97, 112, 111, 110, 67, 108, 97, 115, 115, 93, 13, 10, 99, 108, 97, 115, 115, 76, 97, 98, 101, 108, 61, 34, 120, 34, 32, 47, 47, 32, 107, 101, 101, 112, 32, 109, 101, 13, 10, 111, 114, 100, 78, 97, 109, 101, 32, 61, 32, 34, 111, 114, 100, 95, 97, 34, 13, 10, 13, 10, 91, 67, 97, 110, 110, 111, 110, 67, 108, 97, 115, 115, 93, 13, 10, 115, 104, 111, 116, 68, 101, 108, 97, 121, 61, 49, 46, 48, 13, 10])
+  ✓ no parser warnings (expected 0, got 0)
+
+[ODF parser / duplicates and shadowing]
+  ✓ duplicate declarations preserved (expected 3, got 3)
+  ✓ only last duplicate is effective (expected 2, got 2)
+  ✓ earlier duplicate marked shadowed
+  ✓ later duplicate marked effective shadow
+  ✓ effective value is the last declaration (expected 0.5, got 0.5)
+  ✓ both declarations physically preserved
+
+[ODF parser / comments, block comments, BOM]
+  ✓ semicolon inside quotes is not a comment (expected a;b, got a;b)
+  ✓ CRLF trailing value trimmed (expected x.wav, got x.wav)
+  ✓ block comments and CRLF preserved byte-for-byte (expected [47, 47, 32, 104, 101, 97, 100, 101, 114, 32, 99, 111, 109, 109, 101, 110, 116, 10, 91, 87, 101, 97, 112, 111, 110, 67, 108, 97, 115, 115, 93, 10, 47, 42, 32, 98, 108, 111, 99, 107, 10, 99, 111, 109, 109, 101, 110, 116, 32, 42, 47, 10, 111, 114, 100, 78, 97, 109, 101, 61, 34, 97, 59, 98, 34, 32, 59, 32, 116, 114, 97, 105, 108, 105, 110, 103, 10, 102, 105, 114, 101, 83, 111, 117, 110, 100, 32, 61, 32, 34, 120, 46, 119, 97, 118, 34, 13, 10], got [47, 47, 32, 104, 101, 97, 100, 101, 114, 32, 99, 111, 109, 109, 101, 110, 116, 10, 91, 87, 101, 97, 112, 111, 110, 67, 108, 97, 115, 115, 93, 10, 47, 42, 32, 98, 108, 111, 99, 107, 10, 99, 111, 109, 109, 101, 110, 116, 32, 42, 47, 10, 111, 114, 100, 78, 97, 109, 101, 61, 34, 97, 59, 98, 34, 32, 59, 32, 116, 114, 97, 105, 108, 105, 110, 103, 10, 102, 105, 114, 101, 83, 111, 117, 110, 100, 32, 61, 32, 34, 120, 46, 119, 97, 118, 34, 13, 10])
+  ✓ BOM file loaded
+  ✓ UTF-8 BOM detected
+  ✓ BOM/no-op roundtrip byte-identical (expected [239, 187, 191, 91, 71, 97, 109, 101, 79, 98, 106, 101, 99, 116, 67, 108, 97, 115, 115, 93, 10, 109, 97, 120, 72, 101, 97, 108, 116, 104, 61, 49, 48, 10], got [239, 187, 191, 91, 71, 97, 109, 101, 79, 98, 106, 101, 99, 116, 67, 108, 97, 115, 115, 93, 10, 109, 97, 120, 72, 101, 97, 108, 116, 104, 61, 49, 48, 10])
+
+[ODF serializer / append]
+  ✓ appended entry created
+  ✓ appended value readable (expected Test Unit, got Test Unit)
+  ✓ existing content untouched
+  ✓ appended line uses key = value form
+
+[header duplicate / delete / undo]
+  ✓ new header name is free
+  ✓ header duplicated
+  ✓ duplicate header exists
+  ✓ duplicate kept both property lines (expected 2, got 2)
+  ✓ duplicate values are editable and identical (expected draw_twirl, got draw_twirl)
+  ✓ duplicate marks the document dirty
+  ✓ duplicate refuses an existing name
+  ✓ duplicate header removed
+  ✓ removed header is gone
+  ✓ other headers survive deletion
+  ✓ undo restores the deleted header
+  ✓ redo removes it again
+  ✓ deleting a missing header is refused
+
+[ODF corpus / byte-exact no-op roundtrip]
+  ✓ base corpus enumerated (1478 ODFs)
+  ✓ all base ODFs roundtrip byte-identically (expected 0, got 0)
+
+[ODF serializer / single property edit]
+  ✓ shotDelay located
+  ✓ value changed, inline comment preserved
+  ✓ unrelated headers untouched
+  ✓ newline count unchanged (expected 8, got 8)
+  ✓ only the value span changed (1.0 -> 0.5, same width) (expected 136, got 136)
+  ✓ edited text parses back to new value (expected 0.5, got 0.5)
+
+[Resource index / precedence and duplicates]
+  ✓ three ODFs indexed (expected 3, got 3)
+  ✓ duplicate resource candidates retained (expected 2, got 2)
+  ✓ higher priority wins (expected C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/test_root_high/dup.odf, got C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/test_root_high/dup.odf)
+  ✓ single candidate resolves (expected C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/test_root_low/only_low.odf, got C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/test_root_low/only_low.odf)
+  ✓ missing reference resolves empty (expected , got )
+
+[Resource index / ranked fuzzy search]
+  ✓ exact name ranks first (expected atstab_c.odf, got atstab_c.odf)
+  ✓ subsequence ivtk finds ivtank
+  ✓ multiple tokens match one name
+  ✓ substring still matches
+  ✓ no false positive
+  ✓ empty query lists all indexed ODFs (expected 5, got 5)
+
+[ODF document cache / dirty listing]
+  ✓ freshly cached document is not dirty
+  ✓ append marks the document dirty
+  ✓ dirty listing includes the edited document
+  ✓ clearing dirty removes it from the listing
+
+[Workspace store / persistence / atomic safety]
+  ✓ override saved atomically
+  ✓ override file exists in workspace
+  ✓ original source is byte-identical after save
+  ✓ document reports clean override
+  ✓ second same-name override saved
+  ✓ same-name sources get distinct workspace paths
+  ✓ first same-name override survived
+  ✓ override restored into cache after simulated restart
+  ✓ damage 200 survives restart
+  ✓ unchanged source is not a conflict
+  ✓ changed source is flagged CONFLICT
+  ✓ conflicting override is still readable
+  ✓ path traversal rejected
+  ✓ failed save leaves the previous target intact
+  ✓ raw replace updates values
+  ✓ raw replace bumps revision
+
+[Workspace save / current bytes, not stale source]
+  ✓ first edit saved
+  ✓ to_bytes after save returns saved 200 bytes
+  ✓ saved bytes carry the edited value
+  ✓ original source still contains 100
+  ✓ second edit saved
+  ✓ second save keeps 250 bytes current
+  ✓ reopen serves 250
+  ✓ reopened current bytes equal override
+  ✓ workspace override removed
+  ✓ revert loads the original value
+  ✓ reverted document is ORIGINAL, not override
+  ✓ revert never rewrites the original source
+
+[Header occurrence surgery / duplicate names]
+  ✓ two physical A occurrences parsed (expected 2, got 2)
+  ✓ first A removed
+  ✓ second A survives (expected 1, got 1)
+  ✓ B section untouched
+  ✓ remaining A keeps its value (expected 3, got 3)
+  ✓ removed occurrence value gone
+  ✓ undo restores byte-identical text (expected [A]
+x=1
+
+[B]
+y=2
+
+[A]
+x=3
+, got [A]
+x=1
+
+[B]
+y=2
+
+[A]
+x=3
+)
+  ✓ second occurrence removed by index
+  ✓ other A and B survive the second removal
+  ✓ CRLF removal does not double carriage returns
+  ✓ CRLF removal keeps the next section first
+  ✓ property appended to empty header (expected 1, got 1)
+  ✓ property did not leak into next header
+  ✓ insertion is before the next bracket line
+
+[Workspace transaction / journal recovery]
+  ✓ incomplete replacement recovered
+  ✓ recovery completed the verified new revision
+  ✓ journal committed and removed
+  ✓ manifest reconciled from journal
+  ✓ backup restores old valid revision when new candidate is gone
+  ✓ rollback journal removed
+  ✓ crash before replacement completes the verified new revision
+  ✓ pre-replacement journal committed
+  ✓ pre-replacement manifest reconciled
+  ✓ committed write cleans its journal
+  ✓ committed target is the new bytes
+
+[Workspace transaction / per-phase interruption matrix]
+  ✓ after_temp: interrupted transaction is not reported committed
+  ✓ after_temp: target is a complete old or new revision
+  ✓ after_temp: new bytes are reconciled in the manifest
+  ✓ after_temp: no false RECOVERY_PENDING (expected 0, got 0)
+  ✓ after_temp: old revision preserved (expected old
+, got old
+)
+  ✓ after_temp: second recovery is a no-op (expected 0, got 0)
+  ✓ after_backup: interrupted transaction is not reported committed
+  ✓ after_backup: target is a complete old or new revision
+  ✓ after_backup: new bytes are reconciled in the manifest
+  ✓ after_backup: no false RECOVERY_PENDING (expected 0, got 0)
+  ✓ after_backup: old revision preserved (expected old
+, got old
+)
+  ✓ after_backup: second recovery is a no-op (expected 0, got 0)
+  ✓ after_journal: interrupted transaction is not reported committed
+  ✓ after_journal: target is a complete old or new revision
+  ✓ after_journal: new bytes are reconciled in the manifest
+  ✓ after_journal: no false RECOVERY_PENDING (expected 0, got 0)
+  ✓ after_journal: verified new revision committed (expected new
+, got new
+)
+  ✓ after_journal: second recovery is a no-op (expected 0, got 0)
+  ✓ after_remove_old: interrupted transaction is not reported committed
+  ✓ after_remove_old: target is a complete old or new revision
+  ✓ after_remove_old: new bytes are reconciled in the manifest
+  ✓ after_remove_old: no false RECOVERY_PENDING (expected 0, got 0)
+  ✓ after_remove_old: verified new revision committed (expected new
+, got new
+)
+  ✓ after_remove_old: second recovery is a no-op (expected 0, got 0)
+  ✓ after_rename: interrupted transaction is not reported committed
+  ✓ after_rename: target is a complete old or new revision
+  ✓ after_rename: new bytes are reconciled in the manifest
+  ✓ after_rename: no false RECOVERY_PENDING (expected 0, got 0)
+  ✓ after_rename: verified new revision committed (expected new
+, got new
+)
+  ✓ after_rename: second recovery is a no-op (expected 0, got 0)
+  ✓ after_verify: interrupted transaction is not reported committed
+  ✓ after_verify: target is a complete old or new revision
+  ✓ after_verify: new bytes are reconciled in the manifest
+  ✓ after_verify: no false RECOVERY_PENDING (expected 0, got 0)
+  ✓ after_verify: verified new revision committed (expected new
+, got new
+)
+  ✓ after_verify: second recovery is a no-op (expected 0, got 0)
+
+[Workspace transaction / manifest failure keeps recovery pending]
+  ✓ pending recovery is not counted as committed (expected 0, got 0)
+  ✓ manifest failure reports RECOVERY_PENDING (expected 1, got 1)
+  ✓ verified new bytes remain on disk
+  ✓ manifest is not falsely updated
+  ✓ journal is kept as durable pending evidence (expected 1, got 1)
+  ✓ retry commits the pending transaction (expected 1, got 1)
+  ✓ retry reconciles the manifest (expected ord.odf, got ord.odf)
+  ✓ journal removed only after the manifest commit (expected 0, got 0)
+
+[Workspace save / manifest failure restores the previous revision]
+  ✓ initial override saved
+  ✓ save with a failing manifest is reported failed
+  ✓ previous override bytes restored
+  ✓ manifest still points at the restored override
+  ✓ retry succeeds after the manifest is writable
+  ✓ retry persisted the new revision
+
+[Workspace revert / deletion after durable manifest commit]
+  ✓ override saved before revert
+  ✓ revert with a failing manifest reports RECOVERY_PENDING
+  ✓ saved override is preserved, not deleted
+  ✓ manifest still references the override
+  ✓ revert succeeds once the manifest is writable
+  ✓ override retired only after the manifest commit
+  ✓ manifest entry removed
+  ✓ original game source untouched
+  ✓ retired revision preserved in backups
+  ✓ second revert reports NOT_FOUND (expected NOT_FOUND, got NOT_FOUND)
+  ✓ second override saved
+  ✓ revert with a missing source reports source_missing
+  ✓ third override saved
+  ✓ revert after an external source change reports source_changed
+  ✓ externally changed source is not rewritten by revert
+
+[Workspace safety / rollback failure retains journal (S1, S8)]
+  ✓ initial override saved (200)
+  ✓ save failed when manifest and rollback both failed
+  ✓ S1: never claims previous override restored when rollback failed
+  ✓ S1: reports RECOVERY_PENDING (expected RECOVERY_PENDING, got RECOVERY_PENDING)
+  ✓ S1: original recovery journal retained
+  ✓ S1: previous 200 backup preserved
+  ✓ S8: new write refused while pending journal exists
+  ✓ S8: pending journal bytes untouched by refused retry (expected [123, 10, 32, 32, 34, 98, 97, 99, 107, 117, 112, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 98, 97, 99, 107, 117, 112, 115, 47, 111, 114, 100, 46, 111, 100, 102, 46, 98, 97, 107, 34, 44, 10, 32, 32, 34, 98, 121, 116, 101, 115, 34, 58, 32, 51, 53, 44, 10, 32, 32, 34, 99, 114, 101, 97, 116, 101, 100, 34, 58, 32, 34, 50, 48, 50, 54, 45, 49, 49, 45, 50, 50, 84, 50, 48, 58, 52, 57, 58, 53, 49, 34, 44, 10, 32, 32, 34, 109, 100, 53, 34, 58, 32, 34, 51, 102, 50, 55, 49, 100, 57, 50, 53, 53, 57, 53, 51, 55, 99, 98, 54, 56, 102, 97, 50, 56, 97, 48, 99, 98, 48, 98, 99, 48, 99, 102, 34, 44, 10, 32, 32, 34, 111, 112, 34, 58, 32, 34, 119, 111, 114, 107, 115, 112, 97, 99, 101, 95, 111, 100, 102, 34, 44, 10, 32, 32, 34, 114, 101, 108, 34, 58, 32, 34, 111, 114, 100, 46, 111, 100, 102, 34, 44, 10, 32, 32, 34, 115, 105, 122, 101, 34, 58, 32, 51, 53, 44, 10, 32, 32, 34, 115, 111, 117, 114, 99, 101, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 115, 111, 117, 114, 99, 101, 47, 111, 114, 100, 46, 111, 100, 102, 34, 44, 10, 32, 32, 34, 115, 111, 117, 114, 99, 101, 95, 109, 100, 53, 34, 58, 32, 34, 101, 50, 48, 99, 53, 100, 52, 51, 57, 56, 57, 99, 55, 49, 101, 51, 49, 53, 49, 55, 55, 54, 48, 48, 101, 56, 52, 48, 55, 101, 55, 54, 34, 44, 10, 32, 32, 34, 116, 97, 114, 103, 101, 116, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 111, 100, 102, 47, 111, 114, 100, 46, 111, 100, 102, 34, 44, 10, 32, 32, 34, 116, 101, 109, 112, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 111, 100, 102, 47, 111, 114, 100, 46, 111, 100, 102, 46, 116, 109, 112, 45, 52, 52, 53, 53, 49, 48, 57, 45, 51, 50, 53, 55, 57, 48, 55, 57, 55, 55, 34, 44, 10, 32, 32, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 32, 49, 10, 125], got [123, 10, 32, 32, 34, 98, 97, 99, 107, 117, 112, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 98, 97, 99, 107, 117, 112, 115, 47, 111, 114, 100, 46, 111, 100, 102, 46, 98, 97, 107, 34, 44, 10, 32, 32, 34, 98, 121, 116, 101, 115, 34, 58, 32, 51, 53, 44, 10, 32, 32, 34, 99, 114, 101, 97, 116, 101, 100, 34, 58, 32, 34, 50, 48, 50, 54, 45, 49, 49, 45, 50, 50, 84, 50, 48, 58, 52, 57, 58, 53, 49, 34, 44, 10, 32, 32, 34, 109, 100, 53, 34, 58, 32, 34, 51, 102, 50, 55, 49, 100, 57, 50, 53, 53, 57, 53, 51, 55, 99, 98, 54, 56, 102, 97, 50, 56, 97, 48, 99, 98, 48, 98, 99, 48, 99, 102, 34, 44, 10, 32, 32, 34, 111, 112, 34, 58, 32, 34, 119, 111, 114, 107, 115, 112, 97, 99, 101, 95, 111, 100, 102, 34, 44, 10, 32, 32, 34, 114, 101, 108, 34, 58, 32, 34, 111, 114, 100, 46, 111, 100, 102, 34, 44, 10, 32, 32, 34, 115, 105, 122, 101, 34, 58, 32, 51, 53, 44, 10, 32, 32, 34, 115, 111, 117, 114, 99, 101, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 115, 111, 117, 114, 99, 101, 47, 111, 114, 100, 46, 111, 100, 102, 34, 44, 10, 32, 32, 34, 115, 111, 117, 114, 99, 101, 95, 109, 100, 53, 34, 58, 32, 34, 101, 50, 48, 99, 53, 100, 52, 51, 57, 56, 57, 99, 55, 49, 101, 51, 49, 53, 49, 55, 55, 54, 48, 48, 101, 56, 52, 48, 55, 101, 55, 54, 34, 44, 10, 32, 32, 34, 116, 97, 114, 103, 101, 116, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 111, 100, 102, 47, 111, 114, 100, 46, 111, 100, 102, 34, 44, 10, 32, 32, 34, 116, 101, 109, 112, 34, 58, 32, 34, 67, 58, 47, 85, 115, 101, 114, 115, 47, 118, 97, 99, 51, 52, 47, 65, 112, 112, 68, 97, 116, 97, 47, 82, 111, 97, 109, 105, 110, 103, 47, 71, 111, 100, 111, 116, 47, 97, 112, 112, 95, 117, 115, 101, 114, 100, 97, 116, 97, 47, 66, 90, 95, 79, 68, 70, 95, 83, 72, 65, 77, 65, 78, 47, 112, 48, 95, 114, 98, 95, 102, 97, 105, 108, 95, 52, 52, 52, 53, 53, 53, 54, 47, 111, 100, 102, 47, 111, 114, 100, 46, 111, 100, 102, 46, 116, 109, 112, 45, 52, 52, 53, 53, 49, 48, 57, 45, 51, 50, 53, 55, 57, 48, 55, 57, 55, 55, 34, 44, 10, 32, 32, 34, 118, 101, 114, 115, 105, 111, 110, 34, 58, 32, 49, 10, 125])
+  ✓ recovery commits pending 250 revision (expected 1, got 1)
+  ✓ target has valid 250 after reconciliation
+  ✓ manifest reconciled (expected ord.odf, got ord.odf)
+  ✓ rollback_after_remove reported failed
+  ✓ target absent right after simulated crash during rollback removal
+  ✓ journal retained after rollback_after_remove
+  ✓ recovery restored 250 backup after rollback removal failure
+
+[Workspace safety / journal path validation (S2..S4)]
+  ✓ no synthetic invalid journal committed (expected 0, got 0)
+  ✓ no synthetic invalid journal rolled back (expected 0, got 0)
+  ✓ S2..S4: all invalid journals marked UNRECOVERABLE (expected 8, got 8)
+  ✓ outside victim path never created
+  ✓ diagnostic reasons recorded for every rejected journal (expected 8, got 8)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+  ✓ reason is INVALID_TRANSACTION_PATH (expected INVALID_TRANSACTION_PATH, got INVALID_TRANSACTION_PATH)
+
+[Header preservation / comments, duplicate occurrences, undo bytes]
+  ✓ first [A] removed
+  ✓ trailing comment stays with the section it follows
+  ✓ following section still intact
+  ✓ remaining [A] keeps its own value
+  ✓ undo restores the exact original bytes (expected [A]
+x=1
+; trailing comment owned by A
+
+[B]
+y=2
+
+[A]
+x=3
+, got [A]
+x=1
+; trailing comment owned by A
+
+[B]
+y=2
+
+[A]
+x=3
+)
+  ✓ redo reapplies the same removal
+  ✓ two physical Core occurrences (expected 2, got 2)
+  ✓ occurrence identities differ
+  ✓ graph view lists unique render names (expected 2, got 2)
+  ✓ effective value is the last occurrence (expected 3.0, got 3.0)
+  ✓ edit touched only the effective occurrence
+  ✓ rename renames physical occurrences
+  ✓ both brackets renamed (expected 2, got 2)
+  ✓ old name gone (expected 0, got 0)
+  ✓ no stale bracket text
+  ✓ properties stay on their own lines
+  ✓ rename refuses an existing header name
+  ✓ undo of rename restores the prior revision byte-exactly (expected [Core]
+renderBase = "draw_sprite"
+lifeTime = 1.0
+
+[Shock]
+renderBase = "draw_emit"
+
+[Core]
+lifeTime = 5.0
+, got [Core]
+renderBase = "draw_sprite"
+lifeTime = 1.0
+
+[Shock]
+renderBase = "draw_emit"
+
+[Core]
+lifeTime = 5.0
+)
+  ✓ property appended to the empty header
+  ✓ insertion cannot leak into the next section
+  ✓ next header unchanged
+
+[ODF bytes / LF, BOM, UTF-16LE/BE and no final newline]
+  ✓ UTF-8 BOM detected
+  ✓ UTF-8 BOM/CRLF/no-final-newline roundtrip byte-identical
+  ✓ duplicate same-name properties preserved
+  ✓ utf-16le detected
+  ✓ utf-16le parsed
+  ✓ utf-16le roundtrip byte-identical
+  ✓ utf-16be detected
+  ✓ utf-16be parsed
+  ✓ utf-16be roundtrip byte-identical
+
+[Resource index / workshop scope]
+  ✓ enabled game root scanned
+  ✓ disabled workshop root stays excluded even with runtime workshop support
+  ✓ runtime workshop=false excludes an enabled workshop root
+  ✓ enabled workshop root scanned when runtime support is on
+
+[Native adapter / read-only discovery and staged evidence]
+  ✓ BZCC executable discovered read-only
+  ✓ executable hash recorded
+  ✓ executable size recorded
+  ✓ Steam build id parsed numerically
+  ✓ scenario staged outside the game root
+  ✓ evidence manifest written
+  ✓ manifest does not claim native verification
+  ✓ staging alone is not NATIVE_VERIFIED
+  ✓ staging inside the game installation is refused
+
+[SafeStageManager / allowlist and source-root protection (S5..S7)]
+  ✓ S5/S6 refused forbidden/unowned stage root: V:/__STORE_V/_SOFT/Steam/steamapps/common/BZ2R/shaman_test
+  ✓ S5/S6 refused forbidden/unowned stage root: V:/__STORE_V/_SOFT/Steam/steamapps/workshop/content/624970/shaman_test
+  ✓ S5/S6 refused forbidden/unowned stage root: V:/___VAC/__K/__CODE/_MISC/_BZDECOMP/vrv/shaman_test
+  ✓ S5/S6 refused forbidden/unowned stage root: V:/___VAC/__K/__CODE/_TAMPERMONKEY/_WIN95THEME/Wintage/shaman_test
+  ✓ S5/S6 refused forbidden/unowned stage root: V:/___VAC/_BATTLEZONE/shaman_test
+  ✓ S5/S6 refused forbidden/unowned stage root: V:/___VAC/__K/__CODE/_MISC/_BZ_ODF_SHAMAN/shaman_test
+  ✓ S5/S6 refused forbidden/unowned stage root: C:/Users/vac34/AppData/Roaming/Godot/app_userdata/BZ_ODF_SHAMAN/unrelated_user_folder/stage_a
+  ✓ S5/S6 refused forbidden/unowned stage root: C:/Windows/Temp/shaman_unowned_stage
+  ✓ refused overwriting pre-existing unknown file
+  ✓ unknown file content untouched on collision (expected do-not-delete, got do-not-delete)
+  ✓ dry_run writes nothing
+  ✓ owned stage root accepts staged files
+  ✓ stage_manifest.json created
+  ✓ cleanup succeeds on owned stage
+  ✓ staged file removed by cleanup
+  ✓ S7: unknown pre-existing file preserved after cleanup
+
+[Native adapter / buildid KeyValues & evidence gate (N1..N8)]
+  ✓ N1: buildid extracted numerically without whitespace
+  ✓ N2: missing buildid yields UNKNOWN
+  ✓ N3: non-numeric buildid rejected
+  ✓ N4: forged two-field evidence rejected even with status=NATIVE_VERIFIED
+  ✓ N6: missing launch/staging/exe provenance rejected
+  ✓ Wave D profile resolved
+  ✓ B1: preflight passes structural + BZN + mount + buildid + staging isolation checks
+  ✓ N8: launch args include /config
+  ✓ B1: isolated LuaMission BZN + cfg + ODF scenario staged
+  ✓ N7: stage manifest records all staged files
+  ✓ N7: staged file MD5 recorded (expected 32, got 32)
+  ✓ N7: staged file MD5 recorded (expected 32, got 32)
+  ✓ N7: staged file MD5 recorded (expected 32, got 32)
+  ✓ N7: staged file MD5 recorded (expected 32, got 32)
+  ✓ N7: staged file MD5 recorded (expected 32, got 32)
+  ✓ N7: staged file MD5 recorded (expected 32, got 32)
+  ✓ N7: staged file MD5 recorded (expected 32, got 32)
+  ✓ N5/E2: staged scenario alone is never NATIVE_VERIFIED
+  ✓ N6/N8: unlaunched record cannot become NATIVE_VERIFIED
+  ✓ E1: synthetic fixture passes schema_valid
+  ✓ E1: manually mutated dict flagged as synthetic
+  ✓ E1: synthetic metadata must NEVER become NATIVE_VERIFIED
+
+[Native scenario / BZN, Lua, terrain & mount validation (N1..N7)]
+  ✓ N1: missing BZN fails preflight
+  ✓ N1: explicit reason MISSING_MISSION_BZN (expected MISSING_MISSION_BZN, got MISSING_MISSION_BZN)
+  ✓ N2: valid LuaMission BZN + stock terrain passes structural preflight
+  ✓ N2: BZN selects luamission.dll (expected luamission.dll, got luamission.dll)
+  ✓ N2b: non-LuaMission BZN rejected (expected INCOMPATIBLE_MISSION_TYPE, got INCOMPATIBLE_MISSION_TYPE)
+  ✓ N3: BZN/Lua name mismatch rejected (expected BZN_LUA_MISMATCH, got BZN_LUA_MISMATCH)
+  ✓ N4: missing terrain dependency rejected (expected MISSING_TERRAIN_DEPENDENCY, got MISSING_TERRAIN_DEPENDENCY)
+  ✓ N5: shaman_native.cfg mounts exact staged assets root
+  ✓ N5: cfg does not rely on unrelated @mydocsdir\addon
+  ✓ N6: wrong @mydocsdir\addon mount path rejected (expected MOUNT_PATH_MISMATCH, got MOUNT_PATH_MISMATCH)
+  ✓ N7: Lua avoids disabled io.open
+  ✓ N7: Lua uses WriteToFile and PrintConsoleMessage
+  ✓ N7: Lua implements controlled state machine and GetCurHealth
+  ✓ N7b: io.open usage in Lua rejected by preflight (expected UNSUPPORTED_LUA_IO, got UNSUPPORTED_LUA_IO)
+
+[Steam launch / capability routes and classification (S1..S6)]
+  ✓ S1: direct-exe exit 53 classified as STEAM_HANDOFF_REQUIRED (expected STEAM_HANDOFF_REQUIRED, got STEAM_HANDOFF_REQUIRED)
+  ✓ S1: handoff flag true and not verified
+  ✓ S2: logged-in Steam with compatible @rootdir config selects STEAM_MANAGED launch_ready=true
+  ✓ S2: STEAM_MANAGED preserves -applaunch 624970 /config shaman_shot.bzn
+  ✓ S2 / NB-03: STEAM_MANAGED omits /logconsole by default (opt-in only)
+  ✓ S2 / NB-04: explicit include_logconsole=true adds /logconsole
+  ✓ S3: process open without mission is GAME_STARTED (expected GAME_STARTED, got GAME_STARTED)
+  ✓ S3: launch without mission is never verified
+  ✓ S4: missing Steam client reports BLOCKED (expected BLOCKED, got BLOCKED)
+  ✓ S4: missing Steam client reason STEAM_CLIENT_MISSING (expected STEAM_CLIENT_MISSING, got STEAM_CLIENT_MISSING)
+  ✓ S4b: logged-off Steam reports BLOCKED (expected BLOCKED, got BLOCKED)
+  ✓ S4b: logged-off Steam reason STEAM_USER_NOT_LOGGED_IN (expected STEAM_USER_NOT_LOGGED_IN, got STEAM_USER_NOT_LOGGED_IN)
+  ✓ S5: timeout classified as TIMEOUT (expected TIMEOUT, got TIMEOUT)
+  ✓ S5: timeout is never NATIVE_VERIFIED
+  ✓ S6: BZ2R executable MD5 unchanged (expected e2fa7458cf2604315f48915acd288689, got e2fa7458cf2604315f48915acd288689)
+  ✓ S6: no steam_appid.txt written into read-only BZ2R
+
+[Native evidence / schema vs trusted runner attestation (E1..E8)]
+  ✓ E-setup: scenario staged
+  ✓ E2: staged-only never NATIVE_VERIFIED
+  ✓ E3: process started without mission_loaded_at never NATIVE_VERIFIED
+  ✓ E4: missing observation stays MISSION_LOADED (expected MISSION_LOADED, got MISSION_LOADED)
+  ✓ E4: missing observation never NATIVE_VERIFIED
+  ✓ E5: wrong session_id rejected (expected SESSION_ID_MISMATCH, got SESSION_ID_MISMATCH)
+  ✓ E5: wrong session_id never NATIVE_VERIFIED
+  ✓ E6: wrong ODF hash rejected (expected ODF_HASH_MISMATCH, got ODF_HASH_MISMATCH)
+  ✓ E6: wrong ODF hash never NATIVE_VERIFIED
+  ✓ E7: runner-attested observation accepted as genuine NATIVE_VERIFIED
+  ✓ E8: mismatched comparison scenario_hash rejected
+
+[SafeStageManager / MD5 cleanup & partial overwrite rollback (F1..F7)]
+  ✓ F1: initial staging succeeded
+  ✓ F1: cleanup reports PARTIAL_CLEANUP when a staged file was modified (expected PARTIAL_CLEANUP, got PARTIAL_CLEANUP)
+  ✓ F1: cleanup reports MODIFIED_FILE_PRESERVED (expected MODIFIED_FILE_PRESERVED, got MODIFIED_FILE_PRESERVED)
+  ✓ F1: modified file listed in preserved
+  ✓ F1: modified staged file preserved on disk
+  ✓ F1: unmodified owned file removed cleanly
+  ✓ F2: unknown file preserved untouched
+  ✓ F3: corrupted manifest rejected by cleanup
+  ✓ F3: file preserved when manifest is corrupted
+  ✓ F4: traversal path rejected
+  ✓ F5: Windows junction escape rejected
+  ✓ F6: initial V1 stage succeeded
+  ✓ F6: mid-overwrite failure detected
+  ✓ F6: previously overwritten owned file restored to V1 (expected OLD_FIRST_V1, got OLD_FIRST_V1)
+  ✓ F6: untouched V1 second file intact (expected OLD_SECOND_V1, got OLD_SECOND_V1)
+  ✓ F6: newly created file removed on rollback
+  ✓ F7: BZ2R source root refused
+
+[NativeExperimentSession / single immutable identity (N-S1..N-S5)]
+  ✓ N-S1: session-driven staging succeeded
+  ✓ N-S1: Lua, MountPlan, StageManifest, Receipt, and Evidence share one immutable session identity
+  ✓ N-S1: Lua SESSION_ID equals session.session_id (expected shaman_sess_6504905_1, got shaman_sess_6504905_1)
+  ✓ N-S1: Lua LAUNCH_NONCE equals session.launch_nonce (expected d23644f4bef7f526, got d23644f4bef7f526)
+  ✓ N-S1: Lua OBS_FILE matches MountPlan observation_expected_path basename (expected shaman_obs_shaman_sess_6504905_1.json, got shaman_obs_shaman_sess_6504905_1.json)
+  ✓ N-S1: trusted receipt inherits session_id (expected shaman_sess_6504905_1, got shaman_sess_6504905_1)
+  ✓ N-S1: trusted receipt inherits launch_nonce (expected d23644f4bef7f526, got d23644f4bef7f526)
+  ✓ N-S2: mismatched Lua SESSION_ID rejected
+  ✓ N-S3: mismatched Lua OBS_FILE rejected
+  ✓ N-S4: NativeExperimentSession.from_dict succeeded
+  ✓ N-S4: session_id roundtripped (expected shaman_sess_6504905_1, got shaman_sess_6504905_1)
+  ✓ N-S4: launch_nonce roundtripped (expected d23644f4bef7f526, got d23644f4bef7f526)
+  ✓ N-S4: stage_id roundtripped (expected ns1_ns5_sess_6504763_1766584795, got ns1_ns5_sess_6504763_1766584795)
+  ✓ N-S4: observation_filename roundtripped (expected shaman_obs_shaman_sess_6504905_1.json, got shaman_obs_shaman_sess_6504905_1.json)
+  ✓ N-S4: expected_odf_hashes preserved
+  ✓ N-S4: recovery checkpoints preserved
+  ✓ N-S5: preflight passes with consistent NativeExperimentSession
+  ✓ N-S5: preflight refuses mismatched Lua session identity
+
+[NativeResourceClosureBuilder / transitive ODF & Workshop closure (N-R1..N-R7)]
+  ✓ N-R1: base-game closure is RESOURCE_CLOSURE_COMPLETE (expected RESOURCE_CLOSURE_COMPLETE, got RESOURCE_CLOSURE_COMPLETE)
+  ✓ N-R1: all 4 base-game ODFs classified
+  ✓ N-R2: stage override closure complete (expected RESOURCE_CLOSURE_COMPLETE, got RESOURCE_CLOSURE_COMPLETE)
+  ✓ N-R2: staged ODF recorded in stage_owned_overrides (expected 1, got 1)
+  ✓ N-R3: unmounted Workshop ODF reported RESOURCE_MISSING (expected RESOURCE_MISSING, got RESOURCE_MISSING)
+  ✓ N-R3: reason is MISSING_WORKSHOP_PACKAGE (expected MISSING_WORKSHOP_PACKAGE, got MISSING_WORKSHOP_PACKAGE)
+  ✓ N-R3: unmounted Workshop ODFs enumerated
+  ✓ N-R4: mounted Workshop package satisfies closure (expected RESOURCE_CLOSURE_COMPLETE, got RESOURCE_CLOSURE_COMPLETE)
+  ✓ N-R5: competing Workshop packages yield RESOURCE_AMBIGUOUS (expected RESOURCE_AMBIGUOUS, got RESOURCE_AMBIGUOUS)
+  ✓ N-R5: ambiguous resource details recorded
+  ✓ N-R6: active_packages disambiguates Workshop ODF (expected RESOURCE_CLOSURE_COMPLETE, got RESOURCE_CLOSURE_COMPLETE)
+  ✓ N-R7: missing shooter ODF yields MISSING_SHOOTER_ODF (expected MISSING_SHOOTER_ODF, got MISSING_SHOOTER_ODF)
+  ✓ N-R7: external unstaged dependency yields EXTERNAL_DEPENDENCY_UNSTAGED (expected EXTERNAL_DEPENDENCY_UNSTAGED, got EXTERNAL_DEPENDENCY_UNSTAGED)
+  ✓ N-R7: minimal auto-staging includes Workshop ordnance and transitive parent
+  ✓ N-R7: minimal auto-staging does not copy unmodified base-game ODFs
+
+[Native evidence / expected-vs-observed hashes, synthetic separation & safe JSON (N-E1..N-E8)]
+  ✓ N-E1: Lua emits explicit expected_odf_md5 field
+  ✓ N-E1: Lua honestly reports observed_odf_hash_available=false instead of echoing expected hash
+  ✓ N-E1: Lua no longer conflates expected hash as observed odf_md5
+  ✓ N-E6: UNSUPPORTED launch route refused
+  ✓ N-E3: mismatched expected_odf_md5 rejected (expected EXPECTED_ODF_HASH_MISMATCH, got EXPECTED_ODF_HASH_MISMATCH)
+  ✓ N-E3: mismatched observed_odf_md5 rejected (expected ODF_HASH_MISMATCH, got ODF_HASH_MISMATCH)
+  ✓ N-E4: mismatched mount_marker rejected (expected MOUNT_MARKER_MISMATCH, got MOUNT_MARKER_MISMATCH)
+  ✓ N-E6: synthetic capture_method rejected (expected SYNTHETIC_CAPTURE_METHOD, got SYNTHETIC_CAPTURE_METHOD)
+  ✓ N-E6: observation with synthetic=true rejected (expected SYNTHETIC_OBSERVATION_REJECTED, got SYNTHETIC_OBSERVATION_REJECTED)
+  ✓ N-E7: honest runner-attested observation verified
+  ✓ N-E7: staged ODF disk MD5 verified
+  ✓ N-E7: observed_odf_hash_available remains false honestly
+  ✓ N-E7: attestation_kind is RUNNER_ATTESTED (expected RUNNER_ATTESTED, got RUNNER_ATTESTED)
+  ✓ N-E2: post-staging ODF drift detected at capture (expected STAGED_ODF_DRIFT, got STAGED_ODF_DRIFT)
+  ✓ N-E2: post-staging ODF drift invalidates previously valid evidence
+  ✓ N-E5: begin_synthetic_session never produces NATIVE_VERIFIED
+  ✓ N-E5: synthetic session flagged synthetic=true
+  ✓ N-E5: attestation_kind is SYNTHETIC (expected SYNTHETIC, got SYNTHETIC)
+  ✓ N-E8: corrupt observation JSON rejected cleanly (expected OBSERVATION_JSON_INVALID, got OBSERVATION_JSON_INVALID)
+  ✓ N-E8: structured JSON parse error detail populated
+  ✓ N-E8: WorkspaceStore.parse_json_safe returns structured error
+
+[SafeStageManager / restaging MD5 guard & structured rollback (F8..F12)]
+  ✓ F8: initial stage ok
+  ✓ F8: restaging over modified owned file refused by default
+  ✓ F8: modified owned file untouched (expected HUMAN_MODIFIED_A, got HUMAN_MODIFIED_A)
+  ✓ F8: conflict details and strategies reported
+  ✓ F9: restage with preserve succeeded
+  ✓ F9: modified file preserved (expected HUMAN_MODIFIED_A, got HUMAN_MODIFIED_A)
+  ✓ F9: unmodified file updated (expected NEW_B, got NEW_B)
+  ✓ F9: preserved list names modified file
+  ✓ F10: restage with replace_with_backup succeeded
+  ✓ F10: target replaced after backup (expected REPLACED_A, got REPLACED_A)
+  ✓ F10: backup contains previous modified bytes
+  ✓ F11: initial V1 staged
+  ✓ F11: rollback restore failure reports RECOVERY_PENDING
+  ✓ F11: never falsely claims overwritten files restored
+  ✓ F11: structured rollback.failed records un-restored file
+  ✓ F11: durable stage_recovery_pending.json written
+  ✓ F11: subsequent restage blocked while recovery marker pending
+  ✓ F12: initial stage ok
+  ✓ F12: collision with unknown file refused
+  ✓ F12: unknown file untouched (expected KEEP_UNKNOWN, got KEEP_UNKNOWN)
+  ✓ F12: corrupted manifest on restage rejected cleanly
+
+[NativeExperimentRunner / durable ledger, restart recovery, Steam/manual workflows & Lua contract (T-26)]
+  ✓ T-26: manual preflight structurally valid, launch_ready=false when Steam logged off
+  ✓ T-26: runner stage() materialized isolated stage
+  ✓ T-26: OPERATOR_MANUAL launch transitions to AWAITING_OPERATOR
+  ✓ T-26: operator_instructions.txt persisted in stage
+  ✓ T-26: fresh runner recovered durable session across restart
+  ✓ T-26: recovered session retained AWAITING_OPERATOR state (expected AWAITING_OPERATOR, got AWAITING_OPERATOR)
+  ✓ T-26: recovered session confirmed stage manifest on disk
+  ✓ T-26: operator-manual post-restart collection recorded honest COMPARISON_COMPLETE
+  ✓ T-26: unattested post-restart manual collection never falsely claims NATIVE_VERIFIED
+  ✓ T-26: runner cleanup_stage removed owned staged files cleanly
+  ✓ T-26: STEAM_MANAGED preflight reports launch_ready=true
+  ✓ T-26: STEAM_MANAGED launch spawned via controlled launcher
+  ✓ T-26: STEAM_MANAGED passed -applaunch 624970
+  ✓ T-26: inconsistent damage vs hp delta rejected as LUA_CONTRACT_VIOLATION
+  ✓ T-26: Lua TIMEOUT observation classified as TIMEOUT (expected TIMEOUT, got TIMEOUT)
+  ✓ T-26: STEAM_MANAGED runner-attested observation achieves NATIVE_VERIFIED
+  ✓ T-26: corrupt session_ledger.json rejected cleanly without stderr spam
+
+[Process termination / real OS.kill + fresh process recovery (P1-03)]
+  ✓ after_temp: initial 200 saved
+  ✓ after_temp: worker process spawned
+  ✓ after_temp: worker reached target phase
+  ✓ after_temp: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ after_temp: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ after_temp: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ after_backup: initial 200 saved
+  ✓ after_backup: worker process spawned
+  ✓ after_backup: worker reached target phase
+  ✓ after_backup: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ after_backup: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ after_backup: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ after_journal: initial 200 saved
+  ✓ after_journal: worker process spawned
+  ✓ after_journal: worker reached target phase
+  ✓ after_journal: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ after_journal: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ after_journal: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ after_remove_old: initial 200 saved
+  ✓ after_remove_old: worker process spawned
+  ✓ after_remove_old: worker reached target phase
+  ✓ after_remove_old: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ after_remove_old: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ after_remove_old: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ after_rename: initial 200 saved
+  ✓ after_rename: worker process spawned
+  ✓ after_rename: worker reached target phase
+  ✓ after_rename: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ after_rename: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ after_rename: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ after_verify: initial 200 saved
+  ✓ after_verify: worker process spawned
+  ✓ after_verify: worker reached target phase
+  ✓ after_verify: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ after_verify: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ after_verify: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ manifest_commit: initial 200 saved
+  ✓ manifest_commit: worker process spawned
+  ✓ manifest_commit: worker reached target phase
+  ✓ manifest_commit: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ manifest_commit: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ manifest_commit: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ rollback: initial 200 saved
+  ✓ rollback: worker process spawned
+  ✓ rollback: worker reached target phase
+  ✓ rollback: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ rollback: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ rollback: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+  ✓ journal_cleanup: initial 200 saved
+  ✓ journal_cleanup: worker process spawned
+  ✓ journal_cleanup: worker reached target phase
+  ✓ journal_cleanup: fresh recovery process exited 0 (expected 0, got 0)
+  ✓ journal_cleanup: valid 200 or 250 revision after OS.kill + restart recovery
+  ✓ journal_cleanup: manifest consistent after restart recovery (expected ord.odf, got ord.odf)
+
+[Projectile / earliest collision wins]
+  ✓ target just above ground wins over the ground plane (expected vehicle, got vehicle)
+  ✓ hit position stays above ground
+  ✓ ground before target is reported as ground (expected ground, got ground)
+  ✓ lifetime expiry inside the substep is honored (expected expire, got expire)
+  ✓ expiry is placed at the lifetime fraction
+
+[OdfDocument / external cache change]
+  ✓ initial cached value
+  ✓ clean cached document reloads after external edit
+  ✓ dirty cache keeps unsaved edits
+  ✓ dirty stale source is marked CONFLICT
+
+[Inheritance cache / revision invalidation]
+  ✓ synthetic parent/child loaded
+  ✓ child inherits parent damage (expected 100, got 100)
+  ✓ parent damage entry found
+  ✓ child sees parent edit without cache clear (expected 250, got 250)
+  ✓ merged value stable across rescan (expected 250, got 250)
+
+[ODF inheritance / documented non-inherited properties]
+  ✓ child value wins over parent (expected 150, got 150)
+  ✓ ordinary properties still inherit (expected 10, got 10)
+  ✓ unitIcon is not inherited (EntityClass rule)
+  ✓ unitStatus is not inherited (EntityClass rule)
+  ✓ ignoreMissingInf is not inherited
+  ✓ shotRadius is not inherited (OrdnanceClass rule)
+  ✓ MorphTankClass.unitStatus keeps normal inheritance (expected deployed.tga, got deployed.tga)
+  ✓ child's own unitIcon is kept (expected child_icon.tga, got child_icon.tga)
+
+[Parameter sweep / in-memory overrides + deterministic replay]
+  ✓ synthetic weapon chain resolved: 
+  ✓ shotRadius fallback used when not declared (expected 0.5, got 0.5)
+  ✓ override applies to a not-inherited property (expected 1.25, got 1.25)
+  ✓ override cleared back to the fallback (expected 0.5, got 0.5)
+  ✓ speed sweep produced 3 rows (expected 3, got 3)
+  ✓ baseline damage (expected 50.0, got 50.0)
+  ✓ 150 m/s flight time matches distance / speed
+  ✓ 100 m/s flight time matches distance / speed
+  ✓ higher speed arrives sooner
+  ✓ high-speed row still hits the target (expected vehicle, got vehicle)
+  ✓ damage sweep row 0 = 50 (expected 50.0, got 50.0)
+  ✓ damage sweep midpoint = 100 (expected 100.0, got 100.0)
+  ✓ damage sweep end = 150 (expected 150.0, got 150.0)
+  ✓ delta is relative to the baseline (expected 100.0, got 100.0)
+  ✓ CSV records the swept property
+  ✓ CSV quotes a scenario label containing a comma
+  ✓ CSV header present
+  ✓ CSV baseline row present
+  ✓ CSV has 3 comments + header + baseline + 3 rows (expected 8, got 8)
+  ✓ sweep left no overrides behind
+  ✓ profile reads the unmodified document after the sweep (expected 50.0, got 50.0)
+  ✓ sweep never wrote the ODF
+
+[Weapons / altName alternate chain]
+  ✓ primary chain resolved: 
+  ✓ primary damage from bullet.odf (expected 50.0, got 50.0)
+  ✓ altName resolved to an alternate weapon
+  ✓ alternate weapon name (expected gun2, got gun2)
+  ✓ alternate ordnance name (expected bullet2, got bullet2)
+  ✓ alternate damage from bullet2.odf (expected 200.0, got 200.0)
+  ✓ alt resolution does not recurse (gun2 -> gun stops)
+  ✓ alternate projectile reaches the target (expected vehicle, got vehicle)
+  ✓ alternate shot applies its own damage (expected 200.0, got 200.0)
+  ✓ primary still resolves with broken altName
+  ✓ unresolvable altName leaves alt null
+  ✓ unresolvable altName is reported as a note
+
+[Dependency graph / missing, transitive, cycle]
+  ✓ transitive chain followed a -> b -> c (expected 3, got 3)
+  ✓ missing explosion reported
+  ✓ cycle b -> c -> b detected
+
+[Particles / real render ODF]
+  ✓ four render headers found (expected 4, got 4)
+  ✓ draw_twirl present
+  ✓ draw_sphere present
+  ✓ draw_light present
+  ✓ render ODF roundtrips byte-identically (expected [47, 47, 32, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 13, 10, 47, 47, 32, 67, 79, 82, 69, 32, 84, 85, 82, 82, 69, 84, 32, 69, 88, 80, 76, 79, 83, 73, 79, 78, 13, 10, 47, 47, 32, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 13, 10, 13, 10, 91, 69, 120, 112, 108, 111, 115, 105, 111, 110, 67, 108, 97, 115, 115, 93, 13, 10, 99, 108, 97, 115, 115, 76, 97, 98, 101, 108, 32, 61, 32, 34, 101, 120, 112, 108, 111, 115, 105, 111, 110, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 84, 121, 112, 101, 115, 32, 61, 32, 52, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 49, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 99, 111, 114, 101, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 49, 32, 61, 32, 49, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 49, 32, 61, 32, 34, 48, 46, 48, 32, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 50, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 115, 104, 111, 99, 107, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 50, 32, 61, 32, 49, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 50, 32, 61, 32, 34, 48, 46, 48, 32, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 51, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 108, 105, 103, 104, 116, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 51, 32, 61, 32, 49, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 51, 32, 61, 32, 34, 48, 46, 48, 32, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 52, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 99, 104, 117, 110, 107, 115, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 52, 32, 61, 32, 53, 48, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 52, 32, 61, 32, 34, 49, 54, 46, 48, 32, 50, 53, 46, 48, 32, 49, 54, 46, 48, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 66, 105, 97, 115, 52, 32, 61, 32, 34, 48, 46, 48, 32, 49, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 101, 120, 112, 108, 83, 111, 117, 110, 100, 32, 61, 32, 34, 120, 109, 118, 49, 46, 119, 97, 118, 34, 13, 10, 100, 97, 109, 97, 103, 101, 82, 97, 100, 105, 117, 115, 32, 61, 32, 53, 48, 46, 48, 13, 10, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 78, 41, 32, 61, 32, 49, 48, 48, 32, 47, 47, 32, 110, 111, 110, 101, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 76, 41, 32, 61, 32, 53, 48, 32, 47, 47, 32, 108, 105, 103, 104, 116, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 72, 41, 32, 61, 32, 53, 32, 47, 47, 32, 104, 101, 97, 118, 121, 13, 10, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 83, 41, 32, 61, 32, 53, 48, 32, 47, 47, 32, 115, 116, 97, 110, 100, 97, 114, 100, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 68, 41, 32, 61, 32, 49, 48, 48, 32, 47, 47, 32, 100, 101, 102, 108, 101, 99, 116, 105, 111, 110, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 65, 41, 32, 61, 32, 53, 32, 47, 47, 32, 97, 98, 115, 111, 114, 98, 116, 105, 111, 110, 13, 10, 13, 10, 13, 10, 91, 67, 111, 114, 101, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 110, 117, 108, 108, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 52, 46, 48, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 116, 119, 105, 114, 108, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 78, 97, 109, 101, 32, 61, 32, 34, 102, 108, 97, 109, 101, 46, 116, 103, 97, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 66, 108, 101, 110, 100, 32, 61, 32, 34, 111, 110, 101, 32, 111, 110, 101, 32, 109, 111, 100, 117, 108, 97, 116, 101, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 54, 48, 32, 50, 48, 32, 50, 53, 53, 32, 50, 48, 48, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 54, 48, 32, 50, 48, 32, 49, 48, 32, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 51, 46, 48, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 56, 48, 46, 48, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 52, 46, 48, 13, 10, 13, 10, 13, 10, 91, 83, 104, 111, 99, 107, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 110, 117, 108, 108, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 49, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 115, 112, 104, 101, 114, 101, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 78, 97, 109, 101, 32, 61, 32, 34, 118, 115, 109, 111, 107, 101, 46, 116, 103, 97, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 66, 108, 101, 110, 100, 32, 61, 32, 34, 111, 110, 101, 32, 111, 110, 101, 32, 109, 111, 100, 117, 108, 97, 116, 101, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 52, 48, 32, 50, 53, 53, 32, 50, 48, 48, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 50, 48, 32, 50, 53, 53, 32, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 51, 46, 48, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 49, 50, 48, 46, 48, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 48, 13, 10, 108, 97, 116, 105, 116, 117, 100, 101, 66, 97, 110, 100, 115, 32, 61, 32, 49, 54, 13, 10, 108, 111, 110, 103, 105, 116, 117, 100, 101, 83, 101, 103, 109, 101, 110, 116, 115, 32, 61, 32, 49, 54, 13, 10, 13, 10, 91, 76, 105, 103, 104, 116, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 110, 117, 108, 108, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 53, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 108, 105, 103, 104, 116, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 52, 48, 32, 50, 53, 53, 32, 50, 53, 53, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 56, 48, 32, 50, 53, 53, 32, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 54, 48, 46, 48, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 48, 46, 48, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 53, 13, 10, 97, 116, 116, 101, 110, 117, 97, 116, 101, 67, 111, 110, 115, 116, 97, 110, 116, 32, 61, 32, 49, 46, 48, 13, 10, 97, 116, 116, 101, 110, 117, 97, 116, 101, 76, 105, 110, 101, 97, 114, 32, 61, 32, 48, 46, 48, 13, 10, 97, 116, 116, 101, 110, 117, 97, 116, 101, 81, 117, 97, 100, 114, 97, 116, 105, 99, 32, 61, 32, 49, 53, 46, 48, 13, 10, 108, 101, 110, 115, 70, 108, 97, 114, 101, 32, 61, 32, 48, 13, 10, 13, 10, 91, 67, 104, 117, 110, 107, 115, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 101, 109, 98, 101, 114, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 56, 46, 48, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 116, 119, 105, 114, 108, 34, 32, 47, 47, 115, 112, 114, 105, 116, 101, 13, 10, 116, 101, 120, 116, 117, 114, 101, 78, 97, 109, 101, 32, 61, 32, 34, 112, 97, 114, 116, 105, 99, 108, 101, 46, 116, 103, 97, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 66, 108, 101, 110, 100, 32, 61, 32, 34, 111, 110, 101, 32, 111, 110, 101, 32, 109, 111, 100, 117, 108, 97, 116, 101, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 56, 48, 32, 50, 53, 53, 32, 50, 53, 53, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 56, 48, 32, 50, 53, 53, 32, 53, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 48, 46, 49, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 48, 46, 49, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 56, 46, 48, 13, 10, 13, 10, 13, 10, 13, 10, 13, 10, 13, 10], got [47, 47, 32, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 13, 10, 47, 47, 32, 67, 79, 82, 69, 32, 84, 85, 82, 82, 69, 84, 32, 69, 88, 80, 76, 79, 83, 73, 79, 78, 13, 10, 47, 47, 32, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 13, 10, 13, 10, 91, 69, 120, 112, 108, 111, 115, 105, 111, 110, 67, 108, 97, 115, 115, 93, 13, 10, 99, 108, 97, 115, 115, 76, 97, 98, 101, 108, 32, 61, 32, 34, 101, 120, 112, 108, 111, 115, 105, 111, 110, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 84, 121, 112, 101, 115, 32, 61, 32, 52, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 49, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 99, 111, 114, 101, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 49, 32, 61, 32, 49, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 49, 32, 61, 32, 34, 48, 46, 48, 32, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 50, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 115, 104, 111, 99, 107, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 50, 32, 61, 32, 49, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 50, 32, 61, 32, 34, 48, 46, 48, 32, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 51, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 108, 105, 103, 104, 116, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 51, 32, 61, 32, 49, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 51, 32, 61, 32, 34, 48, 46, 48, 32, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 108, 97, 115, 115, 52, 32, 61, 32, 34, 120, 99, 111, 114, 101, 116, 117, 114, 114, 120, 112, 108, 46, 99, 104, 117, 110, 107, 115, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 67, 111, 117, 110, 116, 52, 32, 61, 32, 53, 48, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 86, 101, 108, 111, 99, 52, 32, 61, 32, 34, 49, 54, 46, 48, 32, 50, 53, 46, 48, 32, 49, 54, 46, 48, 34, 13, 10, 112, 97, 114, 116, 105, 99, 108, 101, 66, 105, 97, 115, 52, 32, 61, 32, 34, 48, 46, 48, 32, 49, 48, 46, 48, 32, 48, 46, 48, 34, 13, 10, 13, 10, 101, 120, 112, 108, 83, 111, 117, 110, 100, 32, 61, 32, 34, 120, 109, 118, 49, 46, 119, 97, 118, 34, 13, 10, 100, 97, 109, 97, 103, 101, 82, 97, 100, 105, 117, 115, 32, 61, 32, 53, 48, 46, 48, 13, 10, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 78, 41, 32, 61, 32, 49, 48, 48, 32, 47, 47, 32, 110, 111, 110, 101, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 76, 41, 32, 61, 32, 53, 48, 32, 47, 47, 32, 108, 105, 103, 104, 116, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 72, 41, 32, 61, 32, 53, 32, 47, 47, 32, 104, 101, 97, 118, 121, 13, 10, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 83, 41, 32, 61, 32, 53, 48, 32, 47, 47, 32, 115, 116, 97, 110, 100, 97, 114, 100, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 68, 41, 32, 61, 32, 49, 48, 48, 32, 47, 47, 32, 100, 101, 102, 108, 101, 99, 116, 105, 111, 110, 13, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 65, 41, 32, 61, 32, 53, 32, 47, 47, 32, 97, 98, 115, 111, 114, 98, 116, 105, 111, 110, 13, 10, 13, 10, 13, 10, 91, 67, 111, 114, 101, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 110, 117, 108, 108, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 52, 46, 48, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 116, 119, 105, 114, 108, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 78, 97, 109, 101, 32, 61, 32, 34, 102, 108, 97, 109, 101, 46, 116, 103, 97, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 66, 108, 101, 110, 100, 32, 61, 32, 34, 111, 110, 101, 32, 111, 110, 101, 32, 109, 111, 100, 117, 108, 97, 116, 101, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 54, 48, 32, 50, 48, 32, 50, 53, 53, 32, 50, 48, 48, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 54, 48, 32, 50, 48, 32, 49, 48, 32, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 51, 46, 48, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 56, 48, 46, 48, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 52, 46, 48, 13, 10, 13, 10, 13, 10, 91, 83, 104, 111, 99, 107, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 110, 117, 108, 108, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 49, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 115, 112, 104, 101, 114, 101, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 78, 97, 109, 101, 32, 61, 32, 34, 118, 115, 109, 111, 107, 101, 46, 116, 103, 97, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 66, 108, 101, 110, 100, 32, 61, 32, 34, 111, 110, 101, 32, 111, 110, 101, 32, 109, 111, 100, 117, 108, 97, 116, 101, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 52, 48, 32, 50, 53, 53, 32, 50, 48, 48, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 50, 48, 32, 50, 53, 53, 32, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 51, 46, 48, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 49, 50, 48, 46, 48, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 48, 13, 10, 108, 97, 116, 105, 116, 117, 100, 101, 66, 97, 110, 100, 115, 32, 61, 32, 49, 54, 13, 10, 108, 111, 110, 103, 105, 116, 117, 100, 101, 83, 101, 103, 109, 101, 110, 116, 115, 32, 61, 32, 49, 54, 13, 10, 13, 10, 91, 76, 105, 103, 104, 116, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 110, 117, 108, 108, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 53, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 108, 105, 103, 104, 116, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 52, 48, 32, 50, 53, 53, 32, 50, 53, 53, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 56, 48, 32, 50, 53, 53, 32, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 54, 48, 46, 48, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 48, 46, 48, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 49, 46, 53, 13, 10, 97, 116, 116, 101, 110, 117, 97, 116, 101, 67, 111, 110, 115, 116, 97, 110, 116, 32, 61, 32, 49, 46, 48, 13, 10, 97, 116, 116, 101, 110, 117, 97, 116, 101, 76, 105, 110, 101, 97, 114, 32, 61, 32, 48, 46, 48, 13, 10, 97, 116, 116, 101, 110, 117, 97, 116, 101, 81, 117, 97, 100, 114, 97, 116, 105, 99, 32, 61, 32, 49, 53, 46, 48, 13, 10, 108, 101, 110, 115, 70, 108, 97, 114, 101, 32, 61, 32, 48, 13, 10, 13, 10, 91, 67, 104, 117, 110, 107, 115, 93, 13, 10, 115, 105, 109, 117, 108, 97, 116, 101, 66, 97, 115, 101, 32, 61, 32, 34, 115, 105, 109, 95, 101, 109, 98, 101, 114, 34, 13, 10, 108, 105, 102, 101, 84, 105, 109, 101, 32, 61, 32, 56, 46, 48, 13, 10, 114, 101, 110, 100, 101, 114, 66, 97, 115, 101, 32, 61, 32, 34, 100, 114, 97, 119, 95, 116, 119, 105, 114, 108, 34, 32, 47, 47, 115, 112, 114, 105, 116, 101, 13, 10, 116, 101, 120, 116, 117, 114, 101, 78, 97, 109, 101, 32, 61, 32, 34, 112, 97, 114, 116, 105, 99, 108, 101, 46, 116, 103, 97, 34, 13, 10, 116, 101, 120, 116, 117, 114, 101, 66, 108, 101, 110, 100, 32, 61, 32, 34, 111, 110, 101, 32, 111, 110, 101, 32, 109, 111, 100, 117, 108, 97, 116, 101, 34, 13, 10, 115, 116, 97, 114, 116, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 56, 48, 32, 50, 53, 53, 32, 50, 53, 53, 34, 13, 10, 102, 105, 110, 105, 115, 104, 67, 111, 108, 111, 114, 32, 61, 32, 34, 49, 48, 32, 56, 48, 32, 50, 53, 53, 32, 53, 48, 34, 13, 10, 115, 116, 97, 114, 116, 82, 97, 100, 105, 117, 115, 32, 61, 32, 48, 46, 49, 13, 10, 102, 105, 110, 105, 115, 104, 82, 97, 100, 105, 117, 115, 32, 61, 32, 48, 46, 49, 13, 10, 97, 110, 105, 109, 97, 116, 101, 84, 105, 109, 101, 32, 61, 32, 56, 46, 48, 13, 10, 13, 10, 13, 10, 13, 10, 13, 10, 13, 10])
+  ✓ found a stock draw_emit render
+  ✓ draw_emit declares emitName
+
+[Audio / WAV reader]
+  ✓ found a stock WAV asset
+  ✓ WAV parsed: amb_wind.wav
+  ✓ sample rate: 48000 Hz
+  ✓ channels: 1
+  ✓ duration: 1.000 s
+  ✓ format reported: PCM 16-bit mono
+  ✓ PCM AudioStreamWAV built
+  ✓ waveform peaks extracted
+  ✓ invalid WAV rejected: file too small for RIFF/WAVE
+
+[Weapons / VSR chain + projectile + damage]
+  ✓ workshop + base indexed (17028 ODFs)
+  ✓ weapon chain resolved: 
+  ✓ shooter weapon resolved (expected gatstabvsr_c, got gatstabvsr_c)
+  ✓ ordnance resolved (expected atstabvsr_c, got atstabvsr_c)
+  ✓ shotSpeed read from real ordnance ODF (expected 120.0, got 120.0)
+  ✓ lifeSpan read from real ordnance ODF (expected 0.834, got 0.834)
+  ✓ target armorClass inherited from parent ivscav.odf (expected H, got H)
+  ✓ target maxHealth inherited from parent ivscav.odf (expected 3000.0, got 3000.0)
+  ✓ damageValue(H) inherited from parent atstab_c.odf (expected 100.0, got 100.0)
+  ✓ shotRadius from bullet.odf is NOT inherited (documented rule); editor fallback 0.5 (expected 0.5, got 0.5)
+  ✓ real VSR chain resolves its inherited altName
+  ✓ alternate weapon resolves inside the VSR package (expected gatstabvsr_a, got gatstabvsr_a)
+  ✓ alternate ordnance resolves inside the VSR package (expected atstabvsr_a, got atstabvsr_a)
+  ✓ alternate profile does not recurse
+  ✓ range derived from lifeSpan * shotSpeed
+  ✓ projectile hits the target sphere (expected vehicle, got vehicle)
+  ✓ damage applied equals inherited damageValue(H) (expected 100.0, got 100.0)
+  ✓ time of flight matches distance / shotSpeed
+  ✓ target hull decreased
+  ✓ telemetry recorded several events
+  ✓ telemetry timestamps are monotonic
+  ✓ replay hits identically (expected vehicle, got vehicle)
+  ✓ replay damage identical (expected 100.0, got 100.0)
+  ✓ replay timing deterministic (expected 0.65, got 0.65)
+  ✓ ordnance inheritance chain has a parent
+  ✓ parent declares damageValue(H)
+  ✓ parent edit visible in child without clear_cache (expected 200.0, got 200.0)
+  ✓ FIRE uses the parent-edited value (expected 200.0, got 200.0)
+  ✓ parent edit reverted (expected 100.0, got 100.0)
+  ✓ raw replace keeps WeaponProfile document identity
+  ✓ raw replace bumps ordnance revision
+  ✓ raw replace reaches WeaponProfile after refresh (expected 200.0, got 200.0)
+  ✓ next shot uses the raw-edited value (expected 200.0, got 200.0)
+  ✓ raw edit reverted cleanly (expected 100.0, got 100.0)
+
+[3D Lab simulation / obstacle blocking & multi-target collision (T-27)]
+  ✓ T-27 sim: VSR profile resolved
+  ✓ T-27: obstacle blocks projectile before reaching target (expected obstacle, got obstacle)
+  ✓ T-27: hit_obstacle_id identifies blocking cover (expected cover_1, got cover_1)
+  ✓ T-27: blocked shot deals 0 direct damage to target behind cover (expected 0.0, got 0.0)
+  ✓ T-27: primary target hull untouched behind obstacle (expected 3000.0, got 3000.0)
+  ✓ T-27: impact position stopped at obstacle front face
+  ✓ T-27: shot hits target once obstacle moved aside (expected vehicle, got vehicle)
+  ✓ T-27: full damage applied when line of sight clear (expected 100.0, got 100.0)
+  ✓ T-27: nearer secondary target hit first (expected vehicle, got vehicle)
+  ✓ T-27: hit_target_id identifies secondary target (expected aux_1, got aux_1)
+  ✓ T-27: secondary target health reduced independently (500 -> 400) (expected 400.0, got 400.0)
+  ✓ T-27: primary target behind secondary target untouched (expected 3000.0, got 3000.0)
+
+[Real BZCC .msh model + materials + hardpoints (V1..V4)]
+  ✓ VSR tank -> scav profile resolved
+  ✓ V3: weaponHard1 inherited from ivtank.odf (expected hp_cannon_1, got hp_cannon_1)
+  ✓ shooter geometryName inherited (expected ivtank00.fbx, got ivtank00.fbx)
+  ✓ V1: ivtank00.msh resolved from geometryName
+  ✓ V1: DOCB .msh parsed into Godot Node3D hierarchy
+  ✓ V1: authentic triangles loaded (1110)
+  ✓ V1: .material files resolved
+  ✓ V1: DDS textures loaded via load_dds_from_buffer
+  ✓ V2: bounding box matches real tank dimensions: (5.554825, 3.070186, 8.50261)
+  ✓ V3: turret_y, turret_x and hp_cannon_1 nodes present
+  ✓ V2: hp_cannon_1 muzzle points toward Godot -Z forward (z=-1.41)
+  ✓ V4: rotating turret_y moves hp_cannon_1 muzzle origin
+  ✓ V4: launch direction rotates by 30 deg with turret_y
+  ✓ V1: target ivscav00.msh also parsed cleanly
+
+[T-29 Houdini scrubber, BZCC .dds particle textures, and categorized catalog]
+  ✓ T-29: HoudiniScrubber initial value set (expected 100.0, got 100.0)
+  ✓ T-29: HoudiniScrubber horizontal drag increments value smoothly
+  ✓ T-29: HoudiniScrubber evaluates Houdini-style math expression (120*2 = 240) (expected 240.0, got 240.0)
+  ✓ T-29: WintageTheme defaults to crisp No-AA font mode (expected none, got none)
+  ✓ T-29: FontFile antialiasing disabled by default (expected 0, got 0)
+  ✓ T-30: embedded pixel-perfect Verdana_m1.ttf and Verdana_m1-Bold.ttf present in project
+  ✓ T-30: WintageTheme loads embedded Verdana_m1 bitmap-strike font
+  ✓ T-30: WintageTheme default font size is pixel-perfect 12px (expected 12, got 12)
+  ✓ T-30: Golden Default background token is #1A1810 (expected #1A1810, got #1A1810)
+  ✓ T-30: Golden Default borderHighlight token is #F0D060 (expected #F0D060, got #F0D060)
+  ✓ T-30: Golden Default accentTealDeep token is #004C4C (expected #004C4C, got #004C4C)
+  ✓ T-29: Font AA setting switches to Gray AA (expected 1, got 1)
+  ✓ T-29: smoke2.tga resolves to real baked smoke2.dds
+  ✓ T-29: crackle.tga resolves to real baked crackle.dds
+  ✓ T-29: xstabgnd_c builds live explosion burst
+  ✓ T-29: draw_planar uses horizontal PlaneMesh
+  ✓ T-29: draw_sphere uses 16x32 SphereMesh
+  ✓ T-29: draw_twirl loads real DDS texture with BILLBOARD_PARTICLES + billboard_keep_scale
+  ✓ T-29: Stock collection cataloged (>=1400 ODFs)
+  ✓ T-29: VSR collection cataloged separately
+  ✓ T-29: VRV collection cataloged separately
+  ✓ T-29: Stock Vehicles category filter returns vehicles
+  ✓ T-31: ivscav.odf resolves in-game name Scavenger (expected Scavenger, got Scavenger)
+  ✓ T-31: fvscav.odf resolves in-game name Scavenger (expected Scavenger, got Scavenger)
+  ✓ T-31: fvscavcpu.odf resolves in-game name Scavenger (expected Scavenger, got Scavenger)
+  ✓ T-31: ivtank_vsr.odf inherits in-game unitName Tank from ivtank.odf (expected Tank, got Tank)
+  ✓ T-31: fvarch.odf resolves in-game name Lancer (expected Lancer, got Lancer)
+  ✓ T-31: ResourceIndex search_filtered matches in-game name 'Scavenger'
+  ✓ T-31: ivtank00.msh parsed for material emission check
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: BzMeshReader sets EMISSION_OP_MULTIPLY to prevent whitewash (expected 1, got 1)
+  ✓ T-31: verified emissive material on ivtank00.msh
+  ✓ T-31: projectile hits target 3D BBOX hitbox (expected vehicle, got vehicle)
+  ✓ T-31: impact occurs at front BBOX face (z=-55.50) instead of center (-60.0)
+  ✓ T-31 R-02: active loadout 3532748119 resolves VSR closure without ambiguity
+  ✓ T-31 P0-03: closure records source-aware ResourceIdentity entries
+  ✓ T-31 R-07: duplicate output filenames from distinct sources report STAGING_RESOURCE_COLLISION (expected STAGING_RESOURCE_COLLISION, got STAGING_RESOURCE_COLLISION)
+  ✓ T-31 P0-04: closure_status reports OUTPUT_PATH_COLLISION (expected OUTPUT_PATH_COLLISION, got OUTPUT_PATH_COLLISION)
+  ✓ T-31 N-03: missing shooter fails preflight_passed
+  ✓ T-31 N-04: failed preflight rejects launchable staging
+  ✓ T-31 N-03: failed preflight rejects launch
+  ✓ T-31 S-01: sessions recovered after restart
+  ✓ T-31 S-01: recovered preflight session stages cleanly from durable snapshot
+  ✓ T-31 N-02: Steam PID without game process reports game_process_detected=false and STEAM_PROCESS_STARTED
+  ✓ T-31 N-05: tampered staged file invalidates launch preflight
+  ✓ T-31 S-05: modified source ODF after preflight rejected as SOURCE_DRIFT_DETECTED
+  ✓ T-31 S-04: valid sessions recovered while 1 corrupt entry counted
+  ✓ T-31 S-04: corrupted ledger record quarantined without losing raw evidence
+
+[Wave B Reset Safety & Occurrence Semantics (RST-04, RST-05, RST-09, RST-11, RST-13, RST-14)]
+  ✓ RST-04 setup: saved override 200
+  ✓ RST-04: manifest failure causes revert_document to fail
+  ✓ RST-04: outcome is RESET_FAILED_RECOVERABLE (expected RESET_FAILED_RECOVERABLE, got RESET_FAILED_RECOVERABLE)
+  ✓ RST-04: recovery_pending flag set
+  ✓ RST-05: in-memory document NOT silently wiped on failed revert (expected 200, got 200)
+  ✓ RST-05: workspace_override stays true on failed revert
+  ✓ RST-05: manifest entry preserved on failed revert
+  ✓ RST-13: after failed reset + restart, UI and manifest still agree on 200 (expected 200, got 200)
+  ✓ RST-14: durable reset recovery point written
+  ✓ RST-13: revert succeeds when manifest is writable
+  ✓ RST-13: factory value 100 restored (expected 100, got 100)
+  ✓ RST-13: manifest cleared on successful revert
+  ✓ RST-13: factory 100 persists across restart (expected 100, got 100)
+  ✓ RST-14: restore_reset_recovery_point succeeded
+  ✓ RST-14: original saved override 200 recovered from reset recovery point (expected 200, got 200)
+  ✓ P0-02: missing factory source returns SOURCE_MISSING
+  ✓ P0-02: missing factory source preserves in-memory value 2 (expected 2, got 2)
+  ✓ RST-09: two physical [Core] value entries parsed (expected 2, got 2)
+  ✓ RST-09: first physical [Core] occurrence maps to factory value 10 (expected 10, got 10)
+  ✓ RST-09: last physical [Core] occurrence maps to factory value 30 (expected 30, got 30)
+  ✓ RST-11: replace_header_occurrence_from_factory succeeded
+  ✓ RST-11: factory property lifeTime restored to 1 (expected 1, got 1)
+  ✓ RST-11: workspace-added customValue removed from [Core]
+  ✓ RST-11: unrelated [KeepMe] section preserved intact (expected bar, got bar)
+
+[Wave C Native Durability & Honest Evidence (N-D01..N-D10, N-E01..N-E08)]
+  ✓ N-D01: failed preflight package write returns PREFLIGHT_PERSIST_FAILED and restart_resumable=false
+  ✓ N-D01: failed preflight package did not claim durable session after restart
+  ✓ N-D02: failed session JSON write returns PREFLIGHT_PERSIST_FAILED
+  ✓ N-D02: failed session_ledger.json write returns PREFLIGHT_PERSIST_FAILED
+  ✓ N-D07 setup: durable preflight succeeded with restart_resumable=true
+  ✓ N-D03: modified 1 byte in preflight package rejected as PREFLIGHT_SNAPSHOT_HASH_MISMATCH
+  ✓ N-D04: corrupted base64 rejected as PREFLIGHT_SNAPSHOT_CORRUPT
+  ✓ N-D05: wrong session package rejected as PREFLIGHT_SNAPSHOT_SESSION_MISMATCH
+  ✓ N-D07: recovered package stages byte-identical files matching snapshot MD5
+  ✓ N-D10: modified staged file blocks launch
+  ✓ N-D06: UTF-16LE SOURCE_RAW_HASH computed byte-exact (expected 67876f8d68f0a7abebd6e1419ee2c9ad, got 67876f8d68f0a7abebd6e1419ee2c9ad)
+  ✓ N-D06: UTF-16LE no-op serialization preserves byte-exact WORKING_DOCUMENT_HASH (expected 67876f8d68f0a7abebd6e1419ee2c9ad, got 67876f8d68f0a7abebd6e1419ee2c9ad)
+  ✓ N-D06: no-op UTF-16LE SOURCE_RAW_HASH == WORKING_DOCUMENT_HASH (expected 67876f8d68f0a7abebd6e1419ee2c9ad, got 67876f8d68f0a7abebd6e1419ee2c9ad)
+  ✓ N-D06: 1-byte external drift in UTF-16LE source rejected as SOURCE_DRIFT_DETECTED (SOURCE_RAW_HASH)
+  ✓ N-D08: missing preflight fields fails closed on stage() with PREFLIGHT_STATE_MISSING
+  ✓ N-D08: missing preflight fields fails closed on launch() with LAUNCH_REJECTED
+  ✓ N-D09: files_override rejected by launchable stage()
+  ✓ N-D09: stage_diagnostic marks launch_eligible=false
+  ✓ N-D09: diagnostic-staged session rejected by launch()
+  ✓ N-E02: caller-provided fake game_process_detected/game_pid in options ignored
+  ✓ N-E01: Steam PID alone reports STEAM_PROCESS_STARTED, never GAME_PROCESS_DETECTED (expected STEAM_PROCESS_STARTED, got STEAM_PROCESS_STARTED)
+  ✓ N-E02: caller-provided fake mission_loaded_at/resources_mounted in options ignored
+  ✓ N-E03: detected game without mission stays GAME_PROCESS_DETECTED (expected GAME_PROCESS_DETECTED, got GAME_PROCESS_DETECTED)
+  ✓ N-E03: mission not observed -> no NATIVE_VERIFIED
+  ✓ N-E04: mission without resource probe stays MISSION_OBSERVED (expected MISSION_OBSERVED, got MISSION_OBSERVED)
+  ✓ N-E04: resource probe missing -> no NATIVE_VERIFIED
+  ✓ N-E05 setup: runner confirms RESOURCE_PROBE_CONFIRMED (expected RESOURCE_PROBE_CONFIRMED, got RESOURCE_PROBE_CONFIRMED)
+  ✓ N-E05: synthetic observation rejected
+  ✓ N-E07: mismatched session_id rejected
+  ✓ N-E08 setup: valid runner-attested observation verified
+  ✓ N-E08: measurement with mismatched scenario_hash rejected
+  ✓ N-E06: operator-imported observation identified as unattested COMPARISON_COMPLETE
+
+[T-36 Titan Lightning, Rigid Floor Bounce, Homing Missiles & Sandbox Physics]
+  ✓ T-36: stock fvatank.odf and ivscav.odf resolved
+  ✓ T-36: Titan weapon profile resolved
+  ✓ T-36: Titan primary weapon is garc_c (expected garc_c, got garc_c)
+  ✓ T-36: Titan ordnance is arcbolt (expected arcbolt, got arcbolt)
+  ✓ T-36: Titan arcbolt flagged as is_beam_render (draw_bolt hitscan)
+  ✓ T-36: Titan dual hardpoints detected (HP_CANNON_1/2)
+  ✓ T-36: arcbolt.render recognized as bolt/beam ref
+  ✓ T-36: build_bolt_beam constructs world-space BoltBeamNode for Titan arcbolt
+  ✓ T-36: Titan bolt uses draw_bolt renderBase (expected draw_bolt, got draw_bolt)
+  ✓ T-36: Titan lightning stays visible for animateTime >= 0.5s
+  ✓ T-36: Titan alt garc_a (ArcCannonClass ordName=NULL) resolves as beam weapon
+  ✓ T-36: garc_a damageValue(H) = 400 read from [ArcCannonClass]
+  ✓ T-36: garc_a beam shot hits target (expected vehicle, got vehicle)
+  ✓ T-36: garc_a beam shot deals 400 damage (expected 400.0, got 400.0)
+  ✓ T-36: xcoreturrxpl built with floor_y=0.0
+  ✓ T-36: draw_sphere/draw_twirl registered for BottomInteractsWithTerrain clamping
+  ✓ T-36: sim_ember chunks registered for rigid floor bounce physics
+  ✓ T-36: sim_ember chunks bounced off rigid floor (bounces=274)
+  ✓ T-36: no simulated particle fell beneath floor y=0 (min_y=0.100)
+  ✓ T-36: all BottomInteractsWithTerrain emitters stay above y=0
+  ✓ T-36: homing missile test profile resolved
+  ✓ T-36: missile omegaTurn & is_homing parsed from [MissileClass]
+  ✓ T-36: shotVariance and kickVeloc parsed
+  ✓ T-36: moving shooter velocity inherited by projectile (speed=75.0)
+  ✓ T-36: homing missile steered off-axis and hit wiggling moving target (expected vehicle, got vehicle)
+  ✓ T-36: multi-target splash damaged nearby secondary target (hp=414.2)
+  ✓ T-36: sloped terrain ramp intercepts low horizontal shot (expected obstacle, got obstacle)
+  ✓ T-36: shot above ramp crest clears terrain ramp and hits target (expected vehicle, got vehicle)
+
+[T-34 Persistent ModLoadout Profiles, Explicit Conflict Resolution & Provenance]
+  ✓ T-34: profile_id sanitized (expected vsr_custom, got vsr_custom)
+  ✓ T-34: multi-package priority order preserved (expected ["pkg_alpha", "pkg_beta"], got ["pkg_alpha", "pkg_beta"])
+  ✓ T-34: policy_note honestly states editor policy != verified BZCC mount order
+  ✓ T-34: ModLoadout saved atomically under workspace/loadouts/
+  ✓ T-34: ModLoadout reloaded from disk
+  ✓ T-34: reloaded multi-package priority matches (expected ["pkg_alpha", "pkg_beta"], got ["pkg_alpha", "pkg_beta"])
+  ✓ T-34: reloaded explicit conflict winner preserved
+  ✓ T-34: ResourceIndex.apply_loadout succeeded
+  ✓ T-34: explicit_resource_winners overrides priority_order in editor ResourceIndex
+  ✓ T-34: NativeResourceClosureBuilder resolves explicit winner without ambiguity
+  ✓ T-34: editor and native staging select identical effective resource path
+  ✓ T-34: native closure provenance records explicit_loadout_winner (expected explicit_loadout_winner, got explicit_loadout_winner)
+  ✓ T-34: missing dependency reported explicitly
+  ✓ T-34: multi-package conflict enumerated with provenance
+  ✓ T-34: missing dependency marks native_test_eligibility INELIGIBLE
+  ✓ T-34: complete loadout marks native_test_eligibility ELIGIBLE
+  ✓ T-34: list_profiles enumerates saved ModLoadout
+  ✓ T-34: delete_profile removes saved profile cleanly
+
+[T-38 Wave B Unified Reset Transaction & Byte-Exact Post-Restart Recovery (RST-15..20, RCV-01..05)]
+  ✓ RST-15 setup: saved workspace override 200
+  ✓ RST-15 setup: doc has BOTH saved override=200 and dirty working=250
+  ✓ RST-15: single revert_document succeeded
+  ✓ RST-15: single-document Reset created durable recovery point
+  ✓ RST-15: factory 100 displayed after reset (expected 100, got 100)
+  ✓ RST-15: original source file untouched on disk (expected e20c5d43989c71e315177600e8407e76, got e20c5d43989c71e315177600e8407e76)
+  ✓ RST-15: list_reset_recovery_points exposes single-doc recovery point
+  ✓ RST-19 setup: document is NOT cached after restart
+  ✓ RST-16/19: restore_reset_recovery_point succeeded without pre-cached document
+  ✓ RST-16/19: per-resource status is WORKING_REVISION_RESTORED (expected WORKING_REVISION_RESTORED, got WORKING_REVISION_RESTORED)
+  ✓ RST-19: recovery materialized document into active cache
+  ✓ RST-16/RCV-01: unsaved dirty working revision 250 recovered after restart (expected 250, got 250)
+  ✓ RST-16: recovered doc retains dirty=true and workspace_override=true
+  ✓ RST-16: recovered working bytes match pre-reset dirty 250 byte-for-byte (expected [91, 79, 114, 100, 110, 97, 110, 99, 101, 67, 108, 97, 115, 115, 93, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 72, 41, 61, 50, 53, 48, 10], got [91, 79, 114, 100, 110, 97, 110, 99, 101, 67, 108, 97, 115, 115, 93, 10, 100, 97, 109, 97, 103, 101, 86, 97, 108, 117, 101, 40, 72, 41, 61, 50, 53, 48, 10])
+  ✓ RST-15: saved workspace override 200 restored in manifest
+  ✓ RST-15: saved override 200 preserved separately from working 250 (expected 200, got 200)
+  ✓ Demo A: restored unsaved 250 survives a subsequent restart (expected 250, got 250)
+  ✓ Demo A: restored doc remains marked dirty after restart until explicitly saved
+  ✓ RCV-05: repeated restore is idempotent and byte-exact
+  ✓ RST-15: saved_only mode restores saved 200 with SAVED_OVERRIDE_RESTORED
+  ✓ RST-15: saved_only restored 200 cleanly (expected 200, got 200)
+  ✓ RST-17 setup: loaded UTF-16LE ODF (expected utf-16le, got utf-16le)
+  ✓ RST-17 setup: UTF-16LE BOM detected
+  ✓ RST-17 setup: dirty working bytes remain UTF-16LE with BOM
+  ✓ RST-17: reset UTF-16LE document succeeded
+  ✓ RST-17: restore UTF-16LE recovery point succeeded
+  ✓ RST-17: UTF-16LE encoding and BOM preserved after recovery
+  ✓ RST-17/RCV-02: recovered UTF-16LE dirty bytes are 100% byte-exact (expected [255, 254, 91, 0, 79, 0, 114, 0, 100, 0, 110, 0, 97, 0, 110, 0, 99, 0, 101, 0, 67, 0, 108, 0, 97, 0, 115, 0, 115, 0, 93, 0, 13, 0, 10, 0, 100, 0, 97, 0, 109, 0, 97, 0, 103, 0, 101, 0, 86, 0, 97, 0, 108, 0, 117, 0, 101, 0, 40, 0, 72, 0, 41, 0, 61, 0, 50, 0, 53, 0, 48, 0, 13, 0, 10, 0], got [255, 254, 91, 0, 79, 0, 114, 0, 100, 0, 110, 0, 97, 0, 110, 0, 99, 0, 101, 0, 67, 0, 108, 0, 97, 0, 115, 0, 115, 0, 93, 0, 13, 0, 10, 0, 100, 0, 97, 0, 109, 0, 97, 0, 103, 0, 101, 0, 86, 0, 97, 0, 108, 0, 117, 0, 101, 0, 40, 0, 72, 0, 41, 0, 61, 0, 50, 0, 53, 0, 48, 0, 13, 0, 10, 0])
+  ✓ RST-18/RCV-03: corrupt working_base64 fails recovery (ok=false)
+  ✓ RST-18/RCV-03: corrupt working_base64 reports explicit HASH_MISMATCH (expected HASH_MISMATCH, got HASH_MISMATCH)
+  ✓ RST-18/RCV-03: corrupt resource is NOT falsely appended to restored[]
+  ✓ RST-18: per-resource status is HASH_MISMATCH (expected HASH_MISMATCH, got HASH_MISMATCH)
+  ✓ RST-20 setup: created 2-document batch recovery point
+  ✓ RST-20/RCV-04: partial corruption returns ok=false
+  ✓ RST-20/RCV-04: status is PARTIAL_RECOVERY (expected PARTIAL_RECOVERY, got PARTIAL_RECOVERY)
+  ✓ RST-20/RCV-04: exactly 1 valid file restored (expected 1, got 1)
+  ✓ RST-20/RCV-04: exactly 1 corrupt file failed (expected 1, got 1)
+  ✓ RST-20: valid doc reports WORKING_REVISION_RESTORED (expected WORKING_REVISION_RESTORED, got WORKING_REVISION_RESTORED)
+  ✓ RST-20: corrupt doc reports HASH_MISMATCH (expected HASH_MISMATCH, got HASH_MISMATCH)
+  ✓ RST-20: valid doc working value 111 recovered cleanly (expected 111, got 111)
+
+[T-39 Wave C Strict ModLoadout Isolation & Resolution Parity (P1-01; ML-01..ML-05)]
+  ✓ ML-02: empty enabled_packages returns [] despite non-empty stale priority_order (expected [], got [])
+  ✓ ML-02: stock-only loadout does NOT resolve disabled Workshop package file (expected , got )
+  ✓ ML-02: stock-only loadout resolves shared_wpn.odf to base game, not Workshop
+  ✓ ML-02: stock-only loadout resolves base game stock_tank.odf
+  ✓ ML-01: strict loadout with pkg_a enabled MUST NOT resolve beta_exclusive.odf from disabled pkg_b (expected , got )
+  ✓ ML-01: resolve_from MUST NOT leak disabled pkg_b resource (expected , got )
+  ✓ ML-01: enabled pkg_a resource resolves normally
+  ✓ ML-01: ModLoadout conflict report rejects disabled-only resource instead of falling back to cands
+  ✓ ML-01: missing_or_disabled_resources reports disabled pkg_b resource
+  ✓ ML-01: resolve_ex STRICT returns MISSING_OR_DISABLED_RESOURCE
+  ✓ ML-01: resolve_ex lists blocked disabled package pkg_b
+  ✓ ML-01: EDITOR_PREVIEW_FALLBACK returns RESOLVED_WITH_PREVIEW_FALLBACK
+  ✓ ML-01: EDITOR_PREVIEW_FALLBACK surfaces non-empty provenance warning
+  ✓ ML-03: explicit winner in disabled pkg_b flagged in disabled_explicit_winners
+  ✓ ML-03: disabled explicit winner marks native eligibility INELIGIBLE
+  ✓ ML-03: ResourceIndex.resolve_ex returns EXPLICIT_WINNER_DISABLED_PACKAGE in strict mode
+  ✓ ML-03: strict ResourceIndex refuses disabled explicit winner (expected , got )
+  ✓ ML-04: editor and native staging select identical shared_wpn.odf path
+  ✓ ML-05: NativeResourceClosureBuilder refuses disabled pkg_b resource
+  ✓ ML-05: native closure reports MISSING_OR_DISABLED_RESOURCE for disabled-only package (expected MISSING_OR_DISABLED_RESOURCE, got MISSING_OR_DISABLED_RESOURCE)
+  ✓ ML-05: build_closure rejects disabled package dependency with MISSING_OR_DISABLED_RESOURCE
+  ✓ ML-05: NativeResourceClosureBuilder rejects disabled explicit winner
+
+[T-40 Wave D Durable Transitions & Async NativeProcessMonitor (P1-02, P1-03; ND-11..15, SM-01..07)]
+  ✓ ND-11: stage() fails closed when session_ledger.json write fails
+  ✓ ND-11: stage() returns STATE_PERSIST_FAILED (expected STATE_PERSIST_FAILED, got STATE_PERSIST_FAILED)
+  ✓ ND-11: stage() returns RECOVERY_PENDING (expected RECOVERY_PENDING, got RECOVERY_PENDING)
+  ✓ ND-11: stage() sets recovery_pending=true
+  ✓ ND-11: durable ledger stays consistent & recoverable after stage persist failure
+  ✓ ND-12: launch() ledger write failure returns STATE_PERSIST_FAILED / RECOVERY_PENDING
+  ✓ ND-13: failed operator_instructions.txt write returns STATE_PERSIST_FAILED / RECOVERY_PENDING, never false AWAITING_OPERATOR
+  ✓ ND-14: failed native_evidence.json write returns STATE_PERSIST_FAILED / RECOVERY_PENDING (verified=false)
+  ✓ ND-14: failed ledger write during collect_observation returns STATE_PERSIST_FAILED / RECOVERY_PENDING
+  ✓ ND-15: failed cleanup_stage persist returns STATE_PERSIST_FAILED / RECOVERY_PENDING
+  ✓ SM-01..07: NativeExperimentRunner exposes async NativeProcessMonitor API (poll_monitor/resume_monitor/cancel_monitor)
+  ✓ SM-01/SM-03: preexisting battlezone2.exe PID 1111 ignored at launch -> STEAM_PROCESS_STARTED (expected STEAM_PROCESS_STARTED, got STEAM_PROCESS_STARTED)
+  ✓ SM-03: preexisting PID 1111 and mismatched exe/MD5 PID 2222 rejected -> stays STEAM_PROCESS_STARTED (expected STEAM_PROCESS_STARTED, got STEAM_PROCESS_STARTED)
+  ✓ SM-03: game_pid remains 0 when only preexisting/mismatched processes exist
+  ✓ SM-01: delayed new verified battlezone2.exe detected on poll 2 -> GAME_PROCESS_DETECTED (expected GAME_PROCESS_DETECTED, got GAME_PROCESS_DETECTED)
+  ✓ SM-01: monitor captured verified new game_pid=8888 (expected 8888, got 8888)
+  ✓ SM-01: monitor verified executable path & MD5
+  ✓ SM-07: restart recovery resumes monitored session preserving session_id and GAME_PROCESS_DETECTED state
+  ✓ SM-07: resumed monitor preserves preexisting_game_pids across restart
+  ✓ SM-04: monitor transitions GAME_PROCESS_DETECTED -> MISSION_OBSERVED (expected MISSION_OBSERVED, got MISSION_OBSERVED)
+  ✓ SM-04: monitor transitions MISSION_OBSERVED -> RESOURCE_PROBE_CONFIRMED (expected RESOURCE_PROBE_CONFIRMED, got RESOURCE_PROBE_CONFIRMED)
+  ✓ SM-05: synthetic observation NEVER transitions monitor to NATIVE_VERIFIED
+  ✓ SM-04: monitor collects observation and completes comparison
+  ✓ SM-04: monitor reaches terminal comparison state (COMPARISON_COMPLETE)
+  ✓ SM-02: game never appears -> stays STEAM_PROCESS_STARTED before timeout (expected STEAM_PROCESS_STARTED, got STEAM_PROCESS_STARTED)
+  ✓ SM-06: exceeding timeout_s transitions cleanly to TIMEOUT (expected TIMEOUT, got TIMEOUT)
+  ✓ SM-06: TIMEOUT stops polling and records MONITOR_TIMEOUT
+  ✓ SM-06: cancel_monitor transitions cleanly to CANCELLED (expected CANCELLED, got CANCELLED)
+  ✓ SM-06: cancelled monitor is inactive
+  ✓ SM-01: game PID created by Steam spawn is not mistaken for preexisting (expected GAME_PROCESS_DETECTED, got GAME_PROCESS_DETECTED)
+  ✓ SM-01: post-spawn game PID 9999 detected (expected 9999, got 9999)
+  ✓ SM-06: wall-clock monitor does not time out on first poll (expected STEAM_PROCESS_STARTED, got STEAM_PROCESS_STARTED)
+
+[T-41 Wave E Damage / Shield / Ammo slice + hit normals (DS-01..DS-05)]
+  ✓ DS-01: shielded target ODF chain resolved
+  ✓ DS-01: maxShield parsed from target ODF (expected 80.0, got 80.0)
+  ✓ DS-01: shieldClass parsed from target ODF (expected D, got D)
+  ✓ DS-01: maxAmmo parsed from target ODF (expected 5, got 5)
+  ✓ DS-02: damageValue(D) selected for shielded target (expected 200.0, got 200.0)
+  ✓ DS-02: BZCC shieldRatio D=0.5 applied (expected 0.5, got 0.5)
+  ✓ DS-02: shot reaches shielded target (expected vehicle, got vehicle)
+  ✓ DS-02: shield absorbed 80 of 100 effective shield damage (expected 80.0, got 80.0)
+  ✓ DS-02: shield fully depleted (expected 0.0, got 0.0)
+  ✓ DS-02: spill damage reaches hull after shield ratio (expected 40.0, got 40.0)
+  ✓ DS-02: hull health reflects shield spill only (expected 960.0, got 960.0)
+  ✓ DS-03: ammoCost consumed from declared reserve (expected 2, got 2)
+  ✓ DS-04: hit normal is a unit-ish outward vector
+  ✓ DS-04: front hit normal points back toward shooter
+  ✓ DS-05: shield absorption is explicitly logged as APPROXIMATED
+  ✓ DS-05: unshielded target falls back to armor damageValue(H) (expected 100.0, got 100.0)
+  ✓ DS-05: unshielded hull damage unchanged (expected 100.0, got 100.0)
+  ✓ DS-05: unshielded hull health unchanged (expected 900.0, got 900.0)
+
+[T-41 Wave E Animated Ribbon Trails & BZCC animation inspection (TR-01..TR-04)]
+  ✓ TR-01: trail header preview holder built
+  ✓ TR-01: animated ribbon trail node created for draw_twirl_trail
+  ✓ TR-01: ribbon sampled path has 25 points (expected 25, got 25)
+  ✓ TR-02: ribbon mesh generated
+  ✓ TR-02: ribbon mesh rebuilds under animation
+  ✓ TR-02: curved trail path sampled deterministically (expected 13, got 13)
+  ✓ TR-03: real baked .msh resolved for animation inspection
+  ✓ TR-03: animation metadata inspected from real DOCB model
+  ✓ TR-03: bone/pose/node count fields reported
+  ✓ TR-03: animation_count reported honestly even when zero
+  ✓ TR-04: non-DOCB .msha rejected (expected ["not a DOCB .msha file"], got ["not a DOCB .msha file"])
+
+[T-60 Wave B Native Startup Diagnosis, Config Compat & Crash Log Correlation (NB-01..NB-08, P1-EVIDENCE-01)]
+  ✓ NB-05: shaman_native.cfg mounts stock bz2r_res, bz2r_loc, and maps streams
+  ✓ NB-03: /logconsole absent by default
+  ✓ NB-04: /logconsole present when explicitly requested
+  ✓ NB-05/08: external stage config flagged as CONFIG_REQUIRES_ROOTDIR_PLACEMENT
+  ✓ NB-05: @rootdir config uses bare filename argument
+  ✓ NB-07: unmounted /config + ds_16.bmf classified as CONFIG_PATH_NOT_LOADED_NO_FILESYS (expected CONFIG_PATH_NOT_LOADED_NO_FILESYS, got CONFIG_PATH_NOT_LOADED_NO_FILESYS)
+  ✓ NB-07: unmounted /config does not falsely blame external missing font
+  ✓ NB-07: mounted filesys log classified as STARTUP_FILESYS_MOUNTED (expected STARTUP_FILESYS_MOUNTED, got STARTUP_FILESYS_MOUNTED)
+  ✓ NB-07: font failure AFTER bz2r_res mount classified as EXTERNAL_MISSING_FONT (expected EXTERNAL_MISSING_FONT, got EXTERNAL_MISSING_FONT)
+  ✓ NB-06: session-matched log achieves CONFIRMED correlation
+  ✓ NB-06 / P1-EVIDENCE-01: collector selects session-matched log over newer unrelated crash log (expected Battlezone-Crashed 2026-11-22 10.00.01.log, got Battlezone-Crashed 2026-11-22 10.00.01.log)
+  ✓ NB-01/Control F: stock ds_16.bmf verified present in bz2r_res/interface/Fonts/DS/
+
+[T-61 Wave C Native Resource Closure, Auto Observation Path, Monitor Persistence & Event-Driven Lua (RC-01..07, NM-04..05, P1-NATIVE-06)]
+  ✓ RC-07: synthetic ordnance-only probe rejected when require_complete_closure=true
+  ✓ RC-07: synthetic probe returns RESOURCE_CLOSURE_INCOMPLETE (expected RESOURCE_CLOSURE_INCOMPLETE, got RESOURCE_CLOSURE_INCOMPLETE)
+  ✓ RC-05 setup: stock-only ivtank -> ivscav profile resolved
+  ✓ RC-05: complete stock-only scenario passes strict closure preflight
+  ✓ RC-06: VSR scenario without active VSR package rejected as closure_incomplete
+  ✓ P1-NATIVE-06: Lua mission removes fake time-based SHOT_OBSERVED
+  ✓ P1-NATIVE-06: Lua separates FIRE_REQUESTED, FIRE_CONFIRMED, HEALTH_DELTA_OBSERVED, and SHOT_COUNT_UNKNOWN
+  ✓ NM-04 setup: staged stock session
+  ✓ NM-04 setup: launch entered STEAM_PROCESS_STARTED (expected STEAM_PROCESS_STARTED, got STEAM_PROCESS_STARTED)
+  ✓ NM-03/04: late battlezone2.exe detected (expected GAME_PROCESS_DETECTED, got GAME_PROCESS_DETECTED)
+  ✓ NM-04: foreign-session observation at expected path rejected
+  ✓ NM-04/08: poll_monitor(sid) auto-resolved expected path and completed comparison
+  ✓ NM-05: process_monitors.json failure reports MONITOR_PERSIST_FAILED / RECOVERY_PENDING
+
+[T-62 Wave D Persistent Combat State: Shooter Ammo/Energy, Persistent Shield, Multi-Target & Replay (CS-01..CS-12)]
+  ✓ CS setup: combat ODF chain resolved
+  ✓ CS-01: shooter ammo_spent=10 is independent of target maxAmmo=1 (expected 10, got 10)
+  ✓ CS-02: Shot 1 fired
+  ✓ CS-02: Shot 1 reduced shooter ammo 30 -> 20 (expected 20, got 20)
+  ✓ CS-04: Shot 1 reduced shooter energy 50 -> 35
+  ✓ CS-05: Shot 1 reduced primary shield 100 -> 40
+  ✓ CS-05: Shot 1 kept primary hull intact at 500
+  ✓ CS-07/08: Splash absorbed by secondary target's own shield (40 -> 10)
+  ✓ CS-08: Splash did not bypass secondary target shield
+  ✓ CS-02: Shot 2 fired
+  ✓ CS-02: Shot 2 reduced shooter ammo 20 -> 10 (expected 10, got 10)
+  ✓ CS-05: Shot 2 depleted persistent shield 40 -> 0 (no shield resurrection)
+  ✓ CS-06: Shot 2 spilled remaining 20 damage to primary hull (500 -> 480)
+  ✓ CS-07/08: Shot 2 splash depleted secondary shield 10->0 and spilled 20 to secondary hull 300->280
+  ✓ CS-02: Shot 3 fired
+  ✓ CS-02: Shot 3 reduced shooter ammo 10 -> 0 (expected 0, got 0)
+  ✓ CS-06: Shot 3 damaged primary hull 480 -> 420
+  ✓ CS-03: Shot 4 rejected with INSUFFICIENT_AMMO when ammo=0
+  ✓ CS-04: shot rejected with INSUFFICIENT_ENERGY when energy < cost
+  ✓ CS-10: replay_deterministic replayed all 3 valid shots (expected 3, got 3)
+  ✓ CS-10: replayed shooter ammo matches (0) (expected 0, got 0)
+  ✓ CS-10: replayed primary hull matches (420)
+  ✓ CS-10: replayed secondary hull matches (250 after 3x30 splash against 40 shield)
+  ✓ CS-09: reset restores all actor states deterministically
+  ✓ CS-11: ODF edit damageValue(H)=120 immediately breaks 100 shield and deals 20 hull
+  ✓ CS-12: Undo restores damageValue(H)=60 and original shield/hull result
+
+[T-63 Wave E Particle Fidelity (Blend Modes, UV Anim, Budgets) & Real .msha Inspection]
+  ✓ PF-01: 'one one modulate' -> BLEND_MODE_ADD (expected 1, got 1)
+  ✓ PF-01: 'dstcolor zero modulate' -> BLEND_MODE_MUL (expected 3, got 3)
+  ✓ PF-01: 'zero invsrc modulate' -> BLEND_MODE_SUB (expected 2, got 2)
+  ✓ PF-01: 'srcalpha invsrcalpha' -> BLEND_MODE_MIX (expected 0, got 0)
+  ✓ PF-02: UV-animated explosion burst built
+  ✓ PF-02: EffectBurst registered UV-animated material
+  ✓ PF-02: step_simulation animates UV offset using textureSpeed/textureRate
+  ✓ PF-03: emitter budget reports ADDITIVE blend (expected ADDITIVE, got ADDITIVE)
+  ✓ PF-03: emitter budget reports UV animation and active count
+  ✓ PF-04: real 44-byte BZCC .msha header parsed cleanly (DOCB v1)
+  ✓ PF-04: empty .msha stub and unimplemented skeletal skinning reported honestly
+
+[T-65 Wave B Native Launch Eligibility Gates & Safe Stock Addon Route (P0-NATIVE-01, P0-NATIVE-02; NL-01..NL-06)]
+  ✓ NL-01: external /config scenario is STRUCTURALLY_VALID=true
+  ✓ NL-01: external /config scenario is STAGE_ELIGIBLE=true
+  ✓ NL-01: external /config reports CONFIG_COMPATIBLE=false
+  ✓ NL-01: external /config + authenticated Steam -> LAUNCH_ELIGIBLE=false
+  ✓ NL-01: reason is CONFIG_REQUIRES_ROOTDIR_PLACEMENT (expected CONFIG_REQUIRES_ROOTDIR_PLACEMENT, got CONFIG_REQUIRES_ROOTDIR_PLACEMENT)
+  ✓ NL-01: stage() succeeds for valid external config while keeping launch_eligible=false
+  ✓ NL-01: actual launch REJECTED while CONFIG_REQUIRES_ROOTDIR_PLACEMENT unresolved
+  ✓ NL-01: launch rejection reason is CONFIG_REQUIRES_ROOTDIR_PLACEMENT (expected CONFIG_REQUIRES_ROOTDIR_PLACEMENT, got CONFIG_REQUIRES_ROOTDIR_PLACEMENT)
+  ✓ NL-01: zero game/Steam processes spawned on incompatible external /config (expected 0, got 0)
+  ✓ NL-01: explicit manual_handoff allowed for structurally valid stage
+  ✓ NL-01/P0-NATIVE-02: controlled fallback provides SHA256 and requires operator approval without auto-writing BZ2R
+  ✓ NL-02: Steam unavailable -> STAGE_ELIGIBLE=true, LAUNCH_ELIGIBLE=false
+  ✓ NL-02: stage() succeeds when Steam unavailable
+  ✓ NL-02: Steam unavailable transitions to AWAITING_OPERATOR (expected AWAITING_OPERATOR, got AWAITING_OPERATOR)
+  ✓ NL-02: no actual process spawned when Steam unavailable (expected 0, got 0)
+  ✓ NL-03: compatible config + valid stage + Steam ready -> LAUNCH_ELIGIBLE=true
+  ✓ NL-03: stage() preserves launch_eligible=true for compatible config
+  ✓ NL-04: stage modification after preflight rejects launch
+  ✓ NL-05: stock bzone.cfg mounts @mydocsdir\addon first
+  ✓ NL-05: STOCK_ADDON route achieves CONFIG_COMPATIBLE=true and LAUNCH_ELIGIBLE=true without touching BZ2R
+  ✓ NL-05: STOCK_ADDON staged cleanly into owned SHAMAN_* folder under addon/
+  ✓ NL-05: STOCK_ADDON does not drop bzshell_init.cfg into global addon
+  ✓ NL-05: STOCK_ADDON launches without /config and passes unique session mission bzn (shaman_ee0df2f857.bzn)
+  ✓ NL-05: STOCK_ADDON cleanup removes only SHAMAN-owned files and preserves existing addon files
+  ✓ NL-06: BZ2R executable MD5 unchanged (expected e2fa7458cf2604315f48915acd288689, got e2fa7458cf2604315f48915acd288689)
+  ✓ NL-06: BZ2R stock bzone.cfg bytes untouched
+  ✓ NL-06: no config file silently written into BZ2R
+
+[T-66 Wave C1 Combat Clock, Reload Enforcement, Pause/Step & DoT (P0-SIM-01, P0-SIM-02; CB-01..CB-08)]
+  ✓ CB setup: weapon chain with 1.0s shotDelay resolved
+  ✓ CB-02/CB-07: t=0.0 fire accepted, ammo 30->25 (single deduct)
+  ✓ CB-07: t=0.0 energy 100->90 (single deduct)
+  ✓ CB-02: reload_remaining initialized to 1.0s
+  ✓ CB-02: at t=0.2s reload_remaining decreased to 0.8s even after projectile finished
+  ✓ CB-06: t=0.2s fire rejected with RELOADING / WEAPON_RELOADING
+  ✓ CB-07: rejected shot at t=0.2s deducted zero ammo (expected 25, got 25)
+  ✓ CB-06: t=0.9s fire still rejected while reloading
+  ✓ CB-04: single-step advances reload_remaining by exact 1/60s
+  ✓ CB-02: at t>=1.0s reload_remaining reached 0.0
+  ✓ CB-02: CombatScenario emitted RELOAD_READY event on single clock
+  ✓ CB-02/CB-07: t=1.0+ fire accepted and ammo 25->20
+  ✓ CB-06: DISABLED shooter rejected cleanly
+  ✓ CB-06: DESTROYED shooter rejected cleanly
+  ✓ CB-05: DoT applied to primary target
+  ✓ CB-05: has_active_timers() true while DoT active
+  ✓ CB-05: 0.5s of 20 dps DoT dealt 10.0 damage
+  ✓ CB-05: full 2.0s DoT dealt 40.0 damage and expired cleanly
+  ✓ CB-08: burst shot 1 accepted
+  ✓ CB-08: second BURST blocked by reload
+  ✓ CB-08: SALVO_FOLLOWUP shot 2 within salvo allowed and deducts ammo once
+
+[T-67 Wave C2 Spatial Replay Snapshots, ODF Revision Isolation & Baseline Preservation (P1-SIM-03, P1-SIM-04; RP-01..RP-08)]
+  ✓ RP setup: combat chain resolved
+  ✓ RP-01: reset('ALL') restores original target position
+  ✓ RP-02: reset('ALL') restores original velocity and yaw_rad
+  ✓ RP-03: reset('ALL') restores collision geometry (radius, half_extents, bbox_offset)
+  ✓ RP-04: Shot 1 at X=0 hits target (expected vehicle, got vehicle)
+  ✓ RP-04: Shot 2 aimed down -Z misses target moved to X=20
+  ✓ RP-04/05: sandboxed replay replayed both moving-target shots (expected 2, got 2)
+  ✓ RP-04: replayed Shot 1 hit target at X=0 (expected vehicle, got vehicle)
+  ✓ RP-04: replayed Shot 2 missed target moved to X=20
+  ✓ RP-05: replaying captured snapshot after ODF edit still uses captured damage=60 (shield 40, hull 500)
+  ✓ RP-08: sandboxed replay leaves active user scenario untouched
+  ✓ RP-06 setup: initial ammo=30 (expected 30, got 30)
+  ✓ RP-06: after Shot 1 ammo=20
+  ✓ RP-07 setup: shooter has active reload_remaining
+  ✓ RP-07: reconfiguration preserves active reload cooldown and target status effects
+  ✓ RP-06: after Shot 2 ammo=10
+  ✓ RP-06: Reset to initial restores ammo to original 30 (NOT depleted 20) (expected 30, got 30)
+
+[T-68 Wave D Active-Experiment Cleanup Guard, Monitor Preservation & Evidence Retention (P1-NATIVE-03; NC-01..NC-07)]
+  ✓ NC-01 setup: monitoring active after launch
+  ✓ NC-01: cleanup_stage rejected while monitor is active
+  ✓ NC-01: rejection reason is ACTIVE_EXPERIMENT_CANNOT_CLEANUP (expected ACTIVE_EXPERIMENT_CANNOT_CLEANUP, got ACTIVE_EXPERIMENT_CANNOT_CLEANUP)
+  ✓ NC-02: rejected cleanup leaves NativeSessionService monitoring and timer active
+  ✓ NC-01: staged files untouched after rejected cleanup
+  ✓ NC-03: cancel_monitoring transitions to CANCELLED (expected CANCELLED, got CANCELLED)
+  ✓ NC-03: monitoring stopped cleanly after cancel
+  ✓ NC-03: CANCELLED state persisted durably across restart (expected CANCELLED, got CANCELLED)
+  ✓ NC-04: cleanup after terminal CANCELLED state proceeds
+  ✓ NC-05: unknown file preserved during cleanup
+  ✓ NC-06: modified staged file preserved during cleanup
+  ✓ NC-07: evidence artifact retained outside disposable stage root after cleanup
+
+[T-72 Wave B Chronological Event-Scheduled Replay Concurrency (P0-SIM-01; RPL-09..RPL-16)]
+  ✓ RPL-09: overlapping replay preserves launch times 0.00 and 0.20
+  ✓ RPL-09: overlapping projectiles coexist during replay
+  ✓ RPL-09: impact timestamps match original run
+  ✓ RPL-10 orig: second shot rejected during reload
+  ✓ RPL-10: replay preserves 1 accepted / 1 rejected history
+  ✓ RPL-11: DoT during projectile flight reproduces identical shield/hull
+  ✓ RPL-12: moving target hit by both overlapping shots identically on replay
+  ✓ RPL-13: historical replay keeps frozen ODF damage after edit
+  ✓ RPL-14: incremental bounded replay completes in multiple chunks and matches original hull
+  ✓ RPL-15: same-time events replay with byte-identical event ordering
+  ✓ RPL-16: simultaneous splash impacts damage primary & secondary identically on replay
+
+[T-73 Wave C Native Cancel, Stock Addon Isolation & Manual Observation (NC-08..12, SA-01..09, NM-11..16)]
+  ✓ NC-08/NC-10: ledger cancel failure reports CANCELLATION_PERSIST_FAILED and retains GUI monitoring
+  ✓ NC-09/NC-10: monitor persist failure visible in GUI snapshot and retains monitoring
+  ✓ NC-11: restart after failed cancellation reconciles to RECOVERY_PENDING (expected RECOVERY_PENDING, got RECOVERY_PENDING)
+  ✓ NC-12: successful retry cancel commits CANCELLED and unlocks safe cleanup
+  ✓ SA-01/SA-04: STOCK_ADDON sessions derive unique mission basenames and unique marker ODFs
+  ✓ SA-02: two simultaneous STOCK_ADDON stages succeed cleanly
+  ✓ SA-03: reusing active mission basename rejected with MISSION_NAME_COLLISION (expected MISSION_NAME_COLLISION, got MISSION_NAME_COLLISION)
+  ✓ SA-05: foreign addon ODF collision detected and blocks launch
+  ✓ SA-06: old SHAMAN stage ODF collision detected
+  ✓ SA-07: foreign addon files untouched by scan and cleanup
+  ✓ SA-08: bzone.cfg parser strips block comments and validates active stream mount order
+  ✓ NM-11: ARM MANUAL OBSERVATION enters MONITOR_ARMED without claiming launch
+  ✓ NM-12: MONITOR_ARMED persists and resumes across restart
+  ✓ NM-13: preexisting PID ignored (expected MONITOR_ARMED, got MONITOR_ARMED)
+  ✓ NM-13: late verified PID enters GAME_PROCESS_VERIFIED (expected GAME_PROCESS_VERIFIED, got GAME_PROCESS_VERIFIED)
+  ✓ NM-14: session-specific Lua observation collected automatically
+  ✓ NM-15/NM-16: manual import / unverified PID stays unattested COMPARISON_COMPLETE, never NATIVE_VERIFIED
+
+[T-74 Wave E DOCB .msh Animations, Transform Compression & ResourceIndex Cache]
+  ✓ T-74 ANIM: Scion fvtank_skel.msh loads cleanly with embedded DOCB clips
+  ✓ T-74 ANIM: ivturr00.msh decodes 'deploy' clip and hp_gun_1
+  ✓ T-74 ANIM: playing ivturr00.msh 'deploy' animates hp_gun_1 by 2.05m
+  ✓ T-74 ANIM: ibnav00.msh 'loop' rotates vertex-colored spinner node
+  ✓ T-74 SOAK: moving-target transform compression collapses 1200 frames -> 5 events
+  ✓ T-74 A/B: CombatScenario.compare_replay_results produces clean diff summary
+  ✓ T-74 IDX: save_index_cache succeeds
+  ✓ T-74 IDX: load_index_cache hits on matching SHA256 fingerprint
+  ✓ T-74 IDX: provenance_summary updates immediately on Workshop package switch
+  ✓ T-74 IDX: cache invalidates on ModLoadout change
+
+1105 checks, 0 failure(s), 36627 ms
+RESULT: PASS
+
+== UI smoke ==
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+BZ_ODF_SHAMAN UI smoke test
+ERROR: Condition "len == 0" is true. Returning: FAILED
+   at: update (core/crypto/hashing_context.cpp:54)
+   GDScript backtrace (most recent call first):
+       [0] _md5_bytes (res://scripts/core/workspace_store.gd:664)
+       [1] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1128)
+       [2] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [3] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [4] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [5] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [6] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [7] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [8] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [9] compute_roots_fingerprint (res://scripts/core/resource_index.gd:1171)
+       [10] save_index_cache (res://scripts/core/resource_index.gd:1209)
+       [11] scan_or_load_cache (res://scripts/core/resource_index.gd:1330)
+       [12] _scan_worker (res://scripts/ui/main_window.gd:1076)
+  ✓ resource index built: 17028 ODFs
+  ✓ a document auto-opened
+  ✓ weapon lab scenario resolved
+  ✓ VSR weapon resolved: gatstabvsr_c
+  ✓ T-76: weapon-slot picker populated
+  ✓ T-76: profile exposes 1 weapon slot(s)
+  ✓ T-76: barrel-mode selector has TANDEM/SALVO/SINGLE
+  ✓ authentic BZCC shooter 3D model loaded
+  ✓ authentic BZCC target 3D model loaded
+  ✓ authentic hp_cannon_1 hardpoint bound
+  ✓ turret yaw moves projectile spawn origin
+  ✓ turret yaw updates projectile launch direction
+  ✓ reload does not create duplicate shooter scene objects
+  ✓ shotSpeed present: 120.0
+  ✓ damage derived: 100.0 (armor H)
+  ✓ FIRE ALT control present
+  ✓ alternate weapon resolved
+  ✓ alternate shot fired in UI
+  ✓ telemetry: weapon activated
+  ✓ telemetry: impact or expiry recorded
+  ✓ telemetry: damage or expiry recorded
+  ✓ FX toggle control present
+  ✓ impact spawned an explosion effect
+  ✓ effect node is in the 3D scene
+  ✓ telemetry records the explosion ODF and emitter count
+  ✓ restart clears explosion effects
+  ✓ edited explosion burst spawned
+  ✓ V5: live startColor edit visible in Weapons Lab shot
+  ✓ V5: undo restores previous explosion effect color
+  ✓ damageValue(H) located or appended in ordnance ODF
+  ✓ edited damage applied by simulation (200.00)
+  ✓ editing never modified the original game file
+  ✓ undo propagated to the next simulated shot (100.00)
+  ✓ redo propagated to the next simulated shot (200.00)
+  ✓ edit propagation keeps the raw editor showing the applied value
+  ✓ edit propagation rebuilds the structured inspector
+  ✓ edit propagation refreshes dependencies
+  ✓ edit propagation keeps the weapon profile on the current revision
+  ✓ staged export file written
+  ✓ exported ODF contains the edit
+  ✓ save-all saved the edited document(s)
+  ✓ save-all wrote the workspace file
+  ✓ save-all cleared the dirty flag
+  ✓ saved document bytes equal the current working revision
+  ✓ smoke workspace is the isolated test root
+  ✓ saved file stays inside the test root
+  ✓ sweep offers a damageValue property for the target armor
+  ✓ parameter sweep produced 5 rows
+  ✓ sweep baseline uses the live 200 damage edit
+  ✓ sweep top point applies 250 damage
+  ✓ sweep results rendered in the UI
+  ✓ sweep rolled back: edit still reads 200
+  ✓ sweep CSV saved to workspace
+  ✓ sweep CSV header present
+  ✓ Audio Lab lists inherited weapon sound references
+  ✓ particle graph populated from real render ODF
+  ✓ found an unused render link to create
+  ✓ graph connection persisted as a real ODF reference
+  ✓ particle and audio labs share the live document revision
+  ✓ graph edit marks the document dirty
+  ✓ connect+disconnect restores byte-exact ODF
+  ✓ graph edit saved to the workspace
+  ✓ graph link restored after save + cache clear
+  ✓ graph duplicate created a real header: Core_copy
+  ✓ duplicate header has editable property lines
+  ✓ graph delete removed the duplicate header
+  ✓ graph undo restored the deleted header
+  ✓ graph redo removed it again
+  ✓ T-76: persisted link found on Core (renderName1)
+  ✓ T-76: COPY link copied the focused edge
+  ✓ T-76: CUT removed a real ODF reference
+  ✓ T-76: UNDO restored the cut link
+  ✓ T-76: PASTE completed without error
+  ✓ cycle detection sees the existing Core -> Shock edge
+  ✓ graph layout saved in the workspace
+  ✓ graph layout restored after reload
+  ✓ GRAPH-18: self-link refused with byte-exact rollback
+  ✓ GRAPH-13: invalid destination preserves original bytes
+  ✓ GRAPH-14/19: indirect cycle reconnection refused
+  ✓ GRAPH-20: default move refuses an occupied slot
+  ✓ GRAPH-22: explicit swap preserves both links
+  ✓ GRAPH-17: valid reconnect commits one revision
+  ✓ GRAPH-16: undo restores exact reference
+  ✓ GRAPH-16: redo reapplies exact reference
+  ✓ GRAPH-15: stale edge focus is ignored after document revision change
+  ✓ GRAPH-EDGE: commands act on selected edge only
+  ✓ GRAPH-HOTKEY: Ctrl+C while a LineEdit has focus is not captured
+  ✓ external file.header references become graph nodes
+  ✓ external node resolves to a real indexed file
+  ✓ external node offers an OPEN control
+  ✓ OPEN navigates to the referenced file
+  ✓ duplicate occurrences are labelled as a merged effective view
+  ✓ NEW NODE created a real render header
+  ✓ created node uses a documented renderBase value
+  ✓ RENAME renamed the render header
+  ✓ renamed header replaces the old name
+  ✓ rename is undoable
+  ✓ raw editor populated
+  ✓ schema registry loaded: 1490 properties
+  ✓ Wintage theme applied
+ERROR: Condition "len == 0" is true. Returning: FAILED
+   at: update (core/crypto/hashing_context.cpp:54)
+   GDScript backtrace (most recent call first):
+       [0] _md5_bytes (res://scripts/core/workspace_store.gd:664)
+       [1] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1128)
+       [2] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [3] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [4] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [5] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [6] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [7] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [8] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [9] compute_roots_fingerprint (res://scripts/core/resource_index.gd:1171)
+       [10] load_index_cache (res://scripts/core/resource_index.gd:1249)
+       [11] scan_or_load_cache (res://scripts/core/resource_index.gd:1325)
+       [12] _scan_worker (res://scripts/ui/main_window.gd:1076)
+ERROR: Condition "len == 0" is true. Returning: FAILED
+   at: update (core/crypto/hashing_context.cpp:54)
+   GDScript backtrace (most recent call first):
+       [0] _md5_bytes (res://scripts/core/workspace_store.gd:664)
+       [1] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1128)
+       [2] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [3] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [4] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [5] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [6] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [7] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [8] _collect_dir_fingerprint_rows (res://scripts/core/resource_index.gd:1132)
+       [9] compute_roots_fingerprint (res://scripts/core/resource_index.gd:1171)
+       [10] save_index_cache (res://scripts/core/resource_index.gd:1209)
+       [11] scan_or_load_cache (res://scripts/core/resource_index.gd:1330)
+       [12] _scan_worker (res://scripts/ui/main_window.gd:1076)
+  ✓ manual rescan rebuilt the index (17028 ODFs)
+  ✓ workspace overrides restored after cache clear
+  ✓ saved damage 200 restored into the editor
+  ✓ restored document shows OVERRIDE state
+  ✓ settings stay inside the test root
+  ✓ saved-revision test found the damage entry
+  ✓ edit saved before export
+  ✓ export after save writes the saved 250 bytes
+  ✓ export report write is confirmed before success is announced
+  ✓ export report records the exported file hash
+  ✓ two exports in the same second get distinct stage directories
+  ✓ second edit saved
+  ✓ second export uses the newer saved revision
+  ✓ restart serves the last saved edit (275)
+  ✓ original game ODF has no saved override content
+  ✓ original game ODF is unchanged since the save
+  ✓ P1-07: multi-selection tracks 2 render nodes
+  ✓ P1-07: duplicate_selected_subgraph created 2 linked headers
+  ✓ P1-07: duplicated subgraph remapped internal emitName edge
+  ✓ P1-07: compound undo removed entire duplicated subgraph in one step
+  ✓ P1-07: copy_selected_nodes captured header
+  ✓ P1-07: paste_nodes created cloned header
+  ✓ P1-07: node search filter matched ChildFlame
+  ✓ P1-07: emitter preset created documented draw_twirl header
+  ✓ P1-07: quick inspector edited lifeTime
+  ✓ P1-07: quick inspector edit persisted on shared OdfDocument
+  ✓ V8: cross-file save_with_external_dependencies saved parent and external render ODFs
+  ✓ T-27 UI: Particle Lab SAVE DEPENDENCIES button present
+  ✓ T-27 V7: cross-file external edit refreshed Particle Lab live preview
+  ✓ T-27 V7: live Particle Lab emitter reflects edited external startColor
+  ✓ T-27 V8: SAVE DEPENDENCIES badge tracks dirty external dependency
+  ✓ T-27 V8: clicking SAVE DEPENDENCIES saved dirty dependencies and cleared dirty state
+  ✓ T-27 V8: original external ODF untouched on disk
+  ✓ 3D Lab: hardpoint picker populated from .msh
+  ✓ 3D Lab: hardpoint picker switches active hardpoint
+  ✓ 3D Lab: bounding-box overlay mesh rendered
+  ✓ 3D Lab: baseline shot snapshot captured
+  ✓ 3D Lab: before/after shot comparison succeeded
+  ✓ V9: synchronized audiovisual timeline recorded weapon activation + audio/impact events
+  ✓ T-26 UI: all 5 split native controls (PREFLIGHT/STAGE/LAUNCH/COLLECT/CLEANUP) present
+  ✓ T-26 UI: PREFLIGHT created active durable session
+  ✓ T-26 UI: STAGE materialized isolated native stage
+  ✓ T-26 UI: LAUNCH / HANDOFF prepared workflow cleanly
+  ✓ T-26 UI: COLLECT reports OBSERVATION_ARTIFACT_MISSING before game run
+  ✓ T-26 UI: CLEANUP safely cleaned staged files
+  ✓ T-27 UI: 5 camera presets available
+  ✓ T-27 UI: muzzle camera preset applied
+  ✓ T-27 UI: camera preset moved 3D camera
+  ✓ T-27 UI: top and overview camera presets applied
+  ✓ T-27 UI: target transform offset and yaw applied
+  ✓ T-27 UI: obstacle added to 3D scene
+  ✓ T-27 UI: 3D obstacle intercepted shot and protected target hull
+  ✓ T-27 UI: clear_obstacles removed obstacle
+  ✓ T-27 UI: secondary target took independent damage while primary stayed untouched
+  ✓ T-27 UI: interactive Timeline panel controls present
+  ✓ T-27 V9: bounded multichannel audio pool initialized to 8 channels
+  ✓ T-27 V9: audio pool remains strictly bounded at 8 after 12 rapid plays
+  ✓ T-27 UI: Timeline filter('audio') returned SFX events
+  ✓ T-27 UI: Timeline scrub_timeline_to(0.0) selected event
+  ✓ T-27 UI: select_timeline_event emitted selection cleanly
+  ✓ T-29 UI: Weapons Lab numeric controls use HoudiniScrubber
+  ✓ T-29 UI: Particle Lab speed uses HoudiniScrubber
+  ✓ T-29 UI: all horizontal and vertical splitters have visible draggers
+  ✓ T-29 UI: crisp 2D HUD mesh labels rendered above Shooter A and Target B
+  ✓ T-29 UI: Stock/VSR/VRV/Mods collection and category filters present
+  ✓ T-29 UI: Pick A (Shooter), Pick B (Target), and Swap A/B controls present
+  ✓ T-29 UI: No-AA crisp font active by default with top-bar selector
+  ✓ T-29 UI: UI scale control updates scale factor
+  ✓ T-29 UI: master audio volume control updates AudioServer bus
+  ✓ T-30 UI: main window uses embedded Verdana_m1 at 12px default
+  ✓ T-30 UI: Weapons Lab E2E combat chain bar (A -> Wpn -> Ord -> Xpl | B) present
+  ✓ T-30 UI: Weapons Lab bottom workbench consolidated into 5 focused tabs
+  ✓ T-30 UI: clicking E2E chain Ordnance button opens atstabvsr_c.odf in Right Inspector
+  ✓ T-30 UI: Right Inspector displays E2E chain breadcrumb navigation strip
+  ✓ T-30 UI: Inspector property filter and Explorer Send to Lab action present
+  ✓ T-30 UI: 1-click [+ Override] promotes inherited property into local ODF
+  ✓ T-31 UI: Reset All, Reset UI, and Reset ODF buttons present
+  ✓ T-31 UI: Weapons Lab Reset A/B, Reset Aim, and Reset Scene buttons present
+  ✓ T-31 UI: Particle Lab RESET ODF and RESET VIEW buttons present
+  ✓ T-31 P0-01 UI: distinct LAUNCH BZCC, MANUAL STEAM HANDOFF, and COMPARE controls present
+  ✓ T-31 P1-08 UI: Loadout selector active with VSR 3532748119 package
+  ✓ T-31 UI: Weapons Lab chain buttons display in-game names (Tank / Scavenger)
+  ✓ T-31 UI: 125% UI scale selects 15px 1bpp Verdana_m1 strike at 1:1 native pixels
+  ✓ T-31 UI: 85% UI scale selects 10px 1bpp Verdana_m1 strike at 1:1 native pixels
+  ✓ T-31 UI: Reset UI restores 12px 100% Golden Default
+  ✓ T-31 UI: per-property Reset restores factory default value
+  ✓ T-31 UI: per-property Reset removes local override and reverts to inherited parent value
+  ✓ T-31 UI: Particle Lab auto-configures context effects from active ODF/chain
+  ✓ T-31 UI: clicking NEW NODE immediately creates render node and populates Quick Render Inspector
+  ✓ T-31 UI: Particle Lab RESET ODF restores factory render headers
+  ✓ T-31 P1-05: forced failure on 2nd file reports PARTIAL_SAVE_RECOVERABLE
+  ✓ T-31 P1-05: recover_partial_save_group restored pre-save revision cleanly
+  ✓ T-31 P1-06: HoudiniScrubber preserves exact high-precision ODF representation
+  ✓ T-31 H-01: physical MMB press opens Houdini Value Ladder overlay
+  ✓ T-31 H-02/H-03: physical mouse motion selects sensitivity rung and scrubs value
+  ✓ T-31 H-04: physical MMB release outside control closes Value Ladder
+  ✓ T-31 UI: RMB on HoudiniScrubber resets value to default (0.0)
+  ✓ RST-01: Reset All requires explicit confirmation before mutating
+  ✓ RST-03: Reset All impact preview enumerates A (saved), B (dirty), and C (other package)
+  ✓ RST-02: Cancel Reset All preserves A, B, and C unchanged
+  ✓ RST-06: Reset current ODF restores B to factory 120
+  ✓ RST-06: Reset current ODF leaves A and C untouched
+  ✓ RST-08: deduplicated reset report accurately reports requested=2, succeeded=1, failed=1
+  ✓ RST-14 UI: confirmed Reset All creates durable recovery point
+  ✓ RST-01/13 UI: confirmed Reset All restores A, B, and C to factory defaults
+  ✓ RST-07: Particle Lab RESET ODF resets A only; external B and C remain unchanged
+  ✓ RST-07: Particle Lab RESET DEPENDENCY GRAPH requires explicit confirmation
+  ✓ RST-07: confirmed RESET DEPENDENCY GRAPH restores B and C with recovery point
+  ✓ RST-10: first reset uses original factory value 10
+  ✓ RST-10: second reset after external source change invalidates cache and uses 42
+  ✓ RST-11 UI: Particle Lab Reset Node restores factory header, removes customValue, keeps [Keep]
+  ✓ RST-12 setup: switched active loadout to VRV 3820486276
+  ✓ RST-12: Reset UI restores Golden Default, scale, and volume
+  ✓ RST-12: Reset UI preserves active mod loadout 3820486276
+  ✓ RST-12: explicit Reset Mod Loadout restores VSR 3532748119
+  ✓ T-36 UI: Live-Swap selector includes Off/Object A/Object B/Weapon/Auto
+  ✓ T-36 UI: Weapons Lab has rigid StaticBody3D floor
+  ✓ T-36 UI: Particle Lab has rigid StaticBody3D floor
+  ✓ T-36 UI: Particle Lab exposes >=10 ready emitter presets
+  ✓ T-36 UI: Titan fire_once spawns live world-space BoltBeamNode lightning
+  ✓ T-36 UI: Titan lightning persists in effect_root after hitscan shot completes
+  ✓ T-36 UI: Titan fire_alt (garc_a Arc Stream) spawns BoltBeamNode
+  ✓ T-36 UI: Live-Swap Weapon mode swaps active weapon on Object A to garc_a
+  ✓ T-36 UI: Moving Target wiggle mode active
+  ✓ T-36 UI: wiggling Moving Target updates 3D position live
+  ✓ T-36 UI: Shooter Aim mode switches to Lead Target
+  ✓ T-36 UI: Sandbox Wall, Terrain Ramp, and Pillar create rigid StaticBody3D props
+  ✓ T-36 UI: Reset Scene clears sandbox props and restores manual aim
+  ✓ T-36 UI: Particle Lab Texture Browser indexes >=20 real BZCC FX textures (120)
+  ✓ T-36 UI: Particle Lab emitter inspection computes rate and cost tier
+  ✓ T-36 UI: Particle Lab Mute toggle mutes emitter
+  ✓ T-36 UI: Particle Lab Solo toggle isolates emitter
+  ✓ T-36 UI: open_texture_browser populates >=20 visual texture items
+  ✓ T-36 UI: RMB on HoudiniScrubber slider resets value to default (50.0)
+  ✓ T-36 UI: RMB on WeaponLab distance_slider resets range to default (120 m)
+  ✓ T-34 UI: save_loadout_profile persisted ModLoadout JSON
+  ✓ T-34 UI: list_loadout_profiles lists saved ModLoadout profile
+  ✓ T-34 UI: load_loadout_profile restores multi-package priority [3532748119, 3820486276]
+  ✓ T-34 UI: save_camera_bookmark persists camera state
+  ✓ T-34 UI: save_scene_preset persists sandbox actors, motion, aim, and props
+  ✓ T-34 UI: scene reset cleared obstacles before reload
+  ✓ T-34 UI: load_scene_preset restores Wall+Ramp obstacles, orbit motion, and track aim
+  ✓ T-34 UI: apply_camera_bookmark restores saved camera view
+  ✓ T-38 UI: request_reset_current_doc binds confirmation snapshot & nonce
+  ✓ T-38 UI / RST-15: confirmed single Reset restores factory 100
+  ✓ VIS-11: Recovery History UI button & dialog present
+  ✓ VIS-11: Recovery History UI lists single-document recovery point (11)
+  ✓ VIS-11 / Demo A UI: Recovery History restore recovers unsaved 250 directly into open Inspector/editor
+  ✓ RST-21 setup: Reset All confirmation captured snapshot
+  ✓ RST-21: stale Reset All confirmation rejected with IMPACT_CHANGED_RECONFIRM_REQUIRED
+  ✓ RST-21: renewed confirmation remains pending after impact drift
+  ✓ RST-21: zero files mutated when confirmation snapshot drifted
+  ✓ RST-22: reset_project_configuration_to_default(include_workspace=true) requires confirmation first
+  ✓ RST-22: UI theme and mod loadout NOT mutated before confirmation
+  ✓ RST-22: cancelled project configuration reset leaves UI, loadout, and ODFs unmutated
+  ✓ RST-22: confirmed project config reset resets UI, loadout, and workspace in one transaction
+  ✓ RST-22: confirmed transaction restored ODFs to factory defaults
+  ✓ ML-06: Stock Only loadout enables strict empty active_packages filter
+  ✓ ML-06: Stock Only loadout strictly blocks disabled VSR ODF (ivtank_vsr.odf)
+  ✓ ML-06: Stock Only resolve_ex reports MISSING_OR_DISABLED_RESOURCE for disabled VSR file
+  ✓ ML-06: Stock Only loadout still resolves base game ivtank.odf
+  ✓ ML-06: switching back to VSR 3532748119 restores VSR resolution and refreshes Weapons Lab
+  ✓ T-41 UI: live parameter inspection reports actual particle nodes
+  ✓ T-41 UI: live radius curve point count inspected
+  ✓ NM-01 UI: MainWindow owns application-level NativeSessionService
+  ✓ NM-01 UI: WeaponLab shares MainWindow NativeSessionService
+  ✓ NM-01/NM-11 UI: Native monitor strip, Cancel/Resume, and ARM MANUAL OBSERVATION controls exist
+  ✓ Wave D/E UI: 3D Combat Actor HUD exposes Target Shield bar and Shooter Ammo/Energy label
+  ✓ Wave F/E UI: Combat-State Timeline, Live Actor Inspector & A/B Replay Compare controls exist
+  ✓ Wave E UI: DOCB .msh Animation selector/Play button and multi-shot trajectory overlay exist
+  ✓ Wave B UI: Native launch mode selector (STOCK_ADDON / CUSTOM_CONFIG) exists
+  ✓ NM-01 UI: automatic non-blocking polling started after launch
+  ✓ NM-02 UI: switching to Particle Lab does NOT interrupt NativeSessionService monitoring
+  ✓ NC-01 UI: active cleanup rejected with ACTIVE_EXPERIMENT_CANNOT_CLEANUP
+  ✓ NC-02 UI: rejected cleanup leaves automatic monitoring active
+  ✓ NM-09 UI: cancel monitor stops automatic polling cleanly
+  ✓ NC-04 UI: cleanup after cancel succeeds cleanly
+  ✓ CB-01/CB-02 UI: fire_once sets shooter reload_remaining > 0 (2.00s)
+  ✓ CB-06 UI: immediate second fire rejected while reloading
+  ✓ CB-03 UI: pause freezes reload cooldown
+  ✓ CB-04 UI: single-step advances shooter reload via CombatScenario.advance()
+  ✓ CB-04/CB-05 UI: single-step advances DoT damage on primary target
+  ✓ Wave F UI: Actor Inspector populates shooter + target rows live
+  ✓ Wave F UI: capture_replay_snapshot stores immutable snapshot
+  ✓ Wave F / RP-08 UI: sandboxed replay runs cleanly without destroying active scenario
+UI smoke: 0 failure(s)
+RESULT: PASS
+
+Ran 1105 tests in canonical BZ_ODF_SHAMAN core+UI suite
+OK (core=1105, ui=0 failures)
+ALL TESTS PASSED

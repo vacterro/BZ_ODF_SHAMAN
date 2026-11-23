@@ -1,0 +1,50 @@
+{
+  "op_id": "convergence-925ce37ccfe44d189a1afe0dbb40fed3",
+  "operation": "convergence_stage",
+  "created_at": "2026-11-23T05:43:53Z",
+  "agent": "saipen",
+  "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+  "project_lineage": "lineage-6e62cd4768134299b036548362cb97e5",
+  "semantic_payload_hash": "ee23fed4f20dd75c",
+  "preconditions": {
+    ".saipen/STATE.md": "c8dc4857733d1bfe",
+    ".saipen/LOG.md": "7fddf23c473b34ec"
+  },
+  "read_preconditions": {
+    ".saipen/BOARD.md": "1504c8fa09c4bc5f",
+    ".saipen/logs": "tree-missing-v1",
+    ".": "source-identity-v1:b8e5733632923f88ae96337a411c3f5811a2adf4a6d8bf1ee89e5d3915683d93"
+  },
+  "verification_policy": "core_fast",
+  "status": "COMMITTED",
+  "progress_index": 2,
+  "targets": [
+    {
+      "path": ".saipen/LOG.md",
+      "role": "log",
+      "action": "write",
+      "before_hash": "7fddf23c473b34ec",
+      "after_hash": "81e40822af5ff857",
+      "applied": true
+    },
+    {
+      "path": ".saipen/STATE.md",
+      "role": "state",
+      "action": "write",
+      "before_hash": "c8dc4857733d1bfe",
+      "after_hash": "8d8e54b228e85860",
+      "applied": true
+    }
+  ],
+  "receipt_metadata": {
+    "operation": "convergence_stage",
+    "status": "COMMITTED",
+    "stage": "H",
+    "verdict": "PASS",
+    "source_head": "44cf3e35fca8000e8a1b06a3ee102f25b197bb69",
+    "source_tree_fingerprint": "git-delta-v1:372298b50c9cf21667ba38218026fe10439d39abbe03255b6bf83f9e514c5900",
+    "detail": "canonical convergence stage H bound to live source identity",
+    "project_identity": "v:\\___vac\\__k\\__code\\_misc\\_bz_odf_shaman",
+    "event_id": "E-1392"
+  }
+}

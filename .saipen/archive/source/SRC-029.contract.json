@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-029:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Refresh stale convergence attribution for 18 main-source paths changed by T-86..T-91 waves"
+    }
+  },
+  "derived_at": "2026-11-23T05:48:34Z",
+  "derived_from": "SRC-029",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "4da41e155c301b6a136f8197d47bdb6ff0d339cf2d81ae005a3c6c3ef3f3bead"
+}

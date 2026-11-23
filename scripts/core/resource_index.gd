@@ -1080,3 +1080,310 @@ func find_asset(name: String, extensions: Array[String], context_path: String = 
 
 func asset_count() -> int:
 	return assets_by_name.size()
+
+
+const CACHE_SCHEMA := 3
+
+## Cache lives inside the active workspace. Fingerprints bind workspace override
+## state, so a cache written for one workspace must never be read by another.
+static func default_cache_path() -> String:
+	return WorkspaceStore.root().path_join("resource_index_cache.json")
+
+
+func _collect_dir_fingerprint_rows(abs_dir: String, root_path: String, rows: Array[String]) -> void:
+	var dir := DirAccess.open(abs_dir)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var n := dir.get_next()
+	var subdirs: Array[String] = []
+	var fnames: Array[String] = []
+	while n != "":
+		if n != "." and n != "..":
+			var full := abs_dir.path_join(n)
+			if dir.current_is_dir():
+				subdirs.append(full)
+			else:
+				var ext := n.get_extension().to_lower()
+				if ext == "odf" or ext == "ini" or ASSET_EXTS.has(ext):
+					fnames.append(n)
+		n = dir.get_next()
+	dir.list_dir_end()
+	fnames.sort()
+	for fn in fnames:
+		var fp := abs_dir.path_join(fn)
+		var rel := fp.trim_prefix(root_path).trim_prefix("/")
+		var mtime := FileAccess.get_modified_time(fp)
+		var flen := 0
+		var fa := FileAccess.open(fp, FileAccess.READ)
+		if fa != null:
+			flen = int(fa.get_length())
+			fa.close()
+		var content_id := ""
+		var ext := fn.get_extension().to_lower()
+		# Strong content tier: active ODFs and INI/package metadata are small and
+		# decisive for resource identity. Bulk binary assets stay metadata-only,
+		# so startup never hashes the entire Workshop collection.
+		if ext == "odf" or ext == "ini":
+			var content_bytes := FileAccess.get_file_as_bytes(fp)
+			content_id = WorkspaceStore._md5_bytes(content_bytes) if not content_bytes.is_empty() else "d41d8cd98f00b204e9800998ecf8427e"
+		rows.append("F|%s|%d|%d|%s" % [rel.to_lower(), flen, mtime, content_id])
+	subdirs.sort()
+	for sd in subdirs:
+		_collect_dir_fingerprint_rows(sd, root_path, rows)
+
+
+## Compute a deterministic SHA256 fingerprint across all enabled roots, file
+## metadata (paths, sizes, mtimes), active ModLoadout/package priority state,
+## explicit resource winners, and WorkspaceStore overrides (Wave E).
+func compute_roots_fingerprint(include_workshop: bool = true) -> Dictionary:
+	var lines: Array[String] = []
+	lines.append("SCHEMA=%d|WORKSHOP=%s" % [CACHE_SCHEMA, str(include_workshop)])
+	lines.append("LOADOUT=%s|POLICY=%s|STRICT=%s|BASE_FB=%s|DIS_WIN=%s" % [
+		active_loadout_profile_id, resolution_policy, str(strict_package_filter),
+		str(allow_base_game_fallback), str(allow_disabled_explicit_winners)
+	])
+	lines.append("ACTIVE_PKGS=" + ",".join(active_packages))
+	var wkeys := explicit_resource_winners.keys()
+	wkeys.sort()
+	for wk in wkeys:
+		lines.append("WIN|%s=%s" % [str(wk), str(explicit_resource_winners[wk])])
+	# Include WorkspaceStore manifest & override files so saving/reverting any override invalidates the cache!
+	var ws_root := WorkspaceStore.canonical(WorkspaceStore.root())
+	var ws_proj := ws_root.path_join("project.json")
+	if FileAccess.file_exists(ws_proj):
+		lines.append("WS_PROJ|" + WorkspaceStore._md5_bytes(FileAccess.get_file_as_bytes(ws_proj)))
+	else:
+		lines.append("WS_PROJ|NONE")
+	var ws_odf_dir := ws_root.path_join("odf")
+	if DirAccess.dir_exists_absolute(ws_odf_dir):
+		var ws_rows: Array[String] = []
+		_collect_dir_fingerprint_rows(ws_odf_dir, ws_odf_dir, ws_rows)
+		for wr in ws_rows:
+			lines.append("WS_" + wr)
+	var file_count := 0
+	for r in available_roots():
+		var kind := str(r.get("kind", ""))
+		if kind == "workshop" and not include_workshop:
+			continue
+		var rpath := WorkspaceStore.canonical(str(r.get("path", "")))
+		lines.append("ROOT|%s|%s|%d|%s" % [rpath.to_lower(), kind, int(r.get("priority", 10)), str(r.get("label", ""))])
+		var r_rows: Array[String] = []
+		_collect_dir_fingerprint_rows(rpath, rpath, r_rows)
+		file_count += r_rows.size()
+		lines.append_array(r_rows)
+	var payload := "\n".join(lines).to_utf8_buffer()
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	ctx.update(payload)
+	var sha := ctx.finish().hex_encode().to_lower()
+	return {"ok": true, "fingerprint": sha, "tracked_entries": file_count, "include_workshop": include_workshop}
+
+
+func _canonical_json_value(value):
+	if value is Dictionary:
+		var out := {}
+		for k in (value as Dictionary).keys():
+			out[str(k)] = _canonical_json_value((value as Dictionary)[k])
+		return out
+	if value is Array:
+		var arr := []
+		for v in (value as Array):
+			arr.append(_canonical_json_value(v))
+		return arr
+	if value is float and is_equal_approx(float(value), roundf(float(value))):
+		return int(value)
+	return value
+
+
+func _sha256_hex(bytes: PackedByteArray) -> String:
+	var ctx := HashingContext.new()
+	ctx.start(HashingContext.HASH_SHA256)
+	ctx.update(bytes)
+	return ctx.finish().hex_encode().to_lower()
+
+
+## Persist the scanned ResourceIndex along with its live SHA256 fingerprint.
+func save_index_cache(cache_path: String = "", include_workshop: bool = true) -> Dictionary:
+	var target := cache_path.strip_edges() if cache_path.strip_edges() != "" else default_cache_path()
+	var abs_target := WorkspaceStore.canonical(target)
+	var fp := compute_roots_fingerprint(include_workshop)
+	var payload := JSON.stringify({
+		"total_files": total_files,
+		"files": files,
+		"assets_by_name": assets_by_name,
+		"package_names": package_names,
+		"extension_counts": extension_counts,
+	})
+	var doc := {
+		"schema": CACHE_SCHEMA,
+		"payload_sha256": _sha256_hex(payload.to_utf8_buffer()),
+		"saved_at": Time.get_datetime_string_from_system(),
+		"include_workshop": include_workshop,
+		"fingerprint": str(fp.get("fingerprint", "")),
+		"total_files": total_files,
+		"files": files,
+		"assets_by_name": assets_by_name,
+		"package_names": package_names,
+		"extension_counts": extension_counts,
+	}
+	var wres := WorkspaceStore.atomic_write_abs(abs_target, JSON.stringify(doc).to_utf8_buffer())
+	if not bool(wres.get("ok", false)):
+		return {"ok": false, "reason": "CACHE_WRITE_FAILED", "error": str(wres.get("error", ""))}
+	return {"ok": true, "path": abs_target, "fingerprint": str(fp.get("fingerprint", "")), "total_files": total_files}
+
+
+## Load a previously saved ResourceIndex ONLY when the live SHA256 fingerprint
+## (roots, priorities, file sizes/mtimes, active ModLoadout, WorkspaceStore
+## overrides) matches the cached fingerprint bit-for-bit.
+func load_index_cache(include_workshop: bool = true, cache_path: String = "") -> Dictionary:
+	var target := cache_path.strip_edges() if cache_path.strip_edges() != "" else default_cache_path()
+	var abs_target := WorkspaceStore.canonical(target)
+	if not FileAccess.file_exists(abs_target):
+		return {"ok": false, "cache_hit": false, "reason": "CACHE_MISSING", "path": abs_target}
+	var jres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(abs_target))
+	if not bool(jres.get("ok", false)) or not (jres.get("data", null) is Dictionary):
+		return {"ok": false, "cache_hit": false, "reason": "CACHE_CORRUPT", "path": abs_target}
+	var doc: Dictionary = jres.get("data", {})
+	if int(doc.get("schema", 0)) != CACHE_SCHEMA:
+		return {"ok": false, "cache_hit": false, "reason": "CACHE_SCHEMA_MISMATCH", "path": abs_target}
+	var live_fp := compute_roots_fingerprint(include_workshop)
+	var cached_fp := str(doc.get("fingerprint", ""))
+	if cached_fp == "" or cached_fp != str(live_fp.get("fingerprint", "")):
+		return {
+			"ok": false,
+			"cache_hit": false,
+			"reason": "FINGERPRINT_MISMATCH",
+			"cached_fingerprint": cached_fp,
+			"live_fingerprint": str(live_fp.get("fingerprint", "")),
+		}
+	if bool(doc.get("include_workshop", false)) != include_workshop:
+		return {"ok": false, "cache_hit": false, "reason": "CACHE_WORKSHOP_MISMATCH", "path": abs_target}
+	var cached_payload := {
+		"total_files": doc.get("total_files", null),
+		"files": doc.get("files", null),
+		"assets_by_name": doc.get("assets_by_name", null),
+		"package_names": doc.get("package_names", null),
+		"extension_counts": doc.get("extension_counts", null),
+	}
+	var required_maps := ["files", "assets_by_name", "package_names", "extension_counts"]
+	for key in required_maps:
+		if not (doc.get(key, null) is Dictionary):
+			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
+	if not (doc.get("total_files", null) is int or doc.get("total_files", null) is float):
+		return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
+	var cache_counts: Dictionary = doc.get("extension_counts", {})
+	for ck in cache_counts.keys():
+		if not (cache_counts[ck] is int or cache_counts[ck] is float):
+			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
+	var payload_str := JSON.stringify(cached_payload)
+	var expected_hash := str(doc.get("payload_sha256", ""))
+	var payload_hash := _sha256_hex(payload_str.to_utf8_buffer())
+	# JSON round-trip turns integers into floats; canonicalize every numeric
+	# level before hashing so a valid cache survives a save/load cycle.
+	var normalized_hash := _sha256_hex(JSON.stringify(_canonical_json_value(cached_payload)).to_utf8_buffer())
+	if expected_hash == "" or (payload_hash != expected_hash and normalized_hash != expected_hash):
+		return {"ok": false, "cache_hit": false, "reason": "CACHE_PAYLOAD_HASH_MISMATCH", "path": abs_target}
+	var cached_files: Dictionary = cached_payload["files"]
+	var cached_counts: Dictionary = cached_payload["extension_counts"]
+	var sum_counts := 0
+	for key in cached_counts.keys():
+		if not (cached_counts[key] is int or cached_counts[key] is float):
+			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
+		sum_counts += int(cached_counts[key])
+	for key in cached_files.keys():
+		if not (cached_files[key] is Array):
+			return {"ok": false, "cache_hit": false, "reason": "CACHE_INVALID_FIELD_TYPE", "path": abs_target}
+	var cached_file_entries := 0
+	for key in cached_files.keys():
+		cached_file_entries += (cached_files[key] as Array).size()
+	if int(cached_payload["total_files"]) != cached_file_entries or sum_counts != cached_file_entries:
+		return {"ok": false, "cache_hit": false, "reason": "CACHE_COUNT_MISMATCH", "path": abs_target}
+	var t0 := Time.get_ticks_msec()
+	files = cached_files.duplicate(true)
+	assets_by_name = (cached_payload["assets_by_name"] as Dictionary).duplicate(true)
+	package_names = (cached_payload["package_names"] as Dictionary).duplicate(true)
+	extension_counts = cached_counts.duplicate(true)
+	total_files = int(cached_payload["total_files"])
+	_game_name_cache.clear()
+	generation += 1
+	last_scan_msec = Time.get_ticks_msec() - t0
+	scan_finished.emit(total_files)
+	return {"ok": true, "cache_hit": true, "reason": "", "fingerprint": cached_fp, "total_files": total_files, "load_ms": last_scan_msec}
+
+
+func invalidate_cache(cache_path: String = "") -> void:
+	var target := cache_path.strip_edges() if cache_path.strip_edges() != "" else default_cache_path()
+	var abs_target := WorkspaceStore.canonical(target)
+	if FileAccess.file_exists(abs_target):
+		DirAccess.remove_absolute(abs_target)
+
+
+## Application index-build entry point: reuse a fingerprint-valid cache when it
+## still matches the live roots, otherwise scan and persist a fresh one. A cache
+## write failure must never prevent the index from being built.
+func scan_or_load_cache(include_workshop: bool = true, cache_path: String = "") -> Dictionary:
+	var hit := load_index_cache(include_workshop, cache_path)
+	if bool(hit.get("ok", false)) and bool(hit.get("cache_hit", false)):
+		hit["scanned"] = false
+		return hit
+	scan(include_workshop)
+	var saved := save_index_cache(cache_path, include_workshop)
+	var result := {
+		"ok": true,
+		"cache_hit": false,
+		"scanned": true,
+		"reason": str(hit.get("reason", "CACHE_MISS")),
+		"fingerprint": str(saved.get("fingerprint", "")),
+		"cache_saved": bool(saved.get("ok", false)),
+		"total_files": total_files,
+	}
+	return result
+
+
+## Return rich live provenance for any resource reference: effective source,
+## package identity, content hash/revision, workspace override flag, alternative
+## candidates across packages/roots, and honest preview fidelity.
+func provenance_summary(name: String, context_path: String = "") -> Dictionary:
+	var resolved := resolve_ex(name, context_path)
+	var found := bool(resolved.get("found", false))
+	var entry: Dictionary = resolved.get("entry", {}) if resolved.get("entry", {}) is Dictionary else {}
+	var eff_path := str(resolved.get("path", ""))
+	var ident := resource_identity(entry if not entry.is_empty() else eff_path, context_path) if found else {}
+	var ws_entry := WorkspaceStore.entry_for(eff_path) if eff_path != "" else {}
+	var has_ws := not ws_entry.is_empty()
+	var alts_raw := alternatives(name)
+	var alts_out: Array[Dictionary] = []
+	for c in alts_raw:
+		var cp := str(c.get("path", ""))
+		if found and WorkspaceStore._same_canon_path(cp, eff_path):
+			continue
+		alts_out.append({
+			"path": cp,
+			"package_id": str(c.get("package", "")),
+			"mod_label": str(c.get("mod_label", "")),
+			"kind": str(c.get("kind", "")),
+			"priority": int(c.get("priority", 0)),
+		})
+	var cat := str(entry.get("category", ""))
+	var fidelity := "EDITING_COMPLETE"
+	if cat in ["Weapons", "Ordnance", "Explosions / FX", "Vehicles"]:
+		fidelity = "APPROXIMATED"
+	return {
+		"found": found,
+		"resource": _clean_ref(name).to_lower(),
+		"effective_path": eff_path,
+		"package_id": str(resolved.get("package", "")),
+		"mod_label": str(entry.get("mod_label", "Stock (BZ2R)" if str(resolved.get("kind", "")) == "game" else "")),
+		"collection": str(entry.get("collection", "")),
+		"kind": str(resolved.get("kind", "")),
+		"content_hash": str(ident.get("content_hash", "")),
+		"workspace_revision": int(ident.get("workspace_revision", 0)),
+		"has_workspace_override": has_ws,
+		"active_loadout_profile_id": active_loadout_profile_id,
+		"rule": str(resolved.get("rule", "")),
+		"status": str(resolved.get("status", "")),
+		"warning": str(resolved.get("warning", "")),
+		"alternatives": alts_out,
+		"preview_fidelity": fidelity,
+	}

@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-024:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "MODE 2 night shift: fix GraphNode slot vs output port identity, external edges, native stage ledger safety, fresh Windows release, continue product work"
+    }
+  },
+  "derived_at": "2026-11-22T23:45:04Z",
+  "derived_from": "SRC-024",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "298ae43912123908fec6af1cdcedb4622d4ae72decde1bcb59c4885308a15850"
+}

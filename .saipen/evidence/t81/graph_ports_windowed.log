@@ -1,0 +1,12 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 581.29 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3060
+
+T-81 Windowed GraphNode Port Verifier
+  [port state] output=5 input=1 children=6 keys=6
+  ✓ WIN-PORT-01: three references + emitName + add port = 5 real outputs
+  ✓ WIN-PORT-02: one real input port
+  ✓ WIN-PORT-03: every mapped key has a real output
+  ✓ WIN-PORT-04: four GraphEdit connections originate from real ports
+
+T-81 Windowed Verifier: 4 checks, 0 failure(s)
+RESULT: PASS

@@ -22,5 +22,6 @@
 ## TODO
 
 ## DONE
+- [x] PY-001 Python tooling audit clean
 
 ## BLOCKED

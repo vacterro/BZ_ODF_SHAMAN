@@ -10,10 +10,23 @@ Equivalent:
 
 ```bat
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/test_runner.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t122_recovery_coherence.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t123_lifecycle_contract.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t128_cleanup_contract.gd
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . res://tests/ui_smoke.tscn
 ```
 
-## `tests/test_runner.gd` — last run: 1,067 checks, 0 failures (`TESTED_HEADLESS`)
+## Canonical suite — last run: 2026-11-23 (`TESTED_HEADLESS`)
+
+`tests/test_runner.gd`: 1,106 checks, 0 failures. `verify_t122_recovery_coherence.gd`:
+28/28 PASS. `verify_t123_lifecycle_contract.gd`: 31/31 PASS.
+`verify_t128_cleanup_contract.gd`: 44/44 PASS. UI smoke: 0 failures.
+Focused regressions also PASS: T-121 journal trust (34/34), T-121 crash phases
+(37/37), T-86 recovery integrity (75/75), T-85 save recovery (11/11),
+T-85 graph events (6/6), T-80 identity (21/21 including PHI-01..06 hardpoint
+inspector), T-81 graph ports (35/35), T-73 native safety (62/62).
+
+Core suite (`tests/test_runner.gd`) coverage:
 
 | Category | Coverage |
 |---|---|

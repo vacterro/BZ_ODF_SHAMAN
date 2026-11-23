@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-027:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-86 closed with verification evidence in LOG: verify -> PASS [target: T-86] conf: high -- REVIEW independent re-run: verify_t86_recovery_integrity.gd RESULT PASS (71 checks, 0 failures); verify_t86_cross_process_save.gd RESULT PASS (19 checks, 0 failures, real OS.kill). Earlier VERIFY: tools/run_tests.cmd ALL TESTS PASSED (1106 checks 0 failures + UI 0 failures); all focused regressions PASS; build sha256 bed94dd1..., GPU GUI report t86_gui_v",
+      "text": "Handoff-20 MODE2 night shift: save-group recovery integrity, native cleanup safety, true cross-process restart tests, T-75 progress, Recovery Center",
+      "verification": "the Work this request created reached its own verification gate; see the T-86 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-86"
+    }
+  },
+  "schema_version": 1
+}

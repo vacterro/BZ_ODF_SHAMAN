@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-024:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "DUPLICATE",
+      "evidence": "E-1148 T-82 DONE with SRC-023 covering the same request; cross-file/native GUI findings also fixed under T-82",
+      "text": "MODE 2 night shift: fix GraphNode slot vs output port identity, external edges, native stage ledger safety, fresh Windows release, continue product work",
+      "verification": null,
+      "work": "T-83"
+    }
+  },
+  "schema_version": 1
+}

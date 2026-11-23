@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-026:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-85 closed with verification evidence in LOG: verify -> PASS [target: T-85] conf: high -- post-REVIEW rerun: canonical suite PASS 1105/0 current ec60a408a0ad774d-20261123T010228707148Z.json; save 11/11, graph events 6/6, native 62/62; core 1106/0, UI 0; fresh exe sha256 e495c97b...; GPU GUI, bench, validate, BZ2R PASS",
+      "text": "V:\\___VAC\\_PIC\\_Clipboard_stuff\\SAIHANDOFF-BZ_ODF_SHAMAN-19.md",
+      "verification": "the Work this request created reached its own verification gate; see the T-85 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-85"
+    }
+  },
+  "schema_version": 1
+}

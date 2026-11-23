@@ -94,6 +94,9 @@ func _initialize() -> void:
 	_test_t66_combat_clock_reload_dot()
 	_test_t67_replay_snapshots_and_baseline()
 	_test_t68_native_cleanup_safety()
+	_test_t72_replay_concurrency()
+	_test_t73_native_safety()
+	_test_t74_visual_and_index()
 	# Static document cache holds strong references by design; release it before
 	# the engine's own shutdown so a passing run exits with no ObjectDB leak.
 	OdfDocument.clear_all_cache()
@@ -1632,7 +1635,13 @@ func _test_native_experiment_runner_t26() -> void:
 	_eq(str(rec_entry.get("state", "")), "AWAITING_OPERATOR", "T-26: recovered session retained AWAITING_OPERATOR state")
 	_check(bool(rec_entry.get("stage_present_on_disk", false)), "T-26: recovered session confirmed stage manifest on disk")
 	# Write Lua observation after restart and collect via recovered runner.
-	var obs1_path := stage1.path_join("obs_manual_after_restart.json")
+	# T-86: the observation is placed OUTSIDE the disposable stage (its
+	# manifest-owned file set), so cleanup can leave a fully CLEANED_UP state
+	# without ever treating a collected observation as a foreign survivor.
+	var obs1_path := str(sess1.observation_expected_path)
+	if obs1_path == "":
+		obs1_path = stage1.get_base_dir().path_join("obs_manual_after_restart.json")
+	DirAccess.make_dir_recursive_absolute(obs1_path.get_base_dir())
 	_write(obs1_path, JSON.stringify({
 		"contract_version": 1, "measurement_method": "GetCurHealth_delta",
 		"session_id": sid1, "launch_nonce": str(sess1.launch_nonce), "scenario_id": str(sess1.scenario_id),
@@ -1646,6 +1655,7 @@ func _test_native_experiment_runner_t26() -> void:
 	var col1: Dictionary = runner2.collect_observation(sid1, obs1_path)
 	_check(bool(col1.get("ok", false)) and str(col1.get("state", "")) == "COMPARISON_COMPLETE", "T-26: operator-manual post-restart collection recorded honest COMPARISON_COMPLETE")
 	_check(not bool(col1.get("verified", true)), "T-26: unattested post-restart manual collection never falsely claims NATIVE_VERIFIED")
+	_prepare_runtime_cleanup(runner2, sid1, "COMPLETED" if false else "COMPARISON_COMPLETE")
 	var cln1: Dictionary = runner2.cleanup_stage(sid1)
 	_check(bool(cln1.get("ok", false)) and str(cln1.get("state", "")) == "CLEANED_UP", "T-26: runner cleanup_stage removed owned staged files cleanly")
 	_remove_tree(stage1)
@@ -3333,6 +3343,7 @@ func _test_t40_wave_d_durable_transitions_and_monitor() -> void:
 	_check(not bool(c14b.get("ok", true)) and str(c14b.get("reason", "")) == "STATE_PERSIST_FAILED" and str(c14b.get("state", "")) == "RECOVERY_PENDING", "ND-14: failed ledger write during collect_observation returns STATE_PERSIST_FAILED / RECOVERY_PENDING")
 
 	# ND-15: cleanup_stage() fails ledger write -> STATE_PERSIST_FAILED / RECOVERY_PENDING (never false CLEANED_UP)
+	_prepare_runtime_cleanup(r12, sid12, "COMPARISON_COMPLETE")
 	r12.fault_fail_session_write = true
 	var cl15: Dictionary = r12.cleanup_stage(sid12)
 	r12.fault_fail_session_write = false
@@ -4109,8 +4120,10 @@ func _test_t65_native_launch_gates_and_stock_addon() -> void:
 	_check(not FileAccess.file_exists(str(sess_ad.stage_root).path_join("assets/Config/bzshell_init.cfg")), "NL-05: STOCK_ADDON does not drop bzshell_init.cfg into global addon")
 	var lch_ad: Dictionary = r_addon.launch(sid_ad, {"execute_process": true})
 	var ad_args: Array = captured_addon_args["args"]
-	_check(bool(lch_ad.get("ok", false)) and not ad_args.has("/config") and ad_args.has("shaman_shot.bzn"), "NL-05: STOCK_ADDON launches without /config and passes mission bzn")
+	var exp_bzn := str(sess_ad.mission_basename) + ".bzn"
+	_check(bool(lch_ad.get("ok", false)) and not ad_args.has("/config") and ad_args.has(exp_bzn) and str(sess_ad.mission_basename).begins_with("shaman_"), "NL-05: STOCK_ADDON launches without /config and passes unique session mission bzn (%s)" % exp_bzn)
 	r_addon.cancel_monitor(sid_ad)
+	_prepare_runtime_cleanup(r_addon, sid_ad, "CANCELLED")
 	var cl_ad: Dictionary = r_addon.cleanup_stage(sid_ad)
 	_check(bool(cl_ad.get("ok", false)) and FileAccess.file_exists(foreign_mod_file), "NL-05: STOCK_ADDON cleanup removes only SHAMAN-owned files and preserves existing addon files")
 
@@ -4368,10 +4381,16 @@ func _test_t68_native_cleanup_safety() -> void:
 	_write(unknown_file, "Keep my notes!")
 	var mod_odf := stage_root.path_join("assets/ODF/atstabvsr_c.odf")
 	_write(mod_odf, "[OrdnanceClass]\ndamageValue(H)=777\n")
+	var cl_modified: Dictionary = r_rec.cleanup_stage(sid)
+	_check(not bool(cl_modified.get("ok", true)) and str(cl_modified.get("reason", "")) == "STAGE_HASH_MISMATCH", "NC-06: modified staged file blocks cleanup and is preserved")
+	_check(FileAccess.file_exists(mod_odf), "NC-06: modified staged file preserved after refused cleanup")
+	_write(mod_odf, "[OrdnanceClass]
+damageValue(H)=100
+")
+	_prepare_runtime_cleanup(r_rec, sid, "CANCELLED")
 	var cl_ok: Dictionary = r_rec.cleanup_stage(sid)
 	_check(bool(cl_ok.get("ok", false)) or str(cl_ok.get("state", "")) in ["CLEANED_UP", "PARTIAL_CLEANUP"], "NC-04: cleanup after terminal CANCELLED state proceeds")
 	_check(FileAccess.file_exists(unknown_file), "NC-05: unknown file preserved during cleanup")
-	_check(FileAccess.file_exists(mod_odf), "NC-06: modified staged file preserved during cleanup")
 	var retained_ev := str(cl_ok.get("retained_evidence_path", ""))
 	_check(retained_ev != "" and FileAccess.file_exists(retained_ev), "NC-07: evidence artifact retained outside disposable stage root after cleanup")
 
@@ -4381,6 +4400,408 @@ func _test_t68_native_cleanup_safety() -> void:
 	WorkspaceStore.root_override = old_root
 	_remove_tree(stage_root)
 	_remove_tree(abs_ws)
+
+
+func _test_t72_replay_concurrency() -> void:
+	_start("T-72 Wave B Chronological Event-Scheduled Replay Concurrency (P0-SIM-01; RPL-09..RPL-16)")
+	var CombatScenarioScript = preload("res://scripts/sim/combat_scenario.gd")
+	var ActorScript = preload("res://scripts/sim/combat_actor_state.gd")
+	var tmp_dir := ProjectSettings.globalize_path("user://t72_core_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_dir)
+
+	var _mk := func(sub: String, sdelay: float, sspeed: float, dmg_h: float, splash_r: float, shield_m: float) -> Dictionary:
+		var d := tmp_dir.path_join(sub)
+		var sh := d.path_join("sh.odf")
+		var wp := d.path_join("wp.odf")
+		var ord := d.path_join("or.odf")
+		var tg := d.path_join("tg.odf")
+		var xpl := d.path_join("xp.odf")
+		_write(sh, "[GameObjectClass]\nweaponName1=\"wp\"\nmaxAmmo=500\nmaxEnergy=500\nmaxHealth=1000\narmorClass=\"H\"\n")
+		_write(wp, "[WeaponClass]\nordName=\"or\"\nshotDelay=%.3f\nenergyCost=1\n" % sdelay)
+		var xpl_line := "xplVehicle=\"xp\"\n" if splash_r > 0.0 else ""
+		_write(ord, "[OrdnanceClass]\nshotSpeed=%.3f\nlifeSpan=3.0\nshotRadius=0.5\nammoCost=1\ndamageValue(H)=%.3f\n%s" % [sspeed, dmg_h, xpl_line])
+		if splash_r > 0.0:
+			_write(xpl, "[ExplosionClass]\ndamageRadius=%.3f\n" % splash_r)
+		_write(tg, "[GameObjectClass]\nmaxHealth=500\narmorClass=\"H\"\nshieldClass=\"N\"\nmaxShield=%.3f\n" % shield_m)
+		var idx := ResourceIndex.new()
+		idx.roots = [{"path": d, "label": sub, "kind": "game", "priority": 10, "enabled": true}]
+		idx.scan(false)
+		var prof := WeaponProfile.new()
+		var ok := prof.resolve(idx, sh, tg)
+		return {"ok": ok, "idx": idx, "prof": prof}
+	var _adv := func(scn, target_t: float) -> void:
+		while scn.sim.sim_time + 0.0001 < target_t:
+			scn.advance(minf(1.0 / 60.0, target_t - scn.sim.sim_time))
+	var _ev_t := func(events: Array, kind: String) -> Array[float]:
+		var out: Array[float] = []
+		for ev in events:
+			if ev is Dictionary and str(ev.get("kind", "")) == kind:
+				out.append(float(ev.get("time", -1.0)))
+		return out
+
+	# RPL-09: Overlapping shots preserve launch times, concurrency & impact timing
+	var f09: Dictionary = _mk.call("r09", 0.1, 100.0, 60.0, 0.0, 100.0)
+	var scn09 = CombatScenarioScript.new(7209)
+	var tpos09 := Vector3(0, 2, -100)
+	scn09.create_new_scenario(f09.prof, tpos09)
+	scn09.fire_shot(f09.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos09, [], Vector3.ZERO, true)
+	_adv.call(scn09, 0.20)
+	scn09.fire_shot(f09.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos09, [], Vector3.ZERO, true)
+	_adv.call(scn09, 1.50)
+	var orig_hit09: Array[float] = _ev_t.call(scn09.combat_events, "PROJECTILE_HIT")
+	var snap09: Dictionary = scn09.save_replay_snapshot("rpl09")
+	var rep09: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(snap09)
+	var rep_sp09: Array[float] = _ev_t.call(rep09.get("combat_events", []), "PROJECTILE_SPAWNED")
+	var rep_hit09: Array[float] = _ev_t.call(rep09.get("combat_events", []), "PROJECTILE_HIT")
+	_check(rep_sp09.size() == 2 and absf(rep_sp09[0]) < 0.02 and absf(rep_sp09[1] - 0.20) < 0.02, "RPL-09: overlapping replay preserves launch times 0.00 and 0.20")
+	_check(int(rep09.get("max_concurrent_shots", 0)) >= 2, "RPL-09: overlapping projectiles coexist during replay")
+	_check(rep_hit09.size() == 2 and orig_hit09.size() == 2 and absf(rep_hit09[0] - orig_hit09[0]) < 0.02 and absf(rep_hit09[1] - orig_hit09[1]) < 0.02, "RPL-09: impact timestamps match original run")
+
+	# RPL-10: Reload rejection identical on replay
+	var f10: Dictionary = _mk.call("r10", 1.0, 100.0, 50.0, 0.0, 100.0)
+	var scn10 = CombatScenarioScript.new(7210)
+	scn10.create_new_scenario(f10.prof, tpos09)
+	scn10.fire_shot(f10.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos09, [], Vector3.ZERO, true)
+	_adv.call(scn10, 0.20)
+	var r10_rej: Dictionary = scn10.fire_shot(f10.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos09, [], Vector3.ZERO, true)
+	_check(not bool(r10_rej.ok), "RPL-10 orig: second shot rejected during reload")
+	_adv.call(scn10, 1.30)
+	var rep10: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(scn10.save_replay_snapshot("rpl10"))
+	_check(int(rep10.get("accepted_shots", 0)) == 1 and int(rep10.get("rejected_shots", 0)) == 1, "RPL-10: replay preserves 1 accepted / 1 rejected history")
+
+	# RPL-11: DoT during flight combines accurately at impact
+	var f11: Dictionary = _mk.call("r11", 0.1, 100.0, 60.0, 0.0, 25.0)
+	var scn11 = CombatScenarioScript.new(7211)
+	scn11.create_new_scenario(f11.prof, tpos09)
+	scn11.fire_shot(f11.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos09, [], Vector3.ZERO, true)
+	_adv.call(scn11, 0.25)
+	scn11.apply_status_effect("primary", "Burn", 40.0, 1.0)
+	_adv.call(scn11, 1.50)
+	var rep11: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(scn11.save_replay_snapshot("rpl11"))
+	var p11: Dictionary = (rep11.get("targets", {}) as Dictionary).get("primary", {})
+	_check(absf(float(p11.get("hull", -1.0)) - scn11.primary_target().hull_current) < 0.1 and absf(float(p11.get("shield", -1.0)) - scn11.primary_target().shield_current) < 0.1, "RPL-11: DoT during projectile flight reproduces identical shield/hull")
+
+	# RPL-12: Moving-target overlap
+	var f12: Dictionary = _mk.call("r12", 0.1, 100.0, 50.0, 0.0, 0.0)
+	var scn12 = CombatScenarioScript.new(7212)
+	scn12.create_new_scenario(f12.prof, Vector3(0, 2, -100))
+	scn12.fire_shot(f12.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), Vector3(0, 2, -100), [], Vector3.ZERO, true)
+	_adv.call(scn12, 0.20)
+	scn12.fire_shot(f12.prof, Vector3(0, 2, 0), (Vector3(15, 2, -100) - Vector3(0, 2, 0)).normalized(), Vector3(0, 2, -100), [], Vector3.ZERO, true)
+	_adv.call(scn12, 1.05)
+	scn12.record_actor_transform("primary", Vector3(15, 2, -100), Vector3(30, 0, 0), 0.0)
+	_adv.call(scn12, 1.50)
+	var rep12: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(scn12.save_replay_snapshot("rpl12"))
+	var p12: Dictionary = (rep12.get("targets", {}) as Dictionary).get("primary", {})
+	_check(absf(float(p12.get("hull", -1.0)) - scn12.primary_target().hull_current) < 0.1 and scn12.primary_target().hull_current < 405.0, "RPL-12: moving target hit by both overlapping shots identically on replay")
+
+	# RPL-13: Frozen ODF revision after edit
+	var od13: OdfDocument = f09.prof.ordnance_doc
+	od13.set_entry_value(od13.find_entry("OrdnanceClass", "damageValue(H)"), "180")
+	f09.prof.refresh()
+	var rep13: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(snap09)
+	_check(absf(float(((rep13.get("targets", {}) as Dictionary).get("primary", {}) as Dictionary).get("hull", -1.0)) - 480.0) < 0.1, "RPL-13: historical replay keeps frozen ODF damage after edit")
+
+	# RPL-14: Incremental bounded replay runner for many shots
+	var f14: Dictionary = _mk.call("r14", 0.05, 100.0, 5.0, 0.0, 0.0)
+	var scn14 = CombatScenarioScript.new(7214)
+	scn14.create_new_scenario(f14.prof, tpos09)
+	for i in range(30):
+		_adv.call(scn14, float(i) * 0.06)
+		scn14.fire_shot(f14.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), tpos09, [], Vector3.ZERO, true)
+	_adv.call(scn14, 3.2)
+	var snap14: Dictionary = scn14.save_replay_snapshot("rpl14")
+	var rrun = CombatScenarioScript.create_replay_runner(snap14)
+	var chunks := 0
+	var inc_res: Dictionary = {}
+	while chunks < 2000:
+		var st: Dictionary = rrun.step(12, 8.0)
+		chunks += 1
+		if bool(st.get("done", false)):
+			inc_res = st.get("result", {})
+			break
+	_check(chunks >= 2 and absf(float(((inc_res.get("targets", {}) as Dictionary).get("primary", {}) as Dictionary).get("hull", -1.0)) - scn14.primary_target().hull_current) < 0.1, "RPL-14: incremental bounded replay completes in multiple chunks and matches original hull")
+
+	# RPL-15: Stable same-time ordering
+	var f15: Dictionary = _mk.call("r15", 0.01, 100.0, 20.0, 0.0, 50.0)
+	var scn15 = CombatScenarioScript.new(7215)
+	scn15.create_new_scenario(f15.prof, Vector3(0, 2, -60))
+	_adv.call(scn15, 0.25)
+	scn15.record_actor_transform("primary", Vector3(0, 2, -50), Vector3.ZERO, 0.0)
+	scn15.apply_status_effect("primary", "IonBurn", 10.0, 1.0)
+	scn15.fire_shot(f15.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), Vector3(0, 2, -50), [], Vector3.ZERO, false)
+	_adv.call(scn15, 1.2)
+	var snap15: Dictionary = scn15.save_replay_snapshot("rpl15")
+	var r15a: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(snap15)
+	var r15b: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(snap15)
+	_check(JSON.stringify(r15a.get("combat_events", [])) == JSON.stringify(r15b.get("combat_events", [])), "RPL-15: same-time events replay with byte-identical event ordering")
+
+	# RPL-16: Simultaneous splash impacts on primary + secondary
+	var f16: Dictionary = _mk.call("r16", 0.01, 100.0, 80.0, 20.0, 50.0)
+	var scn16 = CombatScenarioScript.new(7216)
+	scn16.create_new_scenario(f16.prof, Vector3(0, 2, -60))
+	var t2 = ActorScript.create_target("secondary_1", "Target C", 500.0, "H", 30.0, "N", Vector3(6, 2, -60), 2.0)
+	scn16.add_or_update_target(t2)
+	scn16.capture_replay_baseline(f16.prof)
+	scn16.fire_shot(f16.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), Vector3(0, 2, -60), [], Vector3.ZERO, false)
+	scn16.fire_shot(f16.prof, Vector3(0, 2, 0), Vector3(0, 0, -1), Vector3(0, 2, -60), [], Vector3.ZERO, false)
+	_adv.call(scn16, 1.2)
+	var rep16: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(scn16.save_replay_snapshot("rpl16"))
+	var p16: Dictionary = (rep16.get("targets", {}) as Dictionary).get("primary", {})
+	var s16: Dictionary = (rep16.get("targets", {}) as Dictionary).get("secondary_1", {})
+	_check(t2.hull_current < 500.0 and absf(float(s16.get("hull", -1.0)) - t2.hull_current) < 0.1 and absf(float(p16.get("hull", -1.0)) - scn16.primary_target().hull_current) < 0.1, "RPL-16: simultaneous splash impacts damage primary & secondary identically on replay")
+
+	OdfDocument.clear_all_cache()
+	_remove_tree(tmp_dir)
+
+
+func _test_t73_native_safety() -> void:
+	_start("T-73 Wave C Native Cancel, Stock Addon Isolation & Manual Observation (NC-08..12, SA-01..09, NM-11..16)")
+	var NativeRunnerScript = preload("res://scripts/native/native_experiment_runner.gd")
+	var NativeAdapterScript = preload("res://scripts/native/native_test_adapter.gd")
+	var NativeServiceScript = preload("res://scripts/native/native_session_service.gd")
+	var old_ws := WorkspaceStore.root_override
+	var tmp_root := ProjectSettings.globalize_path("user://t73_native_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_root)
+	WorkspaceStore.root_override = tmp_root
+
+	var disc := NativeAdapterScript.discover()
+	var game_root := str(disc.get("game_root", NativeAdapterScript.DEFAULT_GAME_ROOT))
+	var steam_ok := {"steam_present": true, "steam_running": true, "steam_logged_in": true, "steam_exe": str(disc.get("steam_exe", "")), "detail": "mock logged in"}
+	var steam_off := {"steam_present": true, "steam_running": true, "steam_logged_in": false, "steam_exe": str(disc.get("steam_exe", "")), "detail": "ActiveUser=0x0"}
+	var odf_bytes := "[OrdnanceClass]\r\ndamageValue(H)=100\r\nshotSpeed=200\r\nlifeSpan=2.0\r\n".to_utf8_buffer()
+
+	# NC-08..NC-12: Checked cancellation, GUI retention on failure, restart recovery, clean retry
+	var svc = NativeServiceScript.new()
+	svc.ensure_initialized()
+	var r = svc.runner
+	r.process_launcher = func(_e: String, _a: Array) -> Dictionary: return {"ok": true, "pid": 8201, "exit_code": 0}
+	r.process_inspector = func() -> Array: return []
+	var pre_nc: Dictionary = r.preflight(null, null, {
+		"discovery": disc, "stage_prefix": "t73_nc",
+		"staged_odfs": {"assets/ODF/atstabvsr_c.odf": odf_bytes},
+		"config_path_override": game_root.path_join("shaman_t73nc.cfg"),
+		"steam_override": steam_ok,
+	})
+	var sid_nc := str(pre_nc.get("session_id", ""))
+	svc.stage(sid_nc)
+	svc.launch(sid_nc, {"execute_process": true, "monitor_started_at_s": 0.0, "monitor_timeout_s": 60.0})
+	r.fault_fail_ledger_write = true
+	var c_led: Dictionary = svc.cancel_monitoring(sid_nc)
+	r.fault_fail_ledger_write = false
+	_check(not bool(c_led.get("ok", true)) and str(c_led.get("cancel_status", "")) == "CANCELLATION_PERSIST_FAILED" and svc.is_monitoring(sid_nc), "NC-08/NC-10: ledger cancel failure reports CANCELLATION_PERSIST_FAILED and retains GUI monitoring")
+	r.fault_fail_monitor_persist = true
+	var c_mon: Dictionary = svc.cancel_monitoring(sid_nc)
+	r.fault_fail_monitor_persist = false
+	var snap_mon: Dictionary = svc.get_status_snapshot(sid_nc)
+	_check(not bool(c_mon.get("ok", true)) and str(snap_mon.get("cancel_status", "")) == "CANCELLATION_PERSIST_FAILED" and svc.is_monitoring(sid_nc), "NC-09/NC-10: monitor persist failure visible in GUI snapshot and retains monitoring")
+	var svc2 = NativeServiceScript.new()
+	svc2.ensure_initialized()
+	svc2.recover_pending_sessions()
+	_eq(str(svc2.runner.get_session_record(sid_nc).get("state", "")), "RECOVERY_PENDING", "NC-11: restart after failed cancellation reconciles to RECOVERY_PENDING")
+	svc2.resume_monitoring(sid_nc)
+	var c_ok: Dictionary = svc2.cancel_monitoring(sid_nc)
+	_prepare_runtime_cleanup(svc2.runner, sid_nc, "CANCELLED")
+	var cl_ok: Dictionary = svc2.cleanup_stage(sid_nc)
+	_check(bool(c_ok.get("ok", false)) and str(c_ok.get("state", "")) == "CANCELLED" and bool(cl_ok.get("ok", false)), "NC-12: successful retry cancel commits CANCELLED and unlocks safe cleanup")
+	svc.free()
+	svc2.free()
+
+	# SA-01..SA-09: Unique STOCK_ADDON missions, markers, collision scan, bzone.cfg stream parser
+	var fake_docs := tmp_root.path_join("mock_docs_t73")
+	var fake_addon := fake_docs.path_join("My Games/Battlezone Combat Commander/addon")
+	DirAccess.make_dir_recursive_absolute(fake_addon)
+	var keep_file := fake_addon.path_join("user_keep_t73.odf")
+	_write(keep_file, "[GameObjectClass]\nunitName=\"Keep\"\n")
+	var disc_sa := disc.duplicate(true)
+	disc_sa["addon_root"] = fake_addon
+	var r_sa = NativeRunnerScript.new()
+	var p1: Dictionary = r_sa.preflight(null, null, {"discovery": disc_sa, "stage_prefix": "sa1", "staged_odfs": {"assets/ODF/ord_sa1.odf": odf_bytes}, "steam_override": steam_ok, "launch_mode": "STOCK_ADDON", "docs_dir_override": fake_docs})
+	var p2: Dictionary = r_sa.preflight(null, null, {"discovery": disc_sa, "stage_prefix": "sa2", "staged_odfs": {"assets/ODF/ord_sa2.odf": odf_bytes}, "steam_override": steam_ok, "launch_mode": "STOCK_ADDON", "docs_dir_override": fake_docs})
+	var s1 = p1.get("session")
+	var s2 = p2.get("session")
+	_check(str(s1.mission_basename) != str(s2.mission_basename) and str(s1.mission_basename) != "shaman_shot" and str(s1.marker_odf_filename) != str(s2.marker_odf_filename), "SA-01/SA-04: STOCK_ADDON sessions derive unique mission basenames and unique marker ODFs")
+	_check(bool(r_sa.stage(str(p1.get("session_id", ""))).get("ok", false)) and bool(r_sa.stage(str(p2.get("session_id", ""))).get("ok", false)), "SA-02: two simultaneous STOCK_ADDON stages succeed cleanly")
+	var p_dup: Dictionary = r_sa.preflight(null, null, {"discovery": disc_sa, "stage_prefix": "sadup", "mission_base": str(s1.mission_basename), "staged_odfs": {"assets/ODF/ord_sa3.odf": odf_bytes}, "steam_override": steam_ok, "launch_mode": "STOCK_ADDON", "docs_dir_override": fake_docs})
+	_eq(str(p_dup.get("reason", "")), "MISSION_NAME_COLLISION", "SA-03: reusing active mission basename rejected with MISSION_NAME_COLLISION")
+	_write(fake_addon.path_join("ForeignMod/atstab_f73.odf"), "[OrdnanceClass]\ndamageValue(H)=999\n")
+	var p_fc: Dictionary = r_sa.preflight(null, null, {"discovery": disc_sa, "stage_prefix": "safc", "staged_odfs": {"assets/ODF/atstab_f73.odf": odf_bytes}, "steam_override": steam_ok, "launch_mode": "STOCK_ADDON", "docs_dir_override": fake_docs})
+	_check(not bool(p_fc.get("launch_eligible", true)) and str(p_fc.get("reason", "")) == "ADDON_FOREIGN_ODF_COLLISION", "SA-05: foreign addon ODF collision detected and blocks launch")
+	_write(fake_addon.path_join("SHAMAN_old_t73/assets/ODF/atstab_o73.odf"), "[OrdnanceClass]\ndamageValue(H)=50\n")
+	var p_oc: Dictionary = r_sa.preflight(null, null, {"discovery": disc_sa, "stage_prefix": "saoc", "staged_odfs": {"assets/ODF/atstab_o73.odf": odf_bytes}, "steam_override": steam_ok, "launch_mode": "STOCK_ADDON", "docs_dir_override": fake_docs})
+	_check(not bool(p_oc.get("launch_eligible", true)) and str(p_oc.get("reason", "")) == "OLD_SHAMAN_STAGE_COLLISION", "SA-06: old SHAMAN stage ODF collision detected")
+	r_sa.cleanup_stage(str(p1.get("session_id", "")))
+	r_sa.cleanup_stage(str(p2.get("session_id", "")))
+	_check(FileAccess.file_exists(keep_file), "SA-07: foreign addon files untouched by scan and cleanup")
+	var cfg_dir := tmp_root.path_join("cfg_t73")
+	_write(cfg_dir.path_join("bzone.cfg"), "ConfigureFileSystem() {\n/* AddDirRecurse(\"@mydocsdir\\addon\"); */\nConfigureStream(\"base\") {\nAddDirRecurse(\"@rootdir\\bz2r_res\");\n}\nSetActiveStream(\"base\");\n}\n")
+	var cfg_r := NativeAdapterScript.inspect_stock_bzone_cfg(cfg_dir)
+	var cfg_live := NativeAdapterScript.inspect_stock_bzone_cfg(game_root)
+	_check(not bool(cfg_r.get("ok", true)) and bool(cfg_live.get("ok", false)) and str(cfg_live.get("active_stream", "")) == "base", "SA-08: bzone.cfg parser strips block comments and validates active stream mount order")
+
+	# NM-11..NM-16: ARM MANUAL OBSERVATION, restart persistence, verified late PID, unattested import, fake PID blocked
+	var sv_m = NativeServiceScript.new()
+	sv_m.ensure_initialized()
+	var live_p := [{"pid": 1001, "name": "battlezone2.exe", "exe_path": str(disc.get("exe", "")), "exe_md5": str(disc.get("exe_md5", ""))}]
+	sv_m.runner.process_inspector = func() -> Array: return live_p
+	var pm: Dictionary = sv_m.runner.preflight(null, null, {"discovery": disc_sa, "stage_prefix": "nm73", "staged_odfs": {"assets/ODF/atstab_nm73.odf": odf_bytes}, "steam_override": steam_off, "launch_mode": "STOCK_ADDON", "docs_dir_override": fake_docs})
+	var sid_m := str(pm.get("session_id", ""))
+	var sm_obj = sv_m.stage(sid_m).get("session")
+	var arm: Dictionary = sv_m.arm_manual_observation(sid_m, {"monitor_started_at_s": 0.0, "monitor_timeout_s": 120.0})
+	_check(bool(arm.get("ok", false)) and str(arm.get("state", "")) == "MONITOR_ARMED" and not bool(arm.get("game_launched", false)), "NM-11: ARM MANUAL OBSERVATION enters MONITOR_ARMED without claiming launch")
+	var sv_m2 = NativeServiceScript.new()
+	sv_m2.ensure_initialized()
+	sv_m2.runner.process_inspector = func() -> Array: return live_p
+	sv_m2.recover_pending_sessions()
+	_check(sv_m2.is_monitoring(sid_m) and str(sv_m2.get_status_snapshot(sid_m).get("state", "")) == "MONITOR_ARMED", "NM-12: MONITOR_ARMED persists and resumes across restart")
+	_eq(str(sv_m2.poll_once(sid_m, 1.0).get("state", "")), "MONITOR_ARMED", "NM-13: preexisting PID ignored")
+	live_p.append({"pid": 2002, "name": "battlezone2.exe", "exe_path": str(disc.get("exe", "")), "exe_md5": str(disc.get("exe_md5", ""))})
+	_eq(str(sv_m2.poll_once(sid_m, 2.0).get("state", "")), "GAME_PROCESS_VERIFIED", "NM-13: late verified PID enters GAME_PROCESS_VERIFIED")
+	_write(str(sm_obj.observation_expected_path), JSON.stringify({
+		"contract_version": 2, "measurement_method": "GetCurHealth_delta",
+		"session_id": str(sm_obj.session_id), "launch_nonce": str(sm_obj.launch_nonce), "scenario_id": str(sm_obj.scenario_id),
+		"state": "MEASUREMENT_COMPLETE", "shooter": "ivtank_vsr", "target": "ivscav_vsr", "weapon": "gatstabvsr_c", "ordnance": "atstab_nm73.odf",
+		"hp_before": 1000.0, "hp_after": 920.0, "hp_max": 1000.0, "damage": 80.0, "elapsed_mission_s": 1.1, "tps": 20,
+		"mount_marker": str(sm_obj.mount_marker), "resources_mounted": true,
+	}))
+	_check(bool(sv_m2.poll_once(sid_m, 3.0).get("observation_collected", false)), "NM-14: session-specific Lua observation collected automatically")
+	sv_m2.cleanup_stage(sid_m)
+	sv_m.free()
+	sv_m2.free()
+
+	var r_fk = NativeRunnerScript.new()
+	r_fk.game_process_detector = func() -> Dictionary: return {"detected": true, "game_pid": 7777}
+	var pfk: Dictionary = r_fk.preflight(null, null, {"discovery": disc_sa, "stage_prefix": "nm16", "staged_odfs": {"assets/ODF/atstab_fk73.odf": odf_bytes}, "steam_override": steam_off, "launch_mode": "STOCK_ADDON", "docs_dir_override": fake_docs})
+	var sid_fk := str(pfk.get("session_id", ""))
+	var sfk = r_fk.stage(sid_fk).get("session")
+	var imp_path := tmp_root.path_join("imp_t73.json")
+	_write(imp_path, JSON.stringify({
+		"contract_version": 2, "measurement_method": "GetCurHealth_delta",
+		"session_id": str(sfk.session_id), "launch_nonce": str(sfk.launch_nonce), "scenario_id": str(sfk.scenario_id),
+		"state": "MEASUREMENT_COMPLETE", "shooter": "ivtank_vsr", "target": "ivscav_vsr", "weapon": "gatstabvsr_c", "ordnance": "atstab_fk73.odf",
+		"hp_before": 1000.0, "hp_after": 940.0, "hp_max": 1000.0, "damage": 60.0, "elapsed_mission_s": 1.0, "tps": 20,
+		"mount_marker": str(sfk.mount_marker), "resources_mounted": true,
+	}))
+	var imp_r: Dictionary = r_fk.import_manual_observation(sid_fk, imp_path)
+	_check(bool(imp_r.get("ok", false)) and str(imp_r.get("state", "")) == "COMPARISON_COMPLETE" and bool(imp_r.get("unattested", false)) and not bool(imp_r.get("verified", true)), "NM-15/NM-16: manual import / unverified PID stays unattested COMPARISON_COMPLETE, never NATIVE_VERIFIED")
+	r_fk.cleanup_stage(sid_fk)
+
+	NativeAdapterScript.clear_trusted_sessions()
+	OdfDocument.clear_all_cache()
+	WorkspaceStore.root_override = old_ws
+	_remove_tree(tmp_root)
+
+
+func _test_t74_visual_and_index() -> void:
+	_start("T-74 Wave E DOCB .msh Animations, Transform Compression & ResourceIndex Cache")
+	var BzMeshReaderScript = preload("res://scripts/core/bz_mesh_reader.gd")
+	var CombatScenarioScript = preload("res://scripts/sim/combat_scenario.gd")
+	var ModLoadoutScript = preload("res://scripts/core/mod_loadout.gd")
+	var tmp_root := ProjectSettings.globalize_path("user://t74_wavee_" + str(Time.get_ticks_usec()))
+	DirAccess.make_dir_recursive_absolute(tmp_root)
+
+	var stock_idx := ResourceIndex.new()
+	stock_idx.roots = [{"path": ResourceIndex.DEFAULT_GAME_ROOT + "/bz2r_res", "label": "stock", "kind": "game", "priority": 10, "enabled": true}]
+	stock_idx.scan(false)
+
+	# 1. Scion animated fvtank_skel.msh + ivturr00.msh deploy + ibnav00.msh loop
+	var fv_info: Dictionary = BzMeshReaderScript.build_scene(stock_idx.find_asset("fvtank_skel.msh", ["msh"]), stock_idx)
+	_check(bool(fv_info.get("ok", false)) and (fv_info.get("animation_names", []) as Array).size() >= 5, "T-74 ANIM: Scion fvtank_skel.msh loads cleanly with embedded DOCB clips")
+	if fv_info.get("root", null) is Node:
+		(fv_info["root"] as Node).free()
+
+	var turr_info: Dictionary = BzMeshReaderScript.build_scene(stock_idx.find_asset("ivturr00.msh", ["msh"]), stock_idx)
+	var hp_gun: Node3D = (turr_info.get("hardpoints", {}) as Dictionary).get("hp_gun_1", null)
+	_check(bool(turr_info.get("ok", false)) and (turr_info.get("animation_names", []) as Array).has("deploy") and hp_gun != null, "T-74 ANIM: ivturr00.msh decodes 'deploy' clip and hp_gun_1")
+	var _xf := func(n: Node3D) -> Vector3:
+		var ch: Array[Node3D] = []
+		var c: Node = n
+		while c != null:
+			if c is Node3D:
+				ch.append(c as Node3D)
+			c = c.get_parent()
+		var t := Transform3D.IDENTITY
+		for i in range(ch.size() - 1, -1, -1):
+			t = t * ch[i].transform
+		return t.origin
+	var p0: Vector3 = _xf.call(hp_gun) if hp_gun != null else Vector3.ZERO
+	var pr := BzMeshReaderScript.apply_animation_pose(turr_info, "deploy", 1.0, false)
+	var p1: Vector3 = _xf.call(hp_gun) if hp_gun != null else Vector3.ZERO
+	_check(bool(pr.get("ok", false)) and p0.distance_to(p1) > 0.5, "T-74 ANIM: playing ivturr00.msh 'deploy' animates hp_gun_1 by %.2fm" % p0.distance_to(p1))
+	if turr_info.get("root", null) is Node:
+		(turr_info["root"] as Node).free()
+
+	var nav_info: Dictionary = BzMeshReaderScript.build_scene(stock_idx.find_asset("ibnav00.msh", ["msh"]), stock_idx)
+	var n1: Node3D = (nav_info.get("nodes_by_index", {}) as Dictionary).get(1, null)
+	var q0 := n1.transform.basis.get_rotation_quaternion() if n1 != null else Quaternion.IDENTITY
+	var np := BzMeshReaderScript.apply_animation_pose(nav_info, "loop", 0.5, true)
+	var q1 := n1.transform.basis.get_rotation_quaternion() if n1 != null else Quaternion.IDENTITY
+	_check(bool(np.get("ok", false)) and n1 != null and absf(q0.angle_to(q1)) > 0.3, "T-74 ANIM: ibnav00.msh 'loop' rotates vertex-colored spinner node")
+	if nav_info.get("root", null) is Node:
+		(nav_info["root"] as Node).free()
+
+	# 2. Moving-target transform compression + A/B replay comparison
+	var sh_p := tmp_root.path_join("sh_e.odf")
+	var wp_p := tmp_root.path_join("wp_e.odf")
+	var or_p := tmp_root.path_join("or_e.odf")
+	var tg_p := tmp_root.path_join("tg_e.odf")
+	_write(sh_p, "[GameObjectClass]\nweaponName1=\"wp_e\"\nmaxAmmo=500\nmaxEnergy=500\nmaxHealth=1000\narmorClass=\"H\"\n")
+	_write(wp_p, "[WeaponClass]\nordName=\"or_e\"\nshotDelay=0.2\nenergyCost=0\n")
+	_write(or_p, "[OrdnanceClass]\nshotSpeed=100\nlifeSpan=3.0\nshotRadius=0.5\nammoCost=1\ndamageValue(H)=40\n")
+	_write(tg_p, "[GameObjectClass]\nmaxHealth=5000\narmorClass=\"H\"\nshieldClass=\"N\"\nmaxShield=0\n")
+	var idx_e := ResourceIndex.new()
+	idx_e.roots = [{"path": tmp_root, "label": "e", "kind": "game", "priority": 10, "enabled": true}]
+	idx_e.scan(false)
+	var prof_e := WeaponProfile.new()
+	prof_e.resolve(idx_e, sh_p, tg_p)
+	var scn_e = CombatScenarioScript.new(7410)
+	scn_e.create_new_scenario(prof_e, Vector3(0, 2, -60))
+	scn_e.capture_replay_baseline(prof_e)
+	var pos := Vector3(-10, 2, -60)
+	var vel := Vector3(5, 0, 0)
+	for f in range(1200):
+		if f % 300 == 150:
+			vel = -vel
+		pos += vel * (1.0 / 60.0)
+		scn_e.record_actor_transform("primary", pos, vel, 0.0)
+		scn_e.advance(1.0 / 60.0)
+	var cstat: Dictionary = scn_e.timeline_compression_stats()
+	_check(int(cstat.get("compressed_count", 0)) > 1100 and int(cstat.get("timeline_size", 999)) < 30, "T-74 SOAK: moving-target transform compression collapses 1200 frames -> %d events" % int(cstat.get("timeline_size", 0)))
+	var rep_e: Dictionary = CombatScenarioScript.replay_snapshot_sandboxed(scn_e.save_replay_snapshot("e_soak"))
+	var cmp_e: Dictionary = CombatScenarioScript.compare_replay_results(rep_e, rep_e)
+	_check(bool(cmp_e.get("ok", false)) and bool(cmp_e.get("identical", false)), "T-74 A/B: CombatScenario.compare_replay_results produces clean diff summary")
+
+	# 3. Persistent fingerprint-validated ResourceIndex cache & provenance
+	var old_ws := WorkspaceStore.root_override
+	WorkspaceStore.root_override = tmp_root.path_join("ws_idx")
+	var ws_d := tmp_root.path_join("mock_ws")
+	_write(ws_d.path_join("2001/2001.ini"), "ModName=\"Alpha\"\n")
+	_write(ws_d.path_join("2001/gun_x.odf"), "[WeaponClass]\nwpnName=\"Alpha\"\n")
+	_write(ws_d.path_join("2002/2002.ini"), "ModName=\"Beta\"\n")
+	_write(ws_d.path_join("2002/gun_x.odf"), "[WeaponClass]\nwpnName=\"Beta\"\n")
+	var cpath := tmp_root.path_join("idx_cache.json")
+	var ix1 := ResourceIndex.new()
+	ix1.roots = [{"path": ws_d, "label": "ws", "kind": "workshop", "priority": 30, "enabled": true}]
+	var lo1 := ModLoadoutScript.new()
+	lo1.profile_id = "lo_1"
+	lo1.enabled_packages = ["2001"]
+	ix1.apply_loadout(lo1)
+	ix1.scan(true)
+	_check(bool(ix1.save_index_cache(cpath, true).get("ok", false)), "T-74 IDX: save_index_cache succeeds")
+	var ix2 := ResourceIndex.new()
+	ix2.roots = ix1.roots.duplicate(true)
+	ix2.apply_loadout(lo1)
+	_check(bool(ix2.load_index_cache(true, cpath).get("cache_hit", false)), "T-74 IDX: load_index_cache hits on matching SHA256 fingerprint")
+	var lo2 := ModLoadoutScript.new()
+	lo2.profile_id = "lo_2"
+	lo2.enabled_packages = ["2002"]
+	ix2.apply_loadout(lo2)
+	var pv2 := ix2.provenance_summary("gun_x.odf")
+	_check(str(pv2.get("package_id", "")) == "2002" and (pv2.get("alternatives", []) as Array).size() >= 1, "T-74 IDX: provenance_summary updates immediately on Workshop package switch")
+	_check(not bool(ix2.load_index_cache(true, cpath).get("cache_hit", true)), "T-74 IDX: cache invalidates on ModLoadout change")
+	WorkspaceStore.root_override = old_ws
+	OdfDocument.clear_all_cache()
+	_remove_tree(tmp_root)
 
 
 # ---------------------------------------------------------------- helpers
@@ -4420,6 +4841,47 @@ func _list_odf(root: String) -> Array[String]:
 		out.append_array(_list_odf(d))
 	return out
 
+
+
+## T-85: prepare authoritative terminal state for a legitimate runtime cleanup.
+func _prepare_runtime_cleanup(runner, sid: String, state: String) -> void:
+	if runner == null or sid == "":
+		return
+	var record: Dictionary = runner.sessions.get(sid, {})
+	if record.is_empty():
+		return
+	var sess_obj = NativeSessionScript.from_dict(record.get("session", {}))
+	if sess_obj != null:
+		var stage_root := str(sess_obj.stage_root)
+		var mpath := stage_root.path_join("stage_manifest.json")
+		var mres = WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(mpath))
+		if bool(mres.get("ok", false)) and mres.get("data", null) is Dictionary:
+			var manifest: Dictionary = mres.get("data", {})
+			for item in manifest.get("files", []):
+				if not (item is Dictionary):
+					continue
+				var rel := str(item.get("rel", ""))
+				var fpath := stage_root.path_join(rel)
+				var fbytes := FileAccess.get_file_as_bytes(fpath)
+				item["md5"] = WorkspaceStore._md5_bytes(fbytes)
+				item["bytes"] = fbytes.size()
+			WorkspaceStore.atomic_write_abs(mpath, JSON.stringify(manifest, "  ").to_utf8_buffer())
+	record["state"] = state
+	runner.sessions[sid] = record
+	var ledger_path: String = runner.ledger_path()
+	var lres = WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ledger_path))
+	var ldoc: Dictionary = lres.get("data", {}) if bool(lres.get("ok", false)) and lres.get("data", null) is Dictionary else {"sessions": {}}
+	var sessions: Dictionary = ldoc.get("sessions", {})
+	sessions[sid] = {"state": state}
+	ldoc["sessions"] = sessions
+	WorkspaceStore.atomic_write_abs(ledger_path, JSON.stringify(ldoc, "  ").to_utf8_buffer())
+	var sess: Dictionary = record.get("session", {})
+	var ev_path: String = str(sess.get("evidence_path", ""))
+	if ev_path != "" and FileAccess.file_exists(ev_path):
+		var eres = WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(ev_path))
+		var ev: Dictionary = eres.get("data", {}) if bool(eres.get("ok", false)) and eres.get("data", null) is Dictionary else {}
+		ev["status"] = state
+		WorkspaceStore.atomic_write_abs(ev_path, JSON.stringify(ev, "  ").to_utf8_buffer())
 
 func _write(path: String, text: String) -> void:
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())

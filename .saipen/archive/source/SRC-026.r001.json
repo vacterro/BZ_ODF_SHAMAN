@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-026:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "V:\\___VAC\\_PIC\\_Clipboard_stuff\\SAIHANDOFF-BZ_ODF_SHAMAN-19.md"
+    }
+  },
+  "derived_at": "2026-11-23T01:02:53Z",
+  "derived_from": "SRC-026",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "0af49449bd5ad90c228e28a8e7c8fc006ec4b3578c060e1ed178592450d301fd"
+}

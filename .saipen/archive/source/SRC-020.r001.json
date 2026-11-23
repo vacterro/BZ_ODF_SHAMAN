@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-020:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Autonomous shift: repair external file.header graph reference editing and parallel-edge identity; zero-hardpoint TANDEM fallback and authoritative VolleyResult; Replay job ownership/queue/pause/cancel states; tiered ResourceIndex source verification; resolve old SHAMAN stage collision safely; complete T-75 AUDAPACK and release checks; advance visual lab"
+    }
+  },
+  "derived_at": "2026-11-22T18:59:55Z",
+  "derived_from": "SRC-020",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "55e7a61b8426dbfbd125d12f3a14f9136d15ecceb72fa7d3cf51f86c03845e2a"
+}

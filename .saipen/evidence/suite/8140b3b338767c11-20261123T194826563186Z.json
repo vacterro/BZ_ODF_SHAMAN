@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "saipen-suite-record",
+  "command": [
+    "tools/run_tests.cmd",
+    "--json"
+  ],
+  "command_sha256": "8140b3b338767c11df162de4c284e02a81bfce78bad7d529bdb1b33fa3c8ca4b",
+  "status": "FAIL",
+  "exit_code": 1,
+  "totals": null,
+  "duration_s": 0.1,
+  "timeout_s": 3600,
+  "subject_before": "git:0d0ec6be2746d02acf64ff4d668cd531d9f70ef4ed55e2f4f6e8004bd785fa74",
+  "subject": "git:0d0ec6be2746d02acf64ff4d668cd531d9f70ef4ed55e2f4f6e8004bd785fa74",
+  "stdout_tail": "",
+  "stderr_tail": "'tools' is not recognized as an internal or external command,\noperable program or batch file.\n",
+  "tree_changed_during_run": false,
+  "finished_utc": "2026-11-23T19:48:26Z",
+  "verdict": "FAIL",
+  "problems": [
+    "exit code 1"
+  ]
+}

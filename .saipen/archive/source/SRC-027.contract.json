@@ -1,0 +1,14 @@
+{
+  "clauses": {
+    "SRC-027:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "text": "Handoff-20 MODE2 night shift: save-group recovery integrity, native cleanup safety, true cross-process restart tests, T-75 progress, Recovery Center"
+    }
+  },
+  "derived_at": "2026-11-23T02:43:40Z",
+  "derived_from": "SRC-027",
+  "interpretation_revision": 1,
+  "schema_version": 1,
+  "source_sha256": "0539f955f179849e7faa6337b84c1bd3a02eb06828cf671f3b35b585b22cc32e"
+}

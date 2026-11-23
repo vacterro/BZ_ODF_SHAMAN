@@ -1,0 +1,29 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+T-72 Temporal Replay Concurrency Verifier (RPL-09..RPL-16)
+  ✓ RPL-09 setup resolved
+  ✓ RPL-09 orig: both Shot A (t=0.0) and Shot B (t=0.2) coexist in flight
+  ✓ RPL-09: replay launches Shot A at t=0.00 and Shot B at t=0.20 (got [0.0, 0.2])
+  ✓ RPL-09: replay keeps both projectiles concurrently in flight (max_concurrent=2)
+  ✓ RPL-09: replay impact times match original overlapping schedule (orig=[0.97500129697139, 1.17500129697139] rep=[0.97500129697139, 1.17500129697139])
+  ✓ RPL-09: replay final shield/hull matches original
+  ✓ RPL-10 orig: Shot A accepted, Shot B at t=0.20 rejected while reloading
+  ✓ RPL-10: replay reproduces exact acceptance history (1 accepted, 1 rejected at t=0.20; acc=[0.0] rej=[0.2])
+  ✓ RPL-10: replay shooter ammo matches original (499 vs 499)
+  ✓ RPL-11: DoT ticks advance during projectile flight BEFORE impact (hit=[0.97500129697139], first_dot=0.26666666666667)
+  ✓ RPL-11: replay shield/hull combines DoT + impact identically (orig=0.00/425.00 rep=0.00/425.00)
+  ✓ RPL-12: moving target hit by BOTH overlapping shots identically on replay (orig hull=400.0, rep hull=400.0)
+  ✓ RPL-12: moving-target impact order & timing match original (orig=[0.97500129697139, 1.18618900173547] rep=[0.97500129697139, 1.18618900173547])
+  ✓ RPL-13: historical replay keeps frozen 60 dmg (hull=480.0) while new sim uses edited 180 dmg (hull=420.0)
+  ✓ RPL-14: CombatScenario exposes incremental bounded ReplayRunner API
+  ✓ RJOB-01/02/05/06: single replay job state and conflict guard present
+  ✓ RJOB-03/11: A/B results bound to job and snapshot identity
+  ✓ RPL-25/26: step limit returns ok=false complete=false with full diagnostics
+  ✓ RPL-29: genuine completion still reports REPLAY_COMPLETE
+  ✓ RPL-14: incremental replay runs in 22 bounded chunks (max 4.81ms) and matches sync/orig hull (300.0 vs 300.0 vs 300.0)
+  ✓ RPL-15: same-time events carry stable seq and produce byte-identical event streams across replays
+  ✓ RPL-16: simultaneous splash shots coexist in flight
+  ✓ RPL-16: simultaneous splash impacts on primary + secondary reproduce deterministically (orig 390.0/500.0 rep 390.0/500.0)
+
+T-72 Verifier: 23 checks, 0 failure(s)
+RESULT: PASS

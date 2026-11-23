@@ -76,6 +76,14 @@ var recovery_history_dialog: AcceptDialog
 var recovery_history_tree: Tree
 var recovery_history_info: Label
 var _recovery_history_rows: Array[Dictionary] = []
+var save_group_recovery_button: Button
+var recovery_center_dialog: AcceptDialog
+var recovery_center_tree: Tree
+var recovery_center_info: Label
+var _recovery_center_rows: Array[Dictionary] = []
+var last_recovery_center_scan: Dictionary = {}
+var recovery_confirm_dialog: ConfirmationDialog
+var pending_recovery_action: Dictionary = {}
 var reset_all_confirmation_pending := false
 var reset_doc_confirmation_pending := false
 var _reset_impact_rev: int = 0
@@ -175,6 +183,8 @@ func _build_ui() -> void:
 	top_bar.add_child(reset_all_button)
 	recovery_history_button = _top_button("Recovery", func(): open_recovery_history(), "Inspect and restore Reset Recovery Points (saved overrides & unsaved working revisions)")
 	top_bar.add_child(recovery_history_button)
+	save_group_recovery_button = _top_button("Recovery Center", func(): open_save_group_recovery_center(), "Discover interrupted Save Dependencies transactions and native cleanup intents; inspect, recover or resolve them safely")
+	top_bar.add_child(save_group_recovery_button)
 	top_bar.add_child(_top_button("Export...", _on_export_pressed, "Export staged overrides (dry-run report first)"))
 	top_bar.add_child(_top_button("VSR test", _load_reference_scenario, "Load gatstabvsr / ivtank_vsr / ivscav_vsr"))
 	top_bar.add_child(_top_button("Rescan", rescan_index, "Re-index roots without restarting"))
@@ -545,6 +555,8 @@ func _build_ui() -> void:
 	reset_doc_dialog.canceled.connect(func(): cancel_reset_current_doc())
 	add_child(reset_doc_dialog)
 	_build_recovery_history_dialog()
+	_build_recovery_center_dialog()
+	_scan_startup_recovery()
 	_build_actor_picker_dialog()
 	_populate_theme_option()
 	# Initial comfortable split proportions (user can drag freely anywhere).
@@ -670,6 +682,268 @@ func restore_recovery_point_ui(tx_path: String, mode: String = "full") -> Dictio
 			str(res.get("status", "FAILED")), restored_list.size(), (res.get("failed", []) as Array).size()
 		], "danger")
 	return res
+
+
+## T-86 / Wave E: build the Recovery Center dialog. Startup transaction
+## discovery is read-only; every destructive action stays a deliberate,
+## confirmed user choice routed through the audited recovery entrypoints.
+func _build_recovery_center_dialog() -> void:
+	recovery_center_dialog = AcceptDialog.new()
+	recovery_center_dialog.title = "Recovery Center"
+	recovery_center_dialog.size = Vector2i(940, 520)
+	recovery_center_dialog.ok_button_text = "Close"
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 6)
+	recovery_center_dialog.add_child(vb)
+	recovery_center_info = Label.new()
+	recovery_center_info.text = "Interrupted Save Dependencies transactions and incomplete native cleanup intents discovered from durable records on disk."
+	recovery_center_info.add_theme_color_override("font_color", Color("#C5AB6E"))
+	recovery_center_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(recovery_center_info)
+	recovery_center_tree = Tree.new()
+	recovery_center_tree.columns = 6
+	recovery_center_tree.set_column_title(0, "Kind")
+	recovery_center_tree.set_column_title(1, "ID / State")
+	recovery_center_tree.set_column_title(2, "Affected files")
+	recovery_center_tree.set_column_title(3, "Conflicts")
+	recovery_center_tree.set_column_title(4, "Created")
+	recovery_center_tree.set_column_title(5, "Resolution")
+	recovery_center_tree.column_titles_visible = true
+	recovery_center_tree.hide_root = true
+	recovery_center_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	recovery_center_tree.custom_minimum_size = Vector2(880, 330)
+	vb.add_child(recovery_center_tree)
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 6)
+	vb.add_child(btn_row)
+	var recover_btn := Button.new()
+	recover_btn.text = "Recover Selected Group"
+	recover_btn.tooltip_text = "Roll the selected interrupted Save Dependencies transaction back to its pre-save state (byte-verified, conflict-checked)."
+	recover_btn.pressed.connect(func(): _request_recovery_action("RECOVER"))
+	btn_row.add_child(recover_btn)
+	var keep_btn := Button.new()
+	keep_btn.text = "Resolve Conflict: Keep Current"
+	keep_btn.tooltip_text = "For a pending conflict group: keep the files as they are on disk now."
+	keep_btn.pressed.connect(func(): _request_recovery_action("KEEP CURRENT"))
+	btn_row.add_child(keep_btn)
+	var work_btn := Button.new()
+	work_btn.text = "Resolve Conflict: Restore Working"
+	work_btn.tooltip_text = "For a pending conflict group: restore the preserved working revision from the recovery artifact."
+	work_btn.pressed.connect(func(): _request_recovery_action("RESTORE WORKING"))
+	btn_row.add_child(work_btn)
+	var rescan_btn := Button.new()
+	rescan_btn.text = "Rescan"
+	rescan_btn.pressed.connect(func(): _refresh_recovery_center_tree())
+	btn_row.add_child(rescan_btn)
+	add_child(recovery_center_dialog)
+
+	# UIREC-01..06: destructive recovery actions never fire directly from a
+	# button. A confirmation shows the exact files, revisions and operation,
+	# then revalidates the journal immediately before mutation.
+	recovery_confirm_dialog = ConfirmationDialog.new()
+	recovery_confirm_dialog.title = "Confirm Recovery Action"
+	recovery_confirm_dialog.ok_button_text = "Confirm"
+	recovery_confirm_dialog.cancel_button_text = "Cancel"
+	add_child(recovery_confirm_dialog)
+	recovery_confirm_dialog.confirmed.connect(_confirm_recovery_action)
+
+
+## Read-only startup scan: incomplete save-group journals + incomplete native
+## cleanup intents. Never mutates anything; only surfaces what durable
+## records say so the user can decide.
+func scan_recovery_center() -> Dictionary:
+	var groups: Array[Dictionary] = []
+	if particle_lab != null:
+		groups = particle_lab.discover_incomplete_save_groups()
+	var intents: Array[Dictionary] = []
+	if native_session_service != null and native_session_service.runner != null:
+		intents = native_session_service.runner.discover_cleanup_intents()
+	return {
+		"save_groups": groups,
+		"cleanup_intents": intents,
+		"count": groups.size() + intents.size(),
+	}
+
+
+func _scan_startup_recovery() -> void:
+	last_recovery_center_scan = scan_recovery_center()
+	var n := int(last_recovery_center_scan.get("count", 0))
+	if n > 0:
+		_set_status("Recovery Center: %d interrupted transaction(s) discovered. Open Recovery Center to inspect." % n, "warning")
+		save_group_recovery_button.text = "Recovery Center (%d)" % n
+	else:
+		save_group_recovery_button.text = "Recovery Center"
+
+
+func open_save_group_recovery_center() -> void:
+	_refresh_recovery_center_tree()
+	if recovery_center_dialog != null and is_inside_tree():
+		recovery_center_dialog.popup_centered()
+
+
+func _refresh_recovery_center_tree() -> void:
+	if recovery_center_tree == null:
+		return
+	last_recovery_center_scan = scan_recovery_center()
+	recovery_center_tree.clear()
+	var root_item := recovery_center_tree.create_item()
+	var groups: Array[Dictionary] = last_recovery_center_scan.get("save_groups", [])
+	var intents: Array[Dictionary] = last_recovery_center_scan.get("cleanup_intents", [])
+	recovery_center_info.text = "%d interrupted Save Dependencies transaction(s), %d incomplete native cleanup intent(s)." % [
+		groups.size(), intents.size()]
+	for g in groups:
+		var item := recovery_center_tree.create_item(root_item)
+		item.set_text(0, "SAVE GROUP")
+		item.set_text(1, "%s\n%s" % [str(g.get("group_id", "")), str(g.get("state", ""))])
+		var targets: Array = g.get("targets", [])
+		item.set_text(2, str(targets.size()))
+		item.set_text(3, str(g.get("conflict_resolution", {}).get("failed", []).size() if (g.get("conflict_resolution", {}) as Dictionary).has("failed") else 0))
+		item.set_text(4, str(g.get("created_at", "")))
+		item.set_text(5, "Recover / Resolve")
+		item.set_metadata(0, {"kind": "save_group", "group": g})
+	for it in intents:
+		var item2 := recovery_center_tree.create_item(root_item)
+		item2.set_text(0, "CLEANUP INTENT")
+		item2.set_text(1, "%s\n%s" % [str(it.get("session_id", "")), str(it.get("intent_state", ""))])
+		item2.set_text(2, str(it.get("remaining_owned_files", 0)))
+		item2.set_text(3, str((it.get("unknown_files", []) as Array).size()))
+		item2.set_text(4, str(it.get("intent_file", "")))
+		item2.set_text(5, str(it.get("resolution", "UNKNOWN")))
+		item2.set_metadata(0, {"kind": "cleanup_intent", "intent": it})
+	var n := int(last_recovery_center_scan.get("count", 0))
+	save_group_recovery_button.text = "Recovery Center (%d)" % n if n > 0 else "Recovery Center"
+
+
+func _selected_recovery_row() -> Dictionary:
+	if recovery_center_tree == null:
+		return {}
+	var sel := recovery_center_tree.get_selected()
+	if sel == null:
+		_set_status("Recovery Center: select a row first.", "warning")
+		return {}
+	return sel.get_metadata(0)
+
+
+## UIREC-01: render an explicit preview of files, revisions and operation,
+## distinguishing INSPECT / RECOVER / KEEP CURRENT / RESTORE WORKING.
+func _preview_recovery_action(group: Dictionary, action: String) -> String:
+	var targets: Array = group.get("targets", [])
+	var lines: Array[String] = []
+	lines.append("=== EFFECTIVE VALUE DIFF ===")
+	lines.append("Operation: " + action)
+	lines.append("Group: %s  State: %s" % [str(group.get("group_id", "")), str(group.get("state", ""))])
+	lines.append("Affected files (%d):" % targets.size())
+	for item in targets:
+		if not (item is Dictionary):
+			lines.append("  ! INVALID TARGET (journal will be refused)")
+			continue
+		var t: Dictionary = item
+		lines.append("  %s" % str(t.get("source_path", "")))
+		lines.append("    previous hash: %s" % str(t.get("previous_override_hash", "")))
+		lines.append("    recorded commit: %s" % str(t.get("new_override_hash", "")))
+		var diff: Dictionary = particle_lab.compare_journal_target_revision(t)
+		if not diff.is_empty() and str(diff.get("error", "")) == "":
+			var changes: Array = diff.get("changed_properties", [])
+			lines.append("    effective diff: %d changed property/properties" % changes.size())
+			for change in changes:
+				var ch: Dictionary = change
+				lines.append("      [%s] %s: %s -> %s (now %s)" % [
+					str(ch.get("header", "")), str(ch.get("key", "")),
+					str(ch.get("previous", "")), str(ch.get("working", "")), str(ch.get("current", "")),
+				])
+			var phys: Dictionary = diff.get("physical_source_diff", {})
+			if not phys.is_empty():
+				lines.append("    physical byte-identical: %s" % str(bool(phys.get("byte_identical", false))))
+				for comment in (phys.get("comment_changes", []) as Array):
+					lines.append("      comment change: %s" % str(comment))
+				for dup in (phys.get("duplicate_key_changes", []) as Array):
+					lines.append("      duplicate physical occurrence: %s" % str(dup))
+				if bool(phys.get("encoding_changes", false)):
+					lines.append("      encoding/BOM change: %s/%s -> %s/%s" % [
+						str(phys.get("previous_encoding", "")), str(bool(phys.get("previous_bom", false))),
+						str(phys.get("current_encoding", "")), str(bool(phys.get("current_bom", false)))])
+				if bool(phys.get("physical_entries_changed", false)) and \
+						(phys.get("comment_changes", []) as Array).is_empty() and \
+						(phys.get("duplicate_key_changes", []) as Array).is_empty():
+					lines.append("      physical entry changes (whitespace/order/line endings)")
+			lines.append("    revision hashes: previous %s / working %s / current %s" % [
+				str(diff.get("previous_hash", "")), str(diff.get("working_hash", "")),
+				str(diff.get("current_hash", ""))])
+	lines.append("Conflicts: %d" % int((group.get("conflict_resolution", {}) as Dictionary).get("failed", []).size()))
+	lines.append("=== PHYSICAL SOURCE DIFF (above, per file) ===")
+	lines.append("Preserved: unknown files and protected sources are never touched.")
+	if action == "RECOVER":
+		lines.append("Overwrites: recorded previous override bytes on affected files.")
+	elif action == "KEEP CURRENT":
+		lines.append("Overwrites: nothing; keeps current bytes, marks group resolved.")
+	elif action == "RESTORE WORKING":
+		lines.append("Overwrites: current override bytes with the preserved working revision.")
+	return "\n".join(lines)
+
+
+func _request_recovery_action(action: String) -> void:
+	var meta := _selected_recovery_row()
+	if meta.is_empty() or str(meta.get("kind", "")) != "save_group":
+		_set_status("Recovery Center: select a SAVE GROUP row.", "warning")
+		return
+	var g: Dictionary = meta.get("group", {})
+	var gid := str(g.get("group_id", ""))
+	if gid == "" or particle_lab == null:
+		_set_status("Recovery Center: group id missing or Particle Lab unavailable.", "danger")
+		return
+	var token: Dictionary = particle_lab.build_recovery_confirmation_token(gid, action)
+	if not bool(token.get("ok", false)):
+		_set_status("Recovery Center: cannot capture current revision (%s); action refused." % str(token.get("reason", "UNKNOWN")), "danger")
+		return
+	pending_recovery_action = token
+	recovery_confirm_dialog.dialog_text = _preview_recovery_action(g, action)
+	recovery_confirm_dialog.popup_centered()
+
+
+func _confirm_recovery_action() -> void:
+	if pending_recovery_action.is_empty():
+		return
+	var action := str(pending_recovery_action.get("action", ""))
+	var gid := str(pending_recovery_action.get("group_id", ""))
+	# T-122: the resolver itself revalidates journal, manifest and every
+	# current file hash from the captured token before any mutation.
+	var token: Dictionary = pending_recovery_action.duplicate(true)
+	pending_recovery_action = {}
+	if action == "RECOVER":
+		_execute_recovery(gid, token)
+	else:
+		_execute_conflict_resolution(gid, action.to_lower(), token)
+
+
+func _execute_recovery(gid: String, token: Dictionary = {}) -> void:
+	var options := {"ui_confirmed": true}
+	if not token.is_empty():
+		options["confirmation_token"] = token
+	var res: Dictionary = particle_lab.recover_partial_save_group(gid, options)
+	if bool(res.get("ok", false)):
+		_set_status("Recovery Center: group %s RECOVERED (%d file(s) restored)." % [gid, (res.get("restored", []) as Array).size()], "success")
+	else:
+		var state := str(res.get("status", str(res.get("reason", "FAILED"))))
+		_set_status("Recovery Center: group %s -> %s (no unsafe overwrite was performed)." % [gid, state], "danger")
+	_refresh_recovery_center_tree()
+
+
+func _execute_conflict_resolution(gid: String, action: String, token: Dictionary = {}) -> void:
+	if gid == "" or particle_lab == null:
+		_set_status("Recovery Center: group id missing or Particle Lab unavailable.", "danger")
+		return
+	if not token.is_empty():
+		var guard: Dictionary = particle_lab.verify_recovery_confirmation(gid, "restore_working" if action == "restore_working" else action, token)
+		if not bool(guard.get("ok", false)):
+			_set_status("Recovery Center: %s since preview; action refused." % str(guard.get("reason", "state changed")), "danger")
+			_refresh_recovery_center_tree()
+			return
+	var res: Dictionary = particle_lab.resolve_recovery_conflict(gid, action, token)
+	if bool(res.get("ok", false)):
+		_set_status("Recovery Center: conflict resolved (%s) for %s." % [action, gid], "success")
+	else:
+		_set_status("Recovery Center: resolution %s -> %s." % [action, str(res.get("status", str(res.get("reason", "FAILED"))))], "danger")
+	_refresh_recovery_center_tree()
 
 
 func _build_actor_picker_dialog() -> void:
@@ -1073,7 +1347,7 @@ func _start_index_scan() -> void:
 
 
 func _scan_worker() -> void:
-	index.scan(true)
+	index.scan_or_load_cache(true)
 
 
 func _process(_delta: float) -> void:
@@ -3101,6 +3375,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	var k := event as InputEventKey
+	# T-76: graph link hotkeys get first refusal while the Particle Lab tab is
+	# active and the pointer is over the graph; existing global shortcuts below
+	# stay intact otherwise.
+	if particle_lab != null and particle_lab.visible and particle_lab.has_method("_handle_graph_hotkey"):
+		if particle_lab._handle_graph_hotkey(event):
+			get_viewport().set_input_as_handled()
+			return
 	if k.ctrl_pressed and k.keycode == KEY_O:
 		open_dialog.popup_centered()
 		get_viewport().set_input_as_handled()

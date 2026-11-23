@@ -1,0 +1,14 @@
+{
+  "requirements": {
+    "SRC-022:R001": {
+      "actionable": true,
+      "class": "requirement",
+      "disposition": "VERIFIED",
+      "evidence": "T-81 closed with verification evidence in LOG: verify -> PASS [target: T-81] conf: high -- saipen test suite run T-81: PASS 1105 ran/1105 passed/0 red, records ec60a408a0ad774d-20261122T214907259883Z.json and ...215216482471Z.json both current; Godot headless res://tests/verify_t81_graph_ports.gd 21/21 PASS; Godot windowed res://tests/verify_t81_windowed_ports.gd 4/4 PASS (output=5 input=1); UI smoke 0 failures; build PASS",
+      "text": "Fix Particle Graph GraphNode physical ports and exact ODF reference identity, advance T-75 native readiness and visual lab",
+      "verification": "the Work this request created reached its own verification gate; see the T-81 VERIFY cycle in .saipen/LOG.md",
+      "work": "T-81"
+    }
+  },
+  "schema_version": 1
+}

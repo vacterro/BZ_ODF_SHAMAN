@@ -85,28 +85,122 @@
   "T-67",
   "T-68",
   "T-69",
-  "T-70"
+  "T-70",
+  "T-71",
+  "T-72",
+  "T-73",
+  "T-74",
+  "T-76",
+  "T-77",
+  "T-78",
+  "T-79",
+  "T-80",
+  "T-81",
+  "T-82",
+  "T-83",
+  "T-84",
+  "T-85",
+  "T-86",
+  "T-88",
+  "T-87",
+  "T-89",
+  "T-90",
+  "T-91",
+  "T-93",
+  "T-92",
+  "T-94",
+  "T-95",
+  "T-96",
+  "T-97",
+  "T-98",
+  "T-99",
+  "T-100",
+  "T-101",
+  "T-102",
+  "T-103",
+  "T-104",
+  "T-105",
+  "T-106",
+  "T-107",
+  "T-108",
+  "T-109",
+  "T-110",
+  "T-111",
+  "T-112",
+  "T-113",
+  "T-114",
+  "T-115",
+  "T-116",
+  "T-117",
+  "T-118",
+  "T-119",
+  "T-120",
+  "T-121",
+  "T-122",
+  "T-123",
+  "T-128",
+  "T-124",
+  "T-125",
+  "T-126",
+  "T-127",
+  "T-129",
+  "T-130",
+  "T-131",
+  "T-132",
+  "T-133",
+  "T-134",
+  "T-135",
+  "T-136",
+  "T-137",
+  "T-138",
+  "T-139",
+  "T-140",
+  "T-141",
+  "T-142",
+  "T-143",
+  "T-144",
+  "T-145",
+  "T-146",
+  "T-147",
+  "T-148",
+  "T-149",
+  "T-152",
+  "T-151",
+  "T-150",
+  "T-153",
+  "T-154",
+  "T-155",
+  "T-156",
+  "T-157",
+  "T-158",
+  "T-159",
+  "T-160",
+  "T-164",
+  "T-163",
+  "T-162",
+  "T-161",
+  "T-165"
  ],
- "last_interval_consumed": 60,
+ "last_interval_consumed": 120,
  "last_run": {
-  "counted_at_run": 65,
-  "run_id": "20261122T104508-624c5f9a"
+  "counted_at_run": 136,
+  "run_id": "20261123T202804-b49fc5fa"
  },
  "maintenance": {
   "blockers": [
    {
     "code": "EVIDENCE_KEPT",
-    "detail": "782519 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
+    "detail": "8834385 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
    }
   ],
   "bytes_reclaimed": 0,
-  "fingerprint": "76e393f1066e14dcf0679e4c08860a19bb6712892212e90977104b458a486481",
-  "last_attempt_fingerprint": "76e393f1066e14dcf0679e4c08860a19bb6712892212e90977104b458a486481",
-  "protected_bytes": 782519,
+  "fingerprint": "9318695f23a8945fd9ba8779e27c530dee92d1114e1ac723b1da7a4eba5f4926",
+  "last_attempt_fingerprint": "9318695f23a8945fd9ba8779e27c530dee92d1114e1ac723b1da7a4eba5f4926",
+  "protected_bytes": 8834385,
   "reason": "no reclaimable candidate exists; nothing is safe to delete",
-  "run_id": "20261122T104508-624c5f9a",
+  "run_id": "20261123T202804-b49fc5fa",
   "state": "GC_BLOCKED_NO_SAFE_CANDIDATES",
-  "updated": "2026-11-22T10:45:08Z"
+  "updated": "2026-11-23T20:28:05Z"
  },
  "runs": [
   {
@@ -199,6 +293,139 @@
    "finished": "2026-11-22T10:45:08Z",
    "run_id": "20261122T104508-624c5f9a",
    "started": "2026-11-22T10:45:08Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 71,
+   "finished": "2026-11-22T11:10:14Z",
+   "run_id": "20261122T111014-7b5e6774",
+   "started": "2026-11-22T11:10:14Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 72,
+   "finished": "2026-11-22T11:29:13Z",
+   "run_id": "20261122T112913-51302a67",
+   "started": "2026-11-22T11:29:13Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 73,
+   "finished": "2026-11-22T11:37:37Z",
+   "run_id": "20261122T113736-97543222",
+   "started": "2026-11-22T11:37:36Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 74,
+   "finished": "2026-11-22T12:07:57Z",
+   "run_id": "20261122T120757-30ccf59d",
+   "started": "2026-11-22T12:07:57Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 75,
+   "finished": "2026-11-22T12:51:38Z",
+   "run_id": "20261122T125138-3556e9cb",
+   "started": "2026-11-22T12:51:38Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 76,
+   "finished": "2026-11-22T15:17:57Z",
+   "run_id": "20261122T151756-30c2ef3e",
+   "started": "2026-11-22T15:17:56Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 77,
+   "finished": "2026-11-22T17:30:39Z",
+   "run_id": "20261122T173039-7cf900d3",
+   "started": "2026-11-22T17:30:39Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 78,
+   "finished": "2026-11-22T18:59:56Z",
+   "run_id": "20261122T185956-d74ed1bb",
+   "started": "2026-11-22T18:59:56Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 79,
+   "finished": "2026-11-22T20:42:36Z",
+   "run_id": "20261122T204236-5c1f4696",
+   "started": "2026-11-22T20:42:36Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 80,
+   "finished": "2026-11-22T21:53:16Z",
+   "run_id": "20261122T215316-65e0a69b",
+   "started": "2026-11-22T21:53:16Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 81,
+   "finished": "2026-11-22T23:42:21Z",
+   "run_id": "20261122T234221-a8bb4a24",
+   "started": "2026-11-22T23:42:21Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 84,
+   "finished": "2026-11-23T01:02:55Z",
+   "run_id": "20261123T010255-23cecd02",
+   "started": "2026-11-23T01:02:55Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 85,
+   "finished": "2026-11-23T02:43:42Z",
+   "run_id": "20261123T024342-f29ddf62",
+   "started": "2026-11-23T02:43:42Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 119,
+   "finished": "2026-11-23T11:37:50Z",
+   "run_id": "20261123T113750-54057fe8",
+   "started": "2026-11-23T11:37:50Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 120,
+   "finished": "2026-11-23T15:25:36Z",
+   "run_id": "20261123T152536-5e2cd787",
+   "started": "2026-11-23T15:25:36Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 121,
+   "finished": "2026-11-23T16:15:38Z",
+   "run_id": "20261123T161537-f0da5d07",
+   "started": "2026-11-23T16:15:37Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 122,
+   "finished": "2026-11-23T17:24:32Z",
+   "run_id": "20261123T172432-9ac3ccaa",
+   "started": "2026-11-23T17:24:32Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 123,
+   "finished": "2026-11-23T20:04:02Z",
+   "run_id": "20261123T200402-74df7a39",
+   "started": "2026-11-23T20:04:02Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 136,
+   "finished": "2026-11-23T20:28:05Z",
+   "run_id": "20261123T202804-b49fc5fa",
+   "started": "2026-11-23T20:28:04Z"
   }
  ],
  "schema": 1
