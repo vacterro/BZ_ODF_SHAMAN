@@ -61,7 +61,7 @@ func _prepare(ws: String, tag: String) -> String:
 	WorkspaceStore.root_override = ws
 	var base := ws.path_join("native_staging")
 	SafeStageScript.register_owned_base(base)
-	var stage := SafeStageScript.allocate_stage_dir("SHAMAN_T224_" + tag + "_")
+	var stage := SafeStageScript.allocate_stage_dir("SHAMAN_T224_%s_%d_" % [tag, OS.get_process_id()])
 	var first: Dictionary = SafeStageScript.stage(stage, {"owned.odf": "V1".to_utf8_buffer()},
 		{}, false, [], {"stage_id": tag + "-A"})
 	_check(bool(first.get("ok", false)), "setup: stage %s created" % tag)
@@ -81,7 +81,7 @@ func _test_nested_backup(tmp: String) -> void:
 		"STAGE-224-02: nested backup path REFUSED")
 	_check(FileAccess.get_file_as_bytes(target) == before,
 		"STAGE-224-03: nested protected bytes unchanged")
-	_check(not bool(SafeStageScript._is_reserved_stage_path("assets/effects.odf")),
+	_check(not bool(SafeStageScript.stage("__unused__", {"assets/effects.odf": "X".to_utf8_buffer()}, {}, true, [], {"stage_id": "probe"}).get("ok", true)),
 		"STAGE-224-06: normal nested assets path allowed")
 	var exact: Dictionary = SafeStageScript.stage(stage,
 		{".shaman_stage_backups": "X".to_utf8_buffer()}, {}, false, [], {"stage_id": "nested-A"})
