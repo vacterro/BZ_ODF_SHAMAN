@@ -27,7 +27,6 @@
      write that field name next to a concrete id anywhere in this file. -->
 
 ## DOING
-- [/] T-221 [P2] Mode 2 night shift: fix Native Discovery cleanup-evidence bypass and durable stage-root identity, hardpoint shot provenance across physical slots and alterna... | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-036 | owner: saipen | claim_time: 2026-11-24T19:50:56Z
 
 ## TODO
 - [ ] T-226 [P2] Append SRC-040 to SRC-036: weapon-chain provenance Windows paths source navigation | verify: every derived clause of SRC-040 carries a terminal disposition with evidence | source_receipts: SRC-040
@@ -36,6 +35,7 @@
 - [ ] T-223 [P2] Handoff 29: reserve protected stage backup/metadata namespace during staging, make empty-backup cleanup truthful, bind 3D markers to real physical weapon slo... | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-038 | owner: saipen | claim_time: 2026-11-24T15:41:05Z
 
 ## DONE
+- [x] T-221 [P2] Mode 2 night shift: fix Native Discovery cleanup-evidence bypass and durable stage-root identity, hardpoint shot provenance across physical slots and alterna... | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-036 | owner: saipen | claim_time: 2026-11-24T19:52:31Z | closure_mode: own_patch | publication_state: pending
 - [x] T-214 [P2] # SAIHANDOFF — BZ_ODF_SHAMAN | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-034 | owner: saipen | claim_time: 2026-11-23T22:41:45Z | regression: required | closure_mode: own_patch | publication_state: pending
 - [x] T-213 [P1] Integrate and release saiwiki package sha256:0d2e8b467fbc4a36cae41197ead1ffe65ee094451e4bd25f7827669815390adf | verify: Authenticated payload hashes and producer collect gate pass; reviewed scope contains the package targets; targeted ship uses this ticket instead of a general crew carrier | owner: saipen | claim_time: 2026-11-23T21:46:27Z | closure_mode: own_patch | publication_state: pending
 - [x] T-212 [P1] Integrate and release saitranslate package sha256:e21ce9f62c23b12d22c2cc77e5b245c9d570d90d4529ec16d896d25b8b927f92 | verify: Authenticated payload hashes and producer collect gate pass; reviewed scope contains the package targets; targeted ship uses this ticket instead of a general crew carrier | owner: saipen | claim_time: 2026-11-23T21:46:17Z | closure_mode: own_patch | publication_state: pending
