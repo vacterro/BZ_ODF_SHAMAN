@@ -27,7 +27,7 @@
      write that field name next to a concrete id anywhere in this file. -->
 
 ## DOING
-- [/] T-221 [P2] Mode 2 night shift: fix Native Discovery cleanup-evidence bypass and durable stage-root identity, hardpoint shot provenance across physical slots and alterna... | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-036 | owner: saipen | claim_time: 2026-11-24T19:41:54Z
+- [/] T-221 [P2] Mode 2 night shift: fix Native Discovery cleanup-evidence bypass and durable stage-root identity, hardpoint shot provenance across physical slots and alterna... | verify: the requested change is present and demonstrated against the user own description of it | request_witness: model_supplied | source_receipts: SRC-036 | owner: saipen | claim_time: 2026-11-24T19:48:17Z
 
 ## TODO
 - [ ] T-226 [P2] Append SRC-040 to SRC-036: weapon-chain provenance Windows paths source navigation | verify: every derived clause of SRC-040 carries a terminal disposition with evidence | source_receipts: SRC-040
