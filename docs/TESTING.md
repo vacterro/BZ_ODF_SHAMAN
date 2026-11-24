@@ -36,7 +36,7 @@ Equivalent:
 and fire refusal). `verify_alternate_physical_slot.gd`: 31/31 PASS
 (ALT-SLOT-01..10, including replay identity and TANDEM barrel preservation).
 T-221 native identity 13/13 PASS (NDS-20..25, NID-01..05), T-221 hardpoint provenance 24/24 PASS (PHI-33..44, ALT-01..06), T-222 stage identity 8/8 PASS, T-222 backup inventory 12/12 PASS, T-222 3D hardpoint 8/8 PASS, T-223 reserved paths 11/11 PASS, T-223 cleanup truth 8/8 PASS, T-223 hardpoint fire 10/10 PASS, T-223 viewport picking 6/6 PASS, T-224 physical stage safety 28/28 PASS, and T-224 hardpoint identity 39/39 PASS.
-Canonical frozen-tree rerun: 1,485 checks PASS, 0 failures, `tree_changed_during_run=false`, suite record `1c236f4e4e1a4a51-20261124T182755247147Z`. The later Windows-path/stderr cleanup adds 8 checks; its source change is newest than that frozen record.
+Canonical frozen-tree rerun: 1,485 checks PASS, 0 failures, `tree_changed_during_run=false`, suite record `1c236f4e4e1a4a51-20261124T194817494416Z`.
 The earlier leak was two `Node3D` hardpoint fixtures in the T-214/T-221 test harness, never a product resource leak; both verifiers now free them.
 Focused regressions also PASS: T-121 journal trust (34/34), T-121 crash phases
 (37/37), T-86 recovery integrity (75/75), T-85 save recovery (11/11),
