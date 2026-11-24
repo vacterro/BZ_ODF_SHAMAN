@@ -354,3 +354,5 @@
 {"at": "2026-11-23T21:46:29Z", "event_id": "finish-10beb3c0faa744088a538cc231953660", "key": "T-213:finish-10beb3c0faa744088a538cc231953660", "schema": 1, "state": "done", "ticket": "T-213"}
 {"at": "2026-11-23T22:42:52Z", "event_id": "finish-18524fd299a5464d93a5e00651c271e8", "key": "T-214:finish-18524fd299a5464d93a5e00651c271e8", "schema": 1, "state": "pending", "ticket": "T-214"}
 {"at": "2026-11-23T22:42:53Z", "event_id": "finish-18524fd299a5464d93a5e00651c271e8", "key": "T-214:finish-18524fd299a5464d93a5e00651c271e8", "schema": 1, "state": "done", "ticket": "T-214"}
+{"at": "2026-11-24T19:52:46Z", "event_id": "finish-f5ad79f666d447b186ab04592e2d2cad", "key": "T-221:finish-f5ad79f666d447b186ab04592e2d2cad", "schema": 1, "state": "pending", "ticket": "T-221"}
+{"at": "2026-11-24T19:52:46Z", "event_id": "finish-f5ad79f666d447b186ab04592e2d2cad", "key": "T-221:finish-f5ad79f666d447b186ab04592e2d2cad", "schema": 1, "state": "done", "ticket": "T-221"}
