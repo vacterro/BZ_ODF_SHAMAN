@@ -805,7 +805,7 @@ func _build_ui() -> void:
 	actor_inspector_tree.custom_minimum_size = Vector2(260, 0)
 	tl_split.add_child(actor_inspector_tree)
 	hardpoint_inspector_tree = Tree.new()
-	var hp_columns := ["Hardpoint", "Owner / Role", "Weapon / Ordnance", "Firing Policy", "Fidelity", "Resolved Node3D", "Current Origin", "Shot ID", "Shot Origin (launch)", "Ammo (now)", "Energy (now)", "Reload"]
+	var hp_columns := ["Hardpoint", "Owner / Role", "Weapon / Ordnance", "Firing Policy", "Fidelity", "Resolved Node3D", "Current Origin", "Shot ID", "Shot Origin (launch)", "Shot Rev", "Rev Status", "Ammo (now)", "Energy (now)", "Reload"]
 	hardpoint_inspector_tree.item_activated.connect(_on_hardpoint_row_activated)
 	hardpoint_inspector_tree.item_selected.connect(_on_hardpoint_row_selected)
 	hardpoint_inspector_tree.columns = hp_columns.size()
@@ -4290,6 +4290,27 @@ func build_hardpoint_inspector_rows() -> Array[Dictionary]:
 			var launch = rec.get("launch_origin", null)
 			if launch is Array and (launch as Array).size() == 3:
 				shot_origin_txt = "(%.2f, %.2f, %.2f)" % [float(launch[0]), float(launch[1]), float(launch[2])]
+		var shot_rev_txt := "unavailable"
+		var rev_status_txt := "REVISION_UNVERIFIED"
+		if shot_matches_row:
+			var shot_rev: Dictionary = identity.get("source_revision", {})
+			var current_rev: Dictionary = profile.snapshot_params().get("odf_revisions", {}) if profile != null else {}
+			var comparisons: Array[String] = []
+			for role in ["shooter", "weapon", "ordnance"]:
+				var old_entry: Dictionary = shot_rev.get(role, {})
+				var new_entry: Dictionary = current_rev.get(role, {})
+				var old_md5 := str(old_entry.get("md5", ""))
+				var new_md5 := str(new_entry.get("md5", ""))
+				if old_md5 == "":
+					comparisons.append("%s=SHOT_REV_UNKNOWN" % role)
+				elif new_md5 == "":
+					comparisons.append("%s=SOURCE_MISSING" % role)
+				elif old_md5 == new_md5:
+					comparisons.append("%s=IDENTICAL" % role)
+				else:
+					comparisons.append("%s=SOURCE_CHANGED" % role)
+			shot_rev_txt = "weapon:%s" % str((shot_rev.get("weapon", {}) as Dictionary).get("md5", "?")).substr(0, 8)
+			rev_status_txt = ", ".join(comparisons)
 		rows.append({
 			"hardpoint": nm if nm != "" else "(editor-defined)",
 			"hardpoint_key": nm,
@@ -4313,6 +4334,8 @@ func build_hardpoint_inspector_rows() -> Array[Dictionary]:
 			"firing_context": context,
 			"shot_id": int(identity.get("shot_id", 0)) if shot_matches_row else 0,
 			"shot_origin": shot_origin_txt,
+			"shot_revision": shot_rev_txt,
+			"revision_status": rev_status_txt,
 			"ammo": ammo_txt,
 			"energy": energy_txt,
 			"reload": reload_txt,
@@ -4341,9 +4364,11 @@ func refresh_hardpoint_inspector(force: bool = false) -> void:
 		item.set_text(6, str(row.get("origin", "")))
 		item.set_text(7, str(row.get("shot", "")))
 		item.set_text(8, str(row.get("shot_origin", "")))
-		item.set_text(9, str(row.get("ammo", "")))
-		item.set_text(10, str(row.get("energy", "")))
-		item.set_text(11, str(row.get("reload", "")))
+		item.set_text(9, str(row.get("shot_revision", "")))
+		item.set_text(10, str(row.get("revision_status", "")))
+		item.set_text(11, str(row.get("ammo", "")))
+		item.set_text(12, str(row.get("energy", "")))
+		item.set_text(13, str(row.get("reload", "")))
 		item.set_metadata(0, int(row.get("shot_id", 0)))
 		item.set_metadata(1, str(row.get("hardpoint_key", "")))
 		item.set_metadata(2, int(row.get("node_id", 0)))
