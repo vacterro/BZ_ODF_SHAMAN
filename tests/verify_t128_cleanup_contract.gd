@@ -85,7 +85,8 @@ func _prep(ws: String, sid: String, intent: Dictionary = {}) -> Dictionary:
 	var ledger_dir := NativeRunnerScript.ledger_dir()
 	DirAccess.make_dir_recursive_absolute(ledger_dir)
 	var ledger := ledger_dir.path_join("session_ledger.json")
-	var rec := {"session_id": sid, "state": "COMPLETE"}
+	var rec := {"session_id": sid, "state": "COMPLETE", "stage_id": sid + "_stage",
+		"stage_root": stage, "session": {"stage_id": sid + "_stage", "stage_root": stage}}
 	if intent.has("ledger_state"):
 		rec["state"] = str(intent["ledger_state"])
 	if intent.has("ledger_cleanup"):
@@ -294,10 +295,17 @@ func _prep_discovery(tmp: String, sid: String, intent_state: String,
 	WorkspaceStore.root_override = ws
 	var ledger_dir := NativeRunnerScript.ledger_dir()
 	DirAccess.make_dir_recursive_absolute(ledger_dir)
-	_save_journal(ledger_dir.path_join("session_ledger.json"), {"sessions": {
-		sid: {"session_id": sid, "state": ledger_state},
-	}})
 	var stage := ws.path_join("native_staging").path_join("SHAMAN_" + sid)
+	_save_journal(ledger_dir.path_join("session_ledger.json"), {"sessions": {
+		sid: {"session_id": sid, "state": ledger_state, "stage_id": sid + "_stage",
+			"stage_root": stage, "session": {"stage_id": sid + "_stage", "stage_root": stage}},
+	}})
+	# A CLEANED_UP missing stage is verified only with a full durable cleanup
+	# result (T-221 NDS-20..23).
+	if ledger_state == "CLEANED_UP":
+		var drec: Dictionary = _journal(ledger_dir.path_join("session_ledger.json")).get("sessions", {}).get(sid, {})
+		drec["cleanup"] = {"ok": true, "partial": false}
+		_save_journal(ledger_dir.path_join("session_ledger.json"), {"sessions": {sid: drec}})
 	DirAccess.make_dir_recursive_absolute(stage)
 	if mode == "owned":
 		SafeStageScript.register_owned_base(stage.get_base_dir())

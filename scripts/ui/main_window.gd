@@ -388,6 +388,8 @@ func _build_ui() -> void:
 	weapon_lab.timeline_event_selected.connect(_on_timeline_event_selected)
 	weapon_lab.pick_actor_requested.connect(open_actor_picker)
 	weapon_lab.inspect_path_requested.connect(open_document)
+	weapon_lab.particle_graph_requested.connect(_open_particle_graph)
+	weapon_lab.show_timeline_shot_requested.connect(_show_weapon_lab_shot)
 	doc_tabs.add_child(weapon_lab)
 	particle_lab = ParticleLab.new()
 	particle_lab.name = "Particle Lab"
@@ -1633,6 +1635,25 @@ func open_document(path: String) -> void:
 		doc.get_display_name(), doc.entries.size(), doc.headers.size(), doc.encoding
 	], "success")
 	_save_settings()
+
+
+func _open_particle_graph(path: String) -> void:
+	var doc := OdfDocument.load_cached(path)
+	if doc == null:
+		_set_status("Could not open Particle Graph source " + path, "danger")
+		return
+	open_document(path)
+	particle_lab.load_document(doc)
+	doc_tabs.current_tab = 1
+	_set_status("Opened Particle Graph: " + path.get_file(), "success")
+
+
+func _show_weapon_lab_shot(shot_id: int) -> void:
+	doc_tabs.current_tab = 0
+	if weapon_lab.focus_shot_on_timeline(shot_id):
+		_set_status("Timeline shot #%d selected." % shot_id, "success")
+	else:
+		_set_status("Timeline shot #%d was not found." % shot_id, "warning")
 
 
 func _rebuild_inspector_chain_bar() -> void:
@@ -3498,12 +3519,25 @@ func _run_gui_self_verify(out_dir: String) -> void:
 	DirAccess.make_dir_recursive_absolute(abs_out)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	if weapon_lab != null and weapon_lab.profile != null:
+	var source_navigation_ok := weapon_lab.get_node_or_null("FiringSourceNavigation") != null
+	if source_navigation_ok and weapon_lab.profile != null:
+		var inspected_sources: Array[String] = []
+		weapon_lab.inspect_path_requested.connect(func(path: String):
+			inspected_sources.append(path)
+		)
+		weapon_lab.open_weapon_button.emit_signal("pressed")
+		weapon_lab.open_ordnance_button.emit_signal("pressed")
+		source_navigation_ok = inspected_sources.size() == 2 and \
+			inspected_sources[0] == weapon_lab._firing_source_profile().weapon_path and \
+			inspected_sources[1] == weapon_lab._firing_source_profile().ordnance_path
 		doc_tabs.current_tab = 0
 		weapon_lab.yaw_spin.value = 18.0
 		weapon_lab.fire_once()
 		await get_tree().create_timer(0.85).timeout
 		await RenderingServer.frame_post_draw
+		var first_shot_id := int(weapon_lab.last_volley_result.shot_ids[-1]) if weapon_lab.last_volley_result != null and not weapon_lab.last_volley_result.shot_ids.is_empty() else 0
+		weapon_lab.show_timeline_shot_button.emit_signal("pressed")
+		var timeline_navigation_ok := first_shot_id > 0 and weapon_lab.focus_shot_on_timeline(first_shot_id)
 		var tex1 := get_viewport().get_texture()
 		if tex1 != null:
 			var img1 := tex1.get_image()
@@ -3547,6 +3581,17 @@ func _run_gui_self_verify(out_dir: String) -> void:
 				var img3 := tex3.get_image()
 				if img3 != null:
 					img3.save_png(abs_out.path_join("exe_titan_lightning.png"))
+		var marker_roles := {}
+		var marker_sources_ok := true
+		var inspection_only_count := 0
+		for identity in weapon_lab._hardpoint_marker_data:
+			marker_roles[str(identity.get("hardpoint", ""))] = str(identity.get("marker_role", ""))
+			if str(identity.get("marker_role", "")) == "GENERIC_MODEL_HARDPOINT":
+				inspection_only_count += 1
+				if str(identity.get("weapon_path", "")) != "" or str(identity.get("ordnance_path", "")) != "":
+					marker_sources_ok = false
+			elif str(identity.get("ordnance_status", "")) == "ORDNANCE_UNRESOLVED":
+				marker_sources_ok = false
 		var lines := PackedStringArray([
 			"BZ_ODF_SHAMAN GUI Self-Verify",
 			"theme=" + theme_engine.current_slug,
@@ -3555,6 +3600,14 @@ func _run_gui_self_verify(out_dir: String) -> void:
 			"shooter_model=" + JSON.stringify(weapon_lab.shooter_model_info),
 			"target_model=" + JSON.stringify(weapon_lab.target_model_info),
 			"hardpoint_mode=" + str(weapon_lab.hardpoint_mode),
+			"hardpoint_markers=" + str(weapon_lab._hardpoint_marker_data.size()),
+			"hardpoint_roles=" + JSON.stringify(marker_roles),
+			"inspection_only_markers=" + str(inspection_only_count),
+			"marker_sources_consistent=" + str(marker_sources_ok),
+			"firing_policy=" + JSON.stringify(weapon_lab._last_firing_policy),
+			"source_navigation_ok=" + str(source_navigation_ok),
+			"timeline_navigation_ok=" + str(timeline_navigation_ok),
+			"last_shot_identity=" + JSON.stringify(weapon_lab.last_volley_result.to_dict().get("per_barrel_results", []) if weapon_lab.last_volley_result != null else []),
 			"spawned_effects=" + str(weapon_lab.spawned_effects),
 			"titan_bolt_rendered=" + str(titan_bolt_ok),
 			"rigid_floor_weapon_lab=" + str(weapon_lab.ground_body is StaticBody3D),

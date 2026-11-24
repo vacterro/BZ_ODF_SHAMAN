@@ -9,6 +9,8 @@ signal events_changed
 signal timeline_event_selected(event: Dictionary)
 signal pick_actor_requested(role: String)
 signal inspect_path_requested(path: String)
+signal particle_graph_requested(path: String)
+signal show_timeline_shot_requested(shot_id: int)
 
 const AUDIO_POOL_SIZE := 8
 const CAMERA_PRESETS := ["overview", "muzzle", "target", "side", "top"]
@@ -54,6 +56,9 @@ var barrel_mode: String = "TANDEM"
 var weapon_option: OptionButton = null
 var barrel_mode_option: OptionButton = null
 var _barrel_cycle: int = 0
+var open_weapon_button: Button
+var open_ordnance_button: Button
+var show_timeline_shot_button: Button
 var _volley_counter: int = 0
 var last_volley_result = null
 
@@ -62,7 +67,11 @@ var last_volley_result = null
 class VolleyResult:
 	var volley_id: int = 0
 	var weapon_identity: String = ""
+	var weapon_path: String = ""
+	var weapon_slot: int = -1
+	var firing_context: String = "PRIMARY"
 	var barrel_mode: String = "SINGLE"
+	var firing_policy: Dictionary = {}
 	var requested_barrels: Array[String] = []
 	var accepted_barrels: Array[String] = []
 	var rejected_barrels: Array[String] = []
@@ -81,7 +90,9 @@ class VolleyResult:
 	func to_dict() -> Dictionary:
 		return {
 			"volley_id": volley_id, "weapon_identity": weapon_identity,
-			"barrel_mode": barrel_mode,
+			"weapon_path": weapon_path, "weapon_slot": weapon_slot,
+			"firing_context": firing_context, "barrel_mode": barrel_mode,
+			"firing_policy": firing_policy.duplicate(true),
 			"requested_barrels": requested_barrels.duplicate(),
 			"accepted_barrels": accepted_barrels.duplicate(),
 			"rejected_barrels": rejected_barrels.duplicate(),
@@ -99,7 +110,12 @@ class VolleyResult:
 		var r := VolleyResult.new()
 		r.volley_id = int(d.get("volley_id", 0))
 		r.weapon_identity = str(d.get("weapon_identity", ""))
+		r.weapon_path = str(d.get("weapon_path", ""))
+		r.weapon_slot = int(d.get("weapon_slot", -1))
+		r.firing_context = str(d.get("firing_context", "PRIMARY"))
 		r.barrel_mode = str(d.get("barrel_mode", "SINGLE"))
+		var policy = d.get("firing_policy", {})
+		r.firing_policy = (policy as Dictionary).duplicate(true) if policy is Dictionary else {}
 		for v in d.get("requested_barrels", []):
 			r.requested_barrels.append(str(v))
 		for v in d.get("accepted_barrels", []):
@@ -289,6 +305,16 @@ var _cam_pitch := deg_to_rad(18.0)
 var _cam_dist := 18.0
 var _cam_focus := Vector3(0, 1.5, -5.0)
 var _dragging := false
+## T-222 / HP3D: viewport marker picking state. Markers carry full identity,
+## never only a display name, so duplicate hardpoint aliases stay distinct.
+var _hardpoint_marker_data: Array[Dictionary] = []
+var _selected_hardpoint_name: String = ""
+var _selected_hardpoint_node_id: int = 0
+## T-223 / FIRE-3D: explicit SINGLE-fire mount chosen through marker/inspector.
+var _fire_selection_hardpoint: String = ""
+var _fire_selection_weapon_slot: int = -1
+var _fire_selection_weapon_revision: String = ""
+var _last_firing_policy: Dictionary = {}
 var _drag_last := Vector2.ZERO
 var _current_health := 1000.0
 var _current_shield := 0.0
@@ -348,29 +374,55 @@ func _build_ui() -> void:
 	chain_wpn_button = _mk_button("-> Wpn: -")
 	chain_wpn_button.tooltip_text = "Click to inspect/edit Weapon ODF (shotDelay, salvoCount, flashName, fireSound)"
 	chain_wpn_button.pressed.connect(func():
-		if profile != null and profile.weapon_path != "":
-			inspect_path_requested.emit(profile.weapon_path)
+		var source_profile := _firing_source_profile()
+		if source_profile != null and source_profile.weapon_path != "":
+			inspect_path_requested.emit(source_profile.weapon_path)
 	)
 	ab_row.add_child(chain_wpn_button)
 
 	chain_ord_button = _mk_button("-> Ord: -")
 	chain_ord_button.tooltip_text = "Click to inspect/edit Ordnance ODF (damageValue, shotSpeed, lifeSpan)"
 	chain_ord_button.pressed.connect(func():
-		if profile != null and profile.ordnance_path != "":
-			inspect_path_requested.emit(profile.ordnance_path)
+		var source_profile := _firing_source_profile()
+		if source_profile != null and source_profile.ordnance_path != "":
+			inspect_path_requested.emit(source_profile.ordnance_path)
 	)
 	ab_row.add_child(chain_ord_button)
 
 	chain_xpl_button = _mk_button("-> Xpl: -")
-	chain_xpl_button.tooltip_text = "Click to inspect/edit Explosion ODF in Inspector & Particle Lab"
+	chain_xpl_button.tooltip_text = "Click to open the resolved Explosion ODF in Particle Graph"
 	chain_xpl_button.pressed.connect(func():
-		if profile != null and index != null:
-			var xname := profile.xpl_vehicle if profile.xpl_vehicle != "" else profile.xpl_ground
-			var xp := index.resolve_path_from(xname, profile.ordnance_path) if xname != "" else ""
+		var source_profile := _firing_source_profile()
+		if source_profile != null and index != null:
+			var xname := source_profile.xpl_vehicle if source_profile.xpl_vehicle != "" else source_profile.xpl_ground
+			var xp := index.resolve_path_from(xname, source_profile.ordnance_path) if xname != "" else ""
 			if xp != "":
-				inspect_path_requested.emit(xp)
+				particle_graph_requested.emit(xp)
 	)
 	ab_row.add_child(chain_xpl_button)
+
+	var shot_nav_row := HFlowContainer.new()
+	shot_nav_row.name = "FiringSourceNavigation"
+	shot_nav_row.add_theme_constant_override("h_separation", 4)
+	shot_nav_row.add_theme_constant_override("v_separation", 3)
+	add_child(shot_nav_row)
+	open_weapon_button = _mk_button("OPEN WEAPON ODF")
+	open_weapon_button.tooltip_text = "Open the exact Weapon ODF for the selected physical slot"
+	open_weapon_button.pressed.connect(func(): _open_firing_source(false))
+	shot_nav_row.add_child(open_weapon_button)
+	open_ordnance_button = _mk_button("OPEN ORDNANCE ODF")
+	open_ordnance_button.tooltip_text = "Open the exact Ordnance ODF for the selected physical slot"
+	open_ordnance_button.pressed.connect(func(): _open_firing_source(true))
+	shot_nav_row.add_child(open_ordnance_button)
+	show_timeline_shot_button = _mk_button("SHOW TIMELINE EVENT")
+	show_timeline_shot_button.tooltip_text = "Select the most recent shot for the current physical slot"
+	show_timeline_shot_button.pressed.connect(func():
+		if last_volley_result == null or last_volley_result.shot_ids.is_empty():
+			status_changed.emit("No shot is available for Timeline navigation.", "warning")
+			return
+		show_timeline_shot_requested.emit(int(last_volley_result.shot_ids[-1]))
+	)
+	shot_nav_row.add_child(show_timeline_shot_button)
 
 	swap_ab_button = _mk_button("Swap A<->B")
 	swap_ab_button.tooltip_text = "Swap Shooter A and Target B"
@@ -753,7 +805,9 @@ func _build_ui() -> void:
 	actor_inspector_tree.custom_minimum_size = Vector2(260, 0)
 	tl_split.add_child(actor_inspector_tree)
 	hardpoint_inspector_tree = Tree.new()
-	var hp_columns := ["Hardpoint", "Fidelity", "Resolved Node3D", "World Origin", "Shot ID", "Ammo", "Energy", "Reload"]
+	var hp_columns := ["Hardpoint", "Owner / Role", "Weapon / Ordnance", "Firing Policy", "Fidelity", "Resolved Node3D", "Current Origin", "Shot ID", "Shot Origin (launch)", "Ammo (now)", "Energy (now)", "Reload"]
+	hardpoint_inspector_tree.item_activated.connect(_on_hardpoint_row_activated)
+	hardpoint_inspector_tree.item_selected.connect(_on_hardpoint_row_selected)
 	hardpoint_inspector_tree.columns = hp_columns.size()
 	for i in hp_columns.size():
 		hardpoint_inspector_tree.set_column_title(i, hp_columns[i])
@@ -762,7 +816,7 @@ func _build_ui() -> void:
 	hardpoint_inspector_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	hardpoint_inspector_tree.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hardpoint_inspector_tree.custom_minimum_size = Vector2(300, 0)
-	hardpoint_inspector_tree.tooltip_text = "Physical shot origin for each declared weapon slot. Fidelity separates a resolved model node from an editor fallback; values reflect the last fired volley."
+	hardpoint_inspector_tree.tooltip_text = "Physical hardpoint identity per declared slot: current model origin, the launch origin and Shot ID of the last volley fired by THIS weapon, and the shooter's current ammo/energy. A shot from another weapon is never relabelled here."
 	tl_split.add_child(hardpoint_inspector_tree)
 
 	# Tab 3: Scene & Multi-Target / Obstacle / Sandbox Authoring
@@ -1292,10 +1346,195 @@ func _update_camera() -> void:
 	camera.look_at_from_position(_cam_focus + offset, _cam_focus, Vector3.UP)
 
 
+## T-222 / HP3D: click a marker, or select one by identity from code/tests.
+## Shared mounts need an explicit owner; inspection-only nodes never become fire mounts.
+func select_hardpoint_marker(marker_id: int, owner_slot: int = -2) -> bool:
+	var selected_identity: Dictionary = {}
+	for identity in _hardpoint_marker_data:
+		if int((identity as Dictionary).get("marker_id", 0)) == marker_id:
+			selected_identity = identity
+			break
+	if selected_identity.is_empty():
+		return false
+	var hp_name := str(selected_identity.get("hardpoint", ""))
+	var owner_slots: Array = selected_identity.get("weapon_slots", [])
+	if bool(selected_identity.get("ambiguous", false)) and owner_slot == -2:
+		_select_marker_inspection(selected_identity)
+		status_changed.emit("Shared hardpoint %s requires an explicit owner slot: %s" % [
+			hp_name, str(owner_slots)], "warning")
+		return false
+	var selected_slot := owner_slot
+	if selected_slot == -2:
+		selected_slot = int(selected_identity.get("weapon_slot", -1))
+	var slot_switch_attempted := selected_slot >= 0 and selected_slot != active_weapon_slot
+	var switched := not slot_switch_attempted
+	if slot_switch_attempted:
+		var previous_selection := _fire_selection_hardpoint
+		switched = switch_weapon_slot(selected_slot)
+		if switched:
+			_restore_fire_selection(previous_selection, selected_slot)
+	if not switched:
+		return false
+	if not slot_switch_attempted:
+		if select_hardpoint(hp_name, int(selected_identity.get("node_id", 0)), selected_slot):
+			status_changed.emit("3D hardpoint selected: %s (slot %d)" % [hp_name, selected_slot], "muted")
+			return true
+	_select_marker_inspection(selected_identity)
+	status_changed.emit("3D hardpoint selected for inspection: %s (unresolved node)" % hp_name, "warning")
+	return hp_name != ""
+
+
+func select_hardpoint_marker_owner(marker_id: int, owner_slot: int) -> bool:
+	return select_hardpoint_marker(marker_id, owner_slot)
+
+
+func _select_marker_inspection(identity: Dictionary) -> void:
+	_selected_hardpoint_name = str(identity.get("hardpoint", "")).strip_edges().to_lower()
+	_selected_hardpoint_node_id = int(identity.get("node_id", 0))
+	var node := _find_hardpoint_node_by_id(int(identity.get("node_id", 0)))
+	shooter_hardpoint_node = node if node != null else shooter_hardpoint_node
+	if str(identity.get("marker_role", "")) == "GENERIC_MODEL_HARDPOINT":
+		hardpoint_mode = "inspection:" + _selected_hardpoint_name
+	elif _selected_hardpoint_name != "":
+		hardpoint_mode = "declared:" + _selected_hardpoint_name
+	_update_aim_overlay()
+	refresh_hardpoint_inspector(true)
+
+
+func _find_hardpoint_node_by_id(node_id: int) -> Node3D:
+	var by_id = shooter_model_info.get("nodes_by_id", {})
+	if by_id is Dictionary:
+		var cached = (by_id as Dictionary).get(node_id, null)
+		if cached is Node3D:
+			return cached
+	for identity in _hardpoint_marker_data:
+		var d: Dictionary = identity
+		if int(d.get("node_id", 0)) != node_id:
+			continue
+		var hps: Dictionary = shooter_model_info.get("hardpoints", {}) if bool(shooter_model_info.get("ok", false)) else {}
+		var key := str(d.get("hardpoint", "")).to_lower()
+		if hps.has(key) and hps[key] is Node3D:
+			return hps[key]
+	return null
+
+
+func _selected_marker_identity() -> Dictionary:
+	var selected := _selected_marker_identity_record()
+	if not selected.is_empty():
+		return selected
+	var owners := _marker_owners(_selected_hardpoint_name)
+	var selected_slot := active_weapon_slot if any_owner_is_active(owners) else -1
+	var node := _find_hardpoint_node_by_id(_selected_hardpoint_node_id)
+	return _marker_identity(_selected_hardpoint_name, node, selected_slot) if _selected_hardpoint_name != "" else {}
+
+
+func _selected_marker_identity_record() -> Dictionary:
+	for identity in _hardpoint_marker_data:
+		var d: Dictionary = identity
+		if str(d.get("hardpoint", "")).to_lower() == _selected_hardpoint_name and \
+				int(d.get("node_id", 0)) == _selected_hardpoint_node_id:
+			return d
+	return {}
+
+
+## Screen position for a marker. Uses the lab-local transform, which matches
+## the packaged viewport and also works when a verifier builds the lab outside
+## a viewport tree.
+func _marker_world_position(marker: Node3D) -> Vector3:
+	if marker == null:
+		return Vector3.ZERO
+	if marker.is_inside_tree() and camera != null and camera.is_inside_tree():
+		return marker.global_transform.origin
+	return _world_transform_in_lab(marker).origin
+
+
+func _marker_screen_position(marker: Node3D) -> Vector2:
+	if camera == null or viewport == null or marker == null:
+		return Vector2(-1, -1)
+	var world_pos := _marker_world_position(marker)
+	if camera.is_inside_tree():
+		if camera.is_position_behind(world_pos):
+			return Vector2(-1, -1)
+		return camera.unproject_position(world_pos)
+	# Lab-local projection used by headless tests and by the packaged viewport
+	# when the camera node has not entered the scene tree yet.
+	var xf := _world_transform_in_lab(camera)
+	var to_point := world_pos - xf.origin
+	var forward := -xf.basis.z.normalized()
+	var z := to_point.dot(forward)
+	if z <= 0.0001:
+		return Vector2(-1, -1)
+	var x := to_point.dot(xf.basis.x.normalized())
+	var y := to_point.dot(xf.basis.y.normalized())
+	var rect := viewport.get_visible_rect()
+	var fov_rad := deg_to_rad(camera.fov)
+	var half_h := tan(fov_rad * 0.5) * z
+	var half_w := half_h * maxf(0.1, rect.size.x / maxf(1.0, rect.size.y))
+	return Vector2((x / maxf(0.0001, half_w) * 0.5 + 0.5) * rect.size.x,
+		(0.5 - y / maxf(0.0001, half_h) * 0.5) * rect.size.y)
+
+
+func _pick_hardpoint_at_screen(screen_pos: Vector2) -> bool:
+	if camera == null or viewport == null:
+		return false
+	var from: Vector3
+	var dir: Vector3
+	if camera.is_inside_tree():
+		from = camera.project_ray_origin(screen_pos)
+		dir = camera.project_ray_normal(screen_pos)
+	else:
+		# Headless verifiers can project through the camera's lab-local pose.
+		var xf := _world_transform_in_lab(camera)
+		var origin := xf.origin
+		var forward := -xf.basis.z.normalized()
+		var right := xf.basis.x.normalized()
+		var up := xf.basis.y.normalized()
+		var rect := viewport.get_visible_rect()
+		var sx := ((screen_pos.x / maxf(1.0, rect.size.x)) - 0.5) * 2.0
+		var sy := (0.5 - (screen_pos.y / maxf(1.0, rect.size.y))) * 2.0
+		var half_h := tan(deg_to_rad(camera.fov) * 0.5)
+		var half_w := half_h * maxf(0.1, rect.size.x / maxf(1.0, rect.size.y))
+		from = origin
+		dir = (forward + right * sx * half_w + up * sy * half_h).normalized()
+	var best_id := 0
+	var best_dist := INF
+	for identity in _hardpoint_marker_data:
+		var marker_id := int((identity as Dictionary).get("marker_id", 0))
+		var marker := _find_marker_by_id(hardpoint_markers_root, marker_id)
+		if marker == null:
+			continue
+		var marker_pos: Vector3 = marker.position
+		if marker.is_inside_tree():
+			marker_pos = marker.global_transform.origin
+		var to_marker := marker_pos - from
+		var along := to_marker.dot(dir)
+		if along <= 0.0:
+			continue
+		var perpendicular := (to_marker - dir * along).length()
+		if perpendicular <= 0.35 and along < best_dist:
+			best_dist = along
+			best_id = marker_id
+	return best_id != 0 and select_hardpoint_marker(best_id)
+
+
+func _find_marker_by_id(node: Node, marker_id: int) -> MeshInstance3D:
+	if node == null:
+		return null
+	if node is MeshInstance3D and int(node.get_instance_id()) == marker_id:
+		return node as MeshInstance3D
+	for c in node.get_children():
+		var found := _find_marker_by_id(c, marker_id)
+		if found != null:
+			return found
+	return null
+
+
 func _on_viewport_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed and _pick_hardpoint_at_screen(mb.position):
+				return
 			_dragging = mb.pressed
 			_drag_last = mb.position
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
@@ -2036,7 +2275,29 @@ func _reload_scenario() -> void:
 		_append_telemetry(0.0, "ERROR", "Scenario incomplete; firing is disabled until the chain resolves.")
 
 
+func _firing_source_profile() -> WeaponProfile:
+	if profile == null:
+		return null
+	if last_volley_result != null and str(last_volley_result.firing_context) == "ALTERNATE" and \
+			int(last_volley_result.weapon_slot) == active_weapon_slot and profile.alt != null:
+		return profile.alt
+	return profile
+
+
+func _open_firing_source(ordnance: bool) -> void:
+	var source_profile := _firing_source_profile()
+	if source_profile == null:
+		status_changed.emit("No weapon chain is loaded.", "warning")
+		return
+	var path := source_profile.ordnance_path if ordnance else source_profile.weapon_path
+	if path == "":
+		status_changed.emit("The selected firing chain has no resolved %s ODF." % ("Ordnance" if ordnance else "Weapon"), "warning")
+		return
+	inspect_path_requested.emit(path)
+
+
 func _update_chain_buttons() -> void:
+	var source_profile := _firing_source_profile()
 	if chain_a_button != null:
 		var a_base := shooter_path.get_file().get_basename() if shooter_path != "" else "(none)"
 		var a_gname := index.get_game_name(shooter_path) if (index != null and shooter_path != "") else ""
@@ -2053,21 +2314,27 @@ func _update_chain_buttons() -> void:
 		if bool(target_model_info.get("ok", false)):
 			b_msh = " [" + str((target_model_info.get("provenance", {}) as Dictionary).get("msh_path", "")).get_file() + "]"
 		chain_b_button.text = "B: %s%s" % [b_title, b_msh]
-	if profile != null:
+	if source_profile != null:
 		if chain_wpn_button != null:
-			var w_gname := index.get_game_name(profile.weapon_path) if (index != null and profile.weapon_path != "") else ""
-			var w_lbl := profile.weapon_name if profile.weapon_name != "" else "-"
+			var w_gname := index.get_game_name(source_profile.weapon_path) if (index != null and source_profile.weapon_path != "") else ""
+			var w_lbl := source_profile.weapon_name if source_profile.weapon_name != "" else "-"
 			if w_gname != "" and w_gname.to_lower() != w_lbl.to_lower():
 				w_lbl += " (" + w_gname + ")"
 			chain_wpn_button.text = "-> Wpn: " + w_lbl
-			chain_wpn_button.disabled = (profile.weapon_path == "")
+			chain_wpn_button.disabled = (source_profile.weapon_path == "")
 		if chain_ord_button != null:
-			chain_ord_button.text = "-> Ord: " + (profile.ordnance_name if profile.ordnance_name != "" else "-")
-			chain_ord_button.disabled = (profile.ordnance_path == "")
+			chain_ord_button.text = "-> Ord: " + (source_profile.ordnance_name if source_profile.ordnance_name != "" else "-")
+			chain_ord_button.disabled = (source_profile.ordnance_path == "")
 		if chain_xpl_button != null:
-			var xn := profile.xpl_vehicle if profile.xpl_vehicle != "" else profile.xpl_ground
+			var xn := source_profile.xpl_vehicle if source_profile.xpl_vehicle != "" else source_profile.xpl_ground
 			chain_xpl_button.text = "-> Xpl: " + (xn if xn != "" else "-")
 			chain_xpl_button.disabled = (xn == "")
+	if open_weapon_button != null:
+		open_weapon_button.disabled = source_profile == null or source_profile.weapon_path == ""
+	if open_ordnance_button != null:
+		open_ordnance_button.disabled = source_profile == null or source_profile.ordnance_path == ""
+	if show_timeline_shot_button != null:
+		show_timeline_shot_button.disabled = last_volley_result == null or last_volley_result.shot_ids.is_empty()
 
 
 func _sync_target_bbox_to_profile() -> void:
@@ -2094,11 +2361,16 @@ func _clear_node_children(n: Node) -> void:
 		c.queue_free()
 
 
-func _rebuild_actor_models() -> void:
+func _rebuild_actor_models(preserve_hardpoint_nodes: Dictionary = {}, restore_hardpoint_ids: Dictionary = {}) -> void:
 	shooter_model_info = {}
 	target_model_info = {}
 	shooter_hardpoint_node = null
 	hardpoint_mode = "editor-defined"
+	_selected_hardpoint_name = ""
+	_selected_hardpoint_node_id = 0
+	_clear_fire_selection()
+	_last_firing_policy = {}
+	_hardpoint_marker_data.clear()
 	if shooter_node == null or target_node == null or profile == null:
 		return
 	_clear_node_children(shooter_node)
@@ -2107,7 +2379,25 @@ func _rebuild_actor_models() -> void:
 		if msh_path != "":
 			var res := BzMeshReaderScript.build_scene(msh_path, index, "DOCB .msh (from %s)" % profile.shooter_geometry)
 			if bool(res.get("ok", false)):
+				if not (res.get("hardpoints", {}) is Dictionary):
+					res["hardpoints"] = {}
+				var built_hps: Dictionary = res.get("hardpoints", {})
+				for key in preserve_hardpoint_nodes:
+					if not built_hps.has(key):
+						built_hps[key] = preserve_hardpoint_nodes[key]
+				var previous_ids = restore_hardpoint_ids
+				if previous_ids.is_empty():
+					previous_ids = shooter_model_info.get("nodes_by_id", {})
+				var node_ids: Dictionary = previous_ids.duplicate() if previous_ids is Dictionary else {}
+				for hp_key in built_hps:
+					node_ids[int((built_hps[hp_key] as Node3D).get_instance_id())] = built_hps[hp_key]
+				var selected_node := _find_hardpoint_node_by_id(_selected_hardpoint_node_id)
+				if selected_node == null:
+					selected_node = _hardpoint_node_map().get(_selected_hardpoint_name, null)
+				var selected_name := _selected_hardpoint_name
 				shooter_model_info = res
+				shooter_model_info["hardpoints"] = built_hps
+				shooter_model_info["nodes_by_id"] = node_ids
 				var root: Node3D = res.root
 				shooter_node.add_child(root)
 				var b: AABB = res.bounds
@@ -2120,14 +2410,16 @@ func _rebuild_actor_models() -> void:
 					_recoil_rest_pos = Vector3.ZERO
 				_recoil_offset = 0.0
 				_add_model_label(shooter_node, profile.shooter_path.get_file().get_basename(), "DOCB .msh: " + msh_path.get_file(), b.size.y + maxf(0.0, -b.position.y))
-				var hps: Dictionary = res.get("hardpoints", {})
 				var wanted := profile.weapon_hardpoint.to_lower()
-				if wanted != "" and hps.has(wanted):
-					shooter_hardpoint_node = hps[wanted]
+				if wanted != "" and built_hps.has(wanted):
+					shooter_hardpoint_node = built_hps[wanted]
 					hardpoint_mode = "mesh:" + wanted
-				elif hps.has("hp_cannon_1"):
-					shooter_hardpoint_node = hps["hp_cannon_1"]
+				elif built_hps.has("hp_cannon_1"):
+					shooter_hardpoint_node = built_hps["hp_cannon_1"]
 					hardpoint_mode = "mesh:hp_cannon_1"
+				if selected_node != null and selected_name != "":
+					shooter_hardpoint_node = selected_node
+					hardpoint_mode = "mesh:" + selected_name
 				var prov: Dictionary = res.get("provenance", {})
 				shooter_label.text = "Shooter: %s — %s (%d tris, %d nodes, hp=%s)" % [
 					profile.shooter_path.get_file(), msh_path.get_file(),
@@ -2357,20 +2649,53 @@ func _on_barrel_mode_selected(idx: int) -> void:
 func switch_weapon_slot(slot_index: int) -> bool:
 	if shooter_path == "" or target_path == "":
 		return false
+	var node_map_before := _hardpoint_node_map()
+	var selected_node_before := _find_hardpoint_node_by_id(_selected_hardpoint_node_id)
+	var selected_name_before := _selected_hardpoint_name
+	var model_was_rebuilt := bool(shooter_model_info.get("ok", false)) and profile != null and profile.shooter_geometry == ""
+	var node_ids_before := {}
+	for key in node_map_before:
+		node_ids_before[int((node_map_before[key] as Node3D).get_instance_id())] = node_map_before[key]
 	var candidate := WeaponProfile.new()
+	if profile != null and profile.shooter_geometry != "":
+		candidate.shooter_geometry = profile.shooter_geometry
+		candidate.shooter_geometry_scale = profile.shooter_geometry_scale
+		candidate.target_geometry = profile.target_geometry
+		candidate.target_geometry_scale = profile.target_geometry_scale
 	if not candidate.resolve(index, shooter_path, target_path, "", true, slot_index, barrel_mode):
-		status_changed.emit("Weapon slot %d could not be resolved." % (slot_index + 1), "warning")
+		status_changed.emit("Weapon slot %d could not be resolved: %s" % [
+			slot_index + 1, "; ".join(candidate.errors)], "warning")
 		return false
-	active_weapon_slot = clampi(slot_index, 0, maxi(0, candidate.weapon_slots.size() - 1))
+	var requested_slot := slot_index
+	var resolved_slot := -1
 	for slot_dict in candidate.weapon_slots:
-		if int((slot_dict as Dictionary).get("resolved_index", -1)) == slot_index:
-			candidate.active_slot_index = slot_index
+		if int((slot_dict as Dictionary).get("resolved_index", -1)) == requested_slot:
+			resolved_slot = requested_slot
 			break
+	if resolved_slot < 0 and requested_slot >= 0 and requested_slot < candidate.weapon_slots.size():
+		resolved_slot = requested_slot
+		active_weapon_slot = requested_slot
+		candidate.resolve(index, shooter_path, target_path, "", true, requested_slot, barrel_mode)
+	if resolved_slot < 0:
+		status_changed.emit("Weapon slot %d is not a resolved physical slot." % (slot_index + 1), "warning")
+		return false
+	active_weapon_slot = resolved_slot
+	candidate.active_slot_index = resolved_slot
 	profile = candidate
 	if combat_scenario.shooter != null:
 		combat_scenario.change_weapon(profile, true)
 	# In-flight shots keep their launch-time identity and visual nodes.
-	_rebuild_actor_models()
+	_rebuild_actor_models(node_map_before, node_ids_before)
+	if model_was_rebuilt:
+		shooter_model_info["hardpoints"] = node_map_before
+		shooter_model_info["nodes_by_id"] = node_ids_before
+		if selected_node_before != null and selected_name_before != "":
+			shooter_hardpoint_node = selected_node_before
+			hardpoint_mode = "mesh:" + selected_name_before
+		_selected_hardpoint_name = selected_name_before
+		_selected_hardpoint_node_id = int(selected_node_before.get_instance_id()) if selected_node_before != null else 0
+		_update_aim_overlay()
+	_revalidate_fire_selection()
 	_populate_weapon_picker()
 	_populate_hardpoint_picker()
 	_update_chain_buttons()
@@ -2406,26 +2731,145 @@ func _populate_hardpoint_picker() -> void:
 func _on_hardpoint_selected(idx: int) -> void:
 	if hardpoint_option == null or idx < 0 or idx >= hardpoint_option.item_count:
 		return
-	select_hardpoint(hardpoint_option.get_item_text(idx))
+	var selected_name := str(hardpoint_option.get_item_text(idx))
+	var owners := _marker_owners(selected_name)
+	var selected_owner := active_weapon_slot if any_owner_is_active(owners) else -1
+	if owners.size() > 1 and selected_owner < 0:
+		status_changed.emit("Shared hardpoint %s requires an explicit owning weapon slot." % selected_name, "warning")
+		refresh_hardpoint_inspector(true)
+		return
+	select_hardpoint(selected_name, 0, selected_owner)
 
 
-func select_hardpoint(hp_name: String) -> bool:
-	if not bool(shooter_model_info.get("ok", false)):
-		return false
-	var hps: Dictionary = shooter_model_info.get("hardpoints", {})
+func any_owner_is_active(owners: Array[Dictionary]) -> bool:
+	for owner in owners:
+		if int((owner as Dictionary).get("resolved_index", -1)) == active_weapon_slot:
+			return true
+	return false
+
+
+func _hardpoint_node_map() -> Dictionary:
+	var hps: Dictionary = {}
+	var model_hps: Dictionary = shooter_model_info.get("hardpoints", {}) if bool(shooter_model_info.get("ok", false)) else {}
+	var by_id = shooter_model_info.get("nodes_by_id", {})
+	if not (by_id is Dictionary) and not model_hps.is_empty():
+		by_id = {}
+		for hp_key in model_hps:
+			var model_node = model_hps[hp_key]
+			if model_node is Node3D:
+				(by_id as Dictionary)[int((model_node as Node3D).get_instance_id())] = model_node
+		shooter_model_info["nodes_by_id"] = by_id
+	for key in model_hps:
+		var node: Node3D = model_hps[key]
+		if node != null:
+			hps[str(key).to_lower()] = node
+	if hps.is_empty() and not _hardpoint_marker_data.is_empty():
+		for identity in _hardpoint_marker_data:
+			var d: Dictionary = identity
+			var node_id := int(d.get("node_id", 0))
+			var cached = (by_id as Dictionary).get(node_id, null) if by_id is Dictionary else null
+			var key := str(d.get("hardpoint", "")).to_lower()
+			if cached is Node3D and key != "":
+				hps[key] = cached
+	if not hps.is_empty():
+		return hps
+	for marker in hardpoint_markers_root.get_children() if hardpoint_markers_root != null else []:
+		if marker is Node3D and marker.has_meta("hardpoint_identity"):
+			var identity: Dictionary = marker.get_meta("hardpoint_identity")
+			var key := str(identity.get("hardpoint", "")).to_lower()
+			if key != "" and not hps.has(key):
+				var node := _find_hardpoint_node_by_id(int(identity.get("node_id", 0)))
+				if node != null:
+					hps[key] = node
+	if hps.is_empty() and not _hardpoint_marker_data.is_empty():
+		for identity in _hardpoint_marker_data:
+			var key := str((identity as Dictionary).get("hardpoint", "")).to_lower()
+			var node := _find_hardpoint_node_by_id(int((identity as Dictionary).get("node_id", 0)))
+			if key != "" and node != null:
+				hps[key] = node
+	return hps
+
+
+func select_hardpoint(hp_name: String, node_id: int = 0, preferred_owner_slot: int = -2) -> bool:
+	var hps := _hardpoint_node_map()
 	var key := hp_name.strip_edges().to_lower()
 	if not hps.has(key):
 		return false
-	shooter_hardpoint_node = hps[key]
+	var node: Node3D = hps[key]
+	if node_id > 0 and int(node.get_instance_id()) != node_id:
+		return false
+	var identity := _marker_identity(key, node, preferred_owner_slot)
+	shooter_hardpoint_node = node
 	hardpoint_mode = "mesh:" + key
+	_selected_hardpoint_name = key
+	_selected_hardpoint_node_id = int(node.get_instance_id())
+	if str(identity.get("firing_eligibility", "")) != "INSPECTION_ONLY":
+		_set_fire_selection(key, int(identity.get("weapon_slot", -1)),
+			str(identity.get("weapon_revision", "")))
+	else:
+		hardpoint_mode = "inspection:" + key
 	if hardpoint_option != null:
 		for i in hardpoint_option.item_count:
 			if hardpoint_option.get_item_text(i).to_lower() == key:
 				hardpoint_option.select(i)
 				break
 	_update_aim_overlay()
+	refresh_hardpoint_inspector(true)
 	status_changed.emit("Active hardpoint: " + hardpoint_mode, "muted")
 	return true
+
+
+func _restore_fire_selection(hardpoint: String, weapon_slot: int) -> void:
+	if hardpoint == "":
+		return
+	for owner in _marker_owners(hardpoint):
+		if int((owner as Dictionary).get("resolved_index", -1)) == weapon_slot:
+			var revision := _weapon_revision()
+			_set_fire_selection(hardpoint, weapon_slot, revision)
+			return
+
+
+func _clear_fire_selection() -> void:
+	_fire_selection_hardpoint = ""
+	_fire_selection_weapon_slot = -1
+	_fire_selection_weapon_revision = ""
+
+
+func _weapon_revision() -> String:
+	if profile == null:
+		return ""
+	var revisions: Dictionary = profile.snapshot_params().get("odf_revisions", {})
+	var weapon: Dictionary = revisions.get("weapon", {})
+	return "%s:%s:%s" % [str(weapon.get("path", profile.weapon_path)),
+		str(weapon.get("md5", "")), str(weapon.get("dirty", false))]
+
+
+func _set_fire_selection(hardpoint: String, weapon_slot: int, revision: String) -> void:
+	_fire_selection_hardpoint = hardpoint.strip_edges().to_lower()
+	_fire_selection_weapon_slot = weapon_slot
+	_fire_selection_weapon_revision = revision
+
+
+func _validate_fire_selection() -> void:
+	if _fire_selection_hardpoint == "":
+		return
+	var current_revision := _weapon_revision()
+	var owners := _marker_owners(_fire_selection_hardpoint)
+	var slot_matches := false
+	for owner in owners:
+		if int((owner as Dictionary).get("resolved_index", -1)) == _fire_selection_weapon_slot:
+			slot_matches = true
+			break
+	var hps: Dictionary = shooter_model_info.get("hardpoints", {}) if bool(shooter_model_info.get("ok", false)) else {}
+	var hardpoint_valid := hps.has(_fire_selection_hardpoint)
+	if not slot_matches or _fire_selection_weapon_slot != active_weapon_slot or \
+			_fire_selection_weapon_revision != current_revision or not hardpoint_valid:
+		_clear_fire_selection()
+		status_changed.emit("SINGLE selection invalidated; automatic first declared barrel policy is active.", "warning")
+
+
+func _revalidate_fire_selection() -> void:
+	_validate_fire_selection()
 
 
 func swap_actors() -> void:
@@ -2592,10 +3036,110 @@ func _is_under_turret(node: Node3D) -> Dictionary:
 	return {"yaw": under_y, "pitch": under_x}
 
 
+## T-223 / HP3D-11..18: marker ownership comes from authoritative physical
+## weapon slot declarations, not the currently active slot. A shared hardpoint
+## keeps all owners explicit instead of silently picking one.
+func _effective_weapon_slots() -> Array:
+	if profile == null:
+		return []
+	var stored: Array = profile.snapshot_params().get("weapon_slots", [])
+	if stored is Array and not (stored as Array).is_empty():
+		return stored
+	return profile.weapon_slots
+
+
+func _marker_owners(hp_name: String) -> Array[Dictionary]:
+	var owners: Array[Dictionary] = []
+	if profile == null:
+		return owners
+	var key := hp_name.strip_edges().to_lower()
+	for slot in _effective_weapon_slots():
+		var sd: Dictionary = slot
+		var hps: Array = sd.get("hardpoints", []) if sd.get("hardpoints", []) is Array else []
+		var slot_hp := str(sd.get("hardpoint", ""))
+		if slot_hp.to_lower() == key:
+			owners.append(sd)
+			continue
+		for hp in hps:
+			if str(hp).to_lower() == key:
+				owners.append(sd)
+				break
+	return owners
+
+
+func _marker_role(owners: Array[Dictionary]) -> String:
+	if owners.is_empty():
+		return "GENERIC_MODEL_HARDPOINT"
+	if owners.size() > 1:
+		return "SHARED_WEAPON_MOUNT"
+	return "WEAPON_MUZZLE"
+
+
+func _marker_identity_for_slot(hp_name: String, node_id: int, owner_slot: int) -> Dictionary:
+	var node := _find_hardpoint_node_by_id(node_id)
+	return _marker_identity(hp_name, node, owner_slot)
+
+
+func _marker_identity(hp_name: String, node: Node3D, preferred_owner_slot: int = -2) -> Dictionary:
+	var prov: Dictionary = (shooter_model_info.get("provenance", {}) as Dictionary) if \
+		bool(shooter_model_info.get("ok", false)) else {}
+	var owners := _marker_owners(hp_name)
+	var role := _marker_role(owners)
+	var owner_slots: Array[int] = []
+	for owner in owners:
+		owner_slots.append(int((owner as Dictionary).get("resolved_index", -1)))
+	var primary: Dictionary = {}
+	var owner_slot := -1
+	if not owners.is_empty():
+		if preferred_owner_slot != -2:
+			for owner in owners:
+				if int((owner as Dictionary).get("resolved_index", -1)) == preferred_owner_slot:
+					primary = owner
+					break
+		if primary.is_empty():
+			for owner in owners:
+				if int((owner as Dictionary).get("resolved_index", -1)) == active_weapon_slot:
+					primary = owner
+					break
+		if primary.is_empty() and owners.size() == 1:
+			primary = owners[0]
+		owner_slot = int(primary.get("resolved_index", -1)) if not primary.is_empty() else -1
+	var ordnance_status := str(primary.get("ordnance_status", "ORDNANCE_UNRESOLVED")) if not primary.is_empty() else ("OWNER_SELECTION_REQUIRED" if not owners.is_empty() else "NOT_APPLICABLE")
+	var firing_eligibility := "INSPECTION_ONLY" if owners.is_empty() else "WEAPON_MOUNT"
+	var source_revision: Dictionary = primary.get("source_revision", {}) if not primary.is_empty() else {}
+	var shooter_rev: Dictionary = prov.get("source_revision", {})
+	if shooter_rev.is_empty() and profile != null:
+		shooter_rev = profile.snapshot_params().get("odf_revisions", {}).get("shooter", {})
+	return {
+		"hardpoint": hp_name,
+		"node_id": node.get_instance_id() if node != null else 0,
+		"node_name": node.name if node != null else "",
+		"vehicle_source": str(shooter_model_info.get("msh_path", "")) if \
+			bool(shooter_model_info.get("ok", false)) else str(prov.get("msh_path", "")),
+		"vehicle_source_revision": shooter_rev.duplicate(true),
+		"weapon_slot": owner_slot,
+		"weapon_slots": owner_slots,
+		"weapon_slot_label": str(primary.get("slot", "")) if not primary.is_empty() else "",
+		"ambiguous": owners.size() > 1,
+		"marker_role": role,
+		"firing_eligibility": firing_eligibility,
+		"weapon_path": str(primary.get("path", "")) if not primary.is_empty() else "",
+		"ordnance_path": str(primary.get("ordnance_path", "")) if not primary.is_empty() else "",
+		"ordnance_status": ordnance_status,
+		"weapon_revision": "%s:%s:%s" % [str(source_revision.get("weapon", {}).get("path", "")),
+			str(source_revision.get("weapon", {}).get("md5", "")),
+			str(source_revision.get("weapon", {}).get("dirty", false))],
+		"source_revision": source_revision.duplicate(true),
+		"owners": owners.duplicate(true),
+		"fallback": node == null,
+	}
+
+
 func _update_aim_overlay() -> void:
 	if aim_overlay == null or hardpoint_markers_root == null:
 		return
 	_clear_node_children(hardpoint_markers_root)
+	_hardpoint_marker_data.clear()
 	if bool(shooter_model_info.get("ok", false)):
 		var hps: Dictionary = shooter_model_info.get("hardpoints", {})
 		for hp_name in hps:
@@ -2612,7 +3156,13 @@ func _update_aim_overlay() -> void:
 			m.albedo_color = Color("#ffdf73") if is_active else Color("#6ec2a8")
 			marker.material_override = m
 			marker.position = xf.origin
+			var identity := _marker_identity(str(hp_name), hp_node)
+			identity["marker_id"] = marker.get_instance_id()
+			identity["transform"] = [xf.origin.x, xf.origin.y, xf.origin.z]
+			_hardpoint_marker_data.append(identity)
+			marker.set_meta("hardpoint_identity", identity)
 			hardpoint_markers_root.add_child(marker)
+	var marker_count := hardpoint_markers_root.get_child_count()
 
 	var geom := _shot_geometry()
 	var origin: Vector3 = geom.origin
@@ -2686,6 +3236,11 @@ func _update_aim_overlay() -> void:
 		imp.material_override = imat
 		imp.position = hit_pt
 		hardpoint_markers_root.add_child(imp)
+	# The impact marker is transient overlay geometry, not a hardpoint marker.
+	while hardpoint_markers_root.get_child_count() > marker_count:
+		var extra := hardpoint_markers_root.get_child(hardpoint_markers_root.get_child_count() - 1)
+		hardpoint_markers_root.remove_child(extra)
+		extra.queue_free()
 	_update_bbox_overlay()
 
 
@@ -3119,7 +3674,15 @@ func _fire_volley(use_alt: bool, fire_mode: String, enforce_reload: bool) -> Dic
 	_volley_counter += 1
 	var volley := VolleyResult.new()
 	volley.volley_id = _volley_counter
-	volley.weapon_identity = str(profile.weapon_name) if profile != null else ""
+	# T-214 / PHI-07..13: a volley belongs to the weapon that actually fired it.
+	# The alt chain is a different weapon and must not inherit the primary name.
+	var fire_profile = profile
+	if use_alt and profile != null and profile.alt != null:
+		fire_profile = profile.alt
+	volley.weapon_identity = str(fire_profile.weapon_name) if fire_profile != null else ""
+	volley.weapon_path = str(fire_profile.weapon_path) if fire_profile != null else ""
+	volley.weapon_slot = active_weapon_slot
+	volley.firing_context = "ALTERNATE" if use_alt else "PRIMARY"
 	volley.barrel_mode = mode
 	volley.resolved_barrels = resolved.duplicate(true)
 	for i in range(volley.resolved_barrels.size()):
@@ -3136,11 +3699,40 @@ func _fire_volley(use_alt: bool, fire_mode: String, enforce_reload: bool) -> Dic
 	if mode == "TANDEM":
 		for i in range(resolved.size()):
 			order.append(i)
+		_last_firing_policy = {"mode": mode, "selection": "ALL_DECLARED_IN_ORDER",
+			"weapon_slot": active_weapon_slot, "weapon_revision": _weapon_revision(), "hardpoint": ""}
 	elif mode == "SALVO":
 		order.append(_barrel_cycle % resolved.size())
 		_barrel_cycle = (_barrel_cycle + 1) % resolved.size()
+		_last_firing_policy = {"mode": mode, "selection": "ROUND_ROBIN_DECLARED",
+			"weapon_slot": active_weapon_slot, "weapon_revision": _weapon_revision(),
+			"hardpoint": str((resolved[order[0]] as Dictionary).get("hardpoint_name", ""))}
 	else:
-		order.append(0)
+		_validate_fire_selection()
+		var single_idx := 0
+		var single_policy := "AUTOMATIC_FIRST_DECLARED"
+		if _fire_selection_hardpoint != "":
+			var selected_idx := -1
+			for i in range(resolved.size()):
+				if str((resolved[i] as Dictionary).get("hardpoint_name", "")).to_lower() == \
+						_fire_selection_hardpoint.to_lower():
+					selected_idx = i
+					break
+			if selected_idx >= 0:
+				single_idx = selected_idx
+				single_policy = "EXPLICIT_SLOT_%d_HARDPOINT" % active_weapon_slot
+			else:
+				_clear_fire_selection()
+				single_policy = "AUTOMATIC_FIRST_DECLARED_SELECTION_RESET"
+		_last_firing_policy = {
+			"mode": mode,
+			"selection": single_policy,
+			"weapon_slot": active_weapon_slot,
+			"weapon_revision": _weapon_revision(),
+			"hardpoint": str((resolved[single_idx] as Dictionary).get("hardpoint_name", "")),
+		}
+		order.append(single_idx)
+	volley.firing_policy = _last_firing_policy.duplicate(true)
 	for barrel_index in order:
 		var rec: Dictionary = resolved[barrel_index]
 		var hp_name := str(rec.get("hardpoint_name", ""))
@@ -3157,14 +3749,26 @@ func _fire_volley(use_alt: bool, fire_mode: String, enforce_reload: bool) -> Dic
 		if shot != null and shot.identity != null:
 			shot_identity = shot.identity.to_dict()
 		var per_barrel := {
-			"physical_slot": barrel_index, "hardpoint_name": hp_name,
+			"physical_slot": barrel_index, "weapon_slot": volley.weapon_slot,
+			"firing_context": volley.firing_context, "hardpoint_name": hp_name,
 			"diagnostic": str(rec.get("diagnostic", "")),
 			"fallback_used": bool(rec.get("fallback_used", false)),
 			"state": "FIRED" if bool(r.get("ok", false)) else str(r.get("state", "REJECTED")),
 			"reason": str(r.get("reason", "")),
 			"accepted": bool(r.get("ok", false)),
 			"shot_identity": shot_identity,
+			"weapon_name": str(shot_identity.get("weapon_name", volley.weapon_identity)),
+			"weapon_path": str(shot_identity.get("weapon_path", volley.weapon_path)),
+			"volley_id": volley.volley_id,
 		}
+		# PHI-22..27: the launch origin is captured at fire time. It must never be
+		# reconstructed later from the animated hardpoint transform.
+		if shot != null:
+			var launch: Vector3 = shot.origin
+			per_barrel["launch_origin"] = [launch.x, launch.y, launch.z]
+			per_barrel["launch_origin_available"] = true
+		else:
+			per_barrel["launch_origin_available"] = false
 		volley.resolved_barrels[barrel_index] = per_barrel
 		if bool(r.get("ok", false)):
 			volley.accepted_barrels.append(hp_name)
@@ -3318,7 +3922,8 @@ func _fire_one(use_alt: bool = false, fire_mode: String = "SINGLE", enforce_relo
 	# P0-SIM-02: Single atomic fire permission + resource consumption transition inside CombatScenario.
 	var fire_res: Dictionary = combat_scenario.fire_shot(
 		prof, origin, geom.direction, target_pos, obstacles, shooter_vel, enforce_reload, extra_targets,
-		fire_mode, hp_name, barrel_index, barrel_mode, volley_id
+		fire_mode, hp_name, barrel_index, barrel_mode, volley_id,
+		active_weapon_slot, "ALTERNATE" if use_alt else "PRIMARY"
 	)
 	if not bool(fire_res.get("ok", false)):
 		var rej := str(fire_res.get("reason", "FIRE_REJECTED"))
@@ -3419,6 +4024,13 @@ func _on_combat_scenario_event(ev: Dictionary) -> void:
 	var odf_p := str(ev.get("odf_path", ""))
 	var odf_k := str(ev.get("odf_key", ""))
 	_record_timeline(float(ev.get("time", sim.sim_time)), kind, detail, odf_p, odf_k)
+	var shot_id := int(ev.get("shot_id", 0))
+	if shot_id > 0 and not timeline_events.is_empty():
+		for index in range(timeline_events.size() - 1, -1, -1):
+			if str(timeline_events[index].get("kind", "")) in ["SHOT_ACCEPTED", "PROJECTILE_SPAWNED"]:
+				timeline_events[index]["shot_id"] = shot_id
+				break
+	_rebuild_timeline_panel()
 
 
 func refresh_actor_inspector(force: bool = false) -> void:
@@ -3465,23 +4077,137 @@ func refresh_actor_inspector(force: bool = false) -> void:
 	refresh_hardpoint_inspector(true)
 
 
-## PHI-01..08: show the physical identity of each declared weapon slot. Values
-## are reported from the actual last volley, never guessed from the ODF alone.
+## T-214 / PHI-07..14, T-221 / PHI-33..38, ALT-01..06: a stored volley belongs
+## to the exact physical mount and firing mode that fired it. Equal weapon ODF
+## names or paths in two slots never bind one slot's shot to another.
+func _volley_matches_current_weapon(cur_name: String, cur_path: String) -> bool:
+	if last_volley_result == null or profile == null:
+		return false
+	var volley = last_volley_result
+	var v_name := str((volley as Object).get("weapon_identity"))
+	var v_path := str((volley as Object).get("weapon_path"))
+	var context := str((volley as Object).get("firing_context"))
+	if context == "":
+		context = "PRIMARY"
+	if context == "ALTERNATE" and profile.alt == null:
+		return false
+	var target_name := cur_name
+	var target_path := cur_path
+	if context == "ALTERNATE":
+		target_name = str(profile.alt.weapon_name)
+		target_path = str(profile.alt.weapon_path)
+	if v_name != "" and target_name != "" and v_name.to_lower() != target_name.to_lower():
+		return false
+	if v_path != "" and target_path != "":
+		if WorkspaceStore.canonical(v_path) != WorkspaceStore.canonical(target_path):
+			return false
+	elif v_name == "" or target_name == "" or v_name.to_lower() != target_name.to_lower():
+		return false
+	var v_slot := int((volley as Object).get("weapon_slot"))
+	if v_slot >= 0 and v_slot != active_weapon_slot:
+		return false
+	return true
+
+
+## T-221 / PHI-41..44: one predicate for every historical shot column. The
+## Shot ID and its launch origin must agree with the row's weapon, physical
+## slot, hardpoint and shot identity, or neither is displayed.
+## T-221 / WAVE H: double-click a Hardpoint Inspector row to jump the Combat
+## State Timeline to the event of the shot shown in that physical mount.
+func focus_shot_on_timeline(shot_id: int) -> bool:
+	if shot_id <= 0:
+		return false
+	for i in timeline_events.size():
+		var ev: Dictionary = timeline_events[i]
+		if int(ev.get("shot_id", 0)) != shot_id:
+			continue
+		filter_timeline("all")
+		for j in _timeline_filtered_events.size():
+			if int((_timeline_filtered_events[j] as Dictionary).get("shot_id", 0)) != shot_id:
+				continue
+			if timeline_tree != null and timeline_tree.get_root() != null:
+				var child := timeline_tree.get_root().get_first_child()
+				var cur := 0
+				while child != null:
+					if cur == j:
+						child.select(0)
+						break
+					cur += 1
+					child = child.get_next()
+			select_timeline_event(j)
+			return true
+	return false
+
+
+func _on_hardpoint_row_selected() -> void:
+	if hardpoint_inspector_tree == null:
+		return
+	var item := hardpoint_inspector_tree.get_selected()
+	if item == null:
+		return
+	var hp_name := str(item.get_metadata(1))
+	if hp_name != "" and hp_name != _selected_hardpoint_name:
+		select_hardpoint(hp_name, int(item.get_metadata(2)))
+
+
+func _on_hardpoint_row_activated() -> void:
+	if hardpoint_inspector_tree == null:
+		return
+	var item := hardpoint_inspector_tree.get_selected()
+	if item == null:
+		return
+	var shot_id := int(item.get_metadata(0))
+	if focus_shot_on_timeline(shot_id):
+		status_changed.emit("Timeline: shot #%d selected from Hardpoint Inspector" % shot_id, "muted")
+
+
+func _shot_row_agrees(rec: Dictionary, hp_name: String, weapon_agrees: bool) -> bool:
+	if not weapon_agrees or rec.is_empty():
+		return false
+	var identity: Dictionary = rec.get("shot_identity", {})
+	if identity.is_empty():
+		return false
+	var v_slot := int(rec.get("weapon_slot", -1))
+	if v_slot >= 0 and v_slot != active_weapon_slot:
+		return false
+	var hp_from_shot := str(identity.get("hardpoint", ""))
+	if hp_name != "" and hp_from_shot != "" and hp_from_shot.to_lower() != hp_name.to_lower():
+		return false
+	if hp_from_shot == "" and hp_name != "":
+		var declared := str(rec.get("hardpoint_name", ""))
+		if declared.to_lower() != hp_name.to_lower():
+			return false
+	return true
+
+
+## PHI-01..27: show the physical identity of each declared weapon slot. Shot
+## data is bound to the weapon that fired it, resources come from the live
+## shooter, and current origin is kept separate from launch origin.
 func build_hardpoint_inspector_rows() -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	if combat_scenario == null:
 		return rows
+	var shooter = combat_scenario.shooter
+	var cur_name := str(profile.weapon_name) if profile != null else ""
+	var cur_path := str(profile.weapon_path) if profile != null else ""
+	var volley_bound := _volley_matches_current_weapon(cur_name, cur_path)
+	var volley_stale := last_volley_result != null and not volley_bound
 	var hps: Dictionary = shooter_model_info.get("hardpoints", {}) if bool(shooter_model_info.get("ok", false)) else {}
-	var barrel_results: Array[Dictionary] = []
-	if last_volley_result != null:
+	var by_slot := {}
+	if volley_bound:
 		var shots = (last_volley_result as Object).get("resolved_barrels")
 		if shots is Array:
 			for b in (shots as Array):
 				if b is Dictionary:
-					barrel_results.append(b)
-	var by_slot := {}
-	for b in barrel_results:
-		by_slot[int(b.get("physical_slot", -1))] = b
+					by_slot[int((b as Dictionary).get("physical_slot", -1))] = b
+	# PHI-15..21: authoritative CURRENT resource state, never invented fields.
+	var ammo_txt := "-"
+	var energy_txt := "-"
+	var reload_txt := "-"
+	if shooter != null:
+		ammo_txt = "∞" if bool(shooter.ammo_unlimited) else "%d/%d" % [int(shooter.ammo_current), int(shooter.ammo_max)]
+		energy_txt = "∞" if bool(shooter.energy_unlimited) else "%.0f/%.0f" % [float(shooter.energy_current), float(shooter.energy_max)]
+		reload_txt = "READY" if float(shooter.reload_remaining) <= 0.0001 else "RLD %.2fs" % float(shooter.reload_remaining)
 	var names: Array[String] = []
 	if profile != null:
 		for hp in profile.weapon_hardpoints:
@@ -3490,6 +4216,14 @@ func build_hardpoint_inspector_rows() -> Array[Dictionary]:
 				names.append(nm)
 	if names.is_empty() and profile != null:
 		names.append("")
+	if bool(shooter_model_info.get("ok", false)):
+		var all_hps: Dictionary = shooter_model_info.get("hardpoints", {})
+		var model_keys: Array = all_hps.keys()
+		model_keys.sort()
+		for raw_key in model_keys:
+			var key := str(raw_key)
+			if not names.has(key):
+				names.append(key)
 	for i in names.size():
 		var nm := names[i]
 		var node: Node3D = hps.get(nm.to_lower(), null) if hps.has(nm.to_lower()) and hps[nm.to_lower()] is Node3D else null
@@ -3506,19 +4240,82 @@ func build_hardpoint_inspector_rows() -> Array[Dictionary]:
 		if node != null:
 			var xf := _world_transform_in_lab(node)
 			origin_txt = "(%.2f, %.2f, %.2f)" % [xf.origin.x, xf.origin.y, xf.origin.z]
-		var sid_txt := "not fired"
 		var identity: Dictionary = rec.get("shot_identity", {})
-		if not identity.is_empty():
-			sid_txt = "#%s hp=%s" % [str(identity.get("shot_id", "?")), str(identity.get("hardpoint", nm))]
+		var owners := _marker_owners(nm)
+		var marker_identity := _marker_identity(nm, node)
+		var owner_indices: Array = marker_identity.get("weapon_slots", [])
+		var marker_role := str(marker_identity.get("marker_role", "GENERIC_MODEL_HARDPOINT"))
+		var owner_txt := "INSPECTION_ONLY · " + marker_role
+		var source_txt := "no weapon owner"
+		if not owners.is_empty():
+			var selected_owner := active_weapon_slot if owner_indices.has(active_weapon_slot) else -1
+			var slot_source := profile.slot_source(selected_owner) if selected_owner >= 0 and profile != null else {}
+			if slot_source.is_empty() and selected_owner >= 0:
+				slot_source = WeaponProfile.slot_source_from_slots(_effective_weapon_slots(), selected_owner)
+			var selected_name := str(slot_source.get("weapon", ""))
+			if selected_name == "" and not slot_source.is_empty():
+				selected_name = str(slot_source.get("path", "")).get_file()
+			owner_txt = "owners=%s · active=%d" % [str(owner_indices), selected_owner]
+			if selected_owner < 0:
+				source_txt = "OWNER_SELECTION_REQUIRED"
+			else:
+				var ordnance_txt := str(slot_source.get("ordnance_name", ""))
+				var ordnance_path := str(slot_source.get("ordnance_path", ""))
+				if ordnance_txt == "" and ordnance_path != "":
+					ordnance_txt = ordnance_path.get_file()
+				if str(slot_source.get("ordnance_status", "")) == "ORDNANCE_UNRESOLVED":
+					ordnance_txt = "ORDNANCE_UNRESOLVED"
+				source_txt = "%s → %s" % [selected_name if selected_name != "" else "-",
+					ordnance_txt if ordnance_txt != "" else "-"]
+		var firing_txt := "INSPECTION_ONLY" if owners.is_empty() else "%s · %s" % [
+			str(profile.barrel_mode) if profile != null else barrel_mode,
+			str(_last_firing_policy.get("selection", "NOT_FIRED_YET"))]
+		var rec_weapon := str(rec.get("weapon_name", ""))
+		var context := str(rec.get("firing_context", "PRIMARY"))
+		var shown_weapon := cur_name
+		if context == "ALTERNATE" and profile != null and profile.alt != null:
+			shown_weapon = str(profile.alt.weapon_name)
+		var weapon_agrees := volley_bound and (rec_weapon == "" or shown_weapon == "" or \
+			rec_weapon.to_lower() == shown_weapon.to_lower())
+		var shot_matches_row := _shot_row_agrees(rec, nm, weapon_agrees)
+		var shot_prefix := "ALT#" if context == "ALTERNATE" else "#"
+		var sid_txt := "not fired"
+		if shot_matches_row:
+			sid_txt = "%s%s hp=%s" % [shot_prefix, str(identity.get("shot_id", "?")),
+				str(identity.get("hardpoint", nm))]
+		elif volley_stale:
+			sid_txt = "LAST_SHOT_NOT_FOR_CURRENT_WEAPON"
+		var shot_origin_txt := "unavailable"
+		if shot_matches_row and bool(rec.get("launch_origin_available", false)):
+			var launch = rec.get("launch_origin", null)
+			if launch is Array and (launch as Array).size() == 3:
+				shot_origin_txt = "(%.2f, %.2f, %.2f)" % [float(launch[0]), float(launch[1]), float(launch[2])]
 		rows.append({
 			"hardpoint": nm if nm != "" else "(editor-defined)",
+			"hardpoint_key": nm,
+			"weapon": cur_name if cur_name != "" else "-",
+			"owner_role": owner_txt,
+			"weapon_ordnance": source_txt,
+			"firing_policy": firing_txt,
+			"firing_eligibility": str(marker_identity.get("firing_eligibility", "INSPECTION_ONLY")),
+			"marker_role": marker_role,
+			"weapon_slots": owner_indices,
+			"weapon_path": str(marker_identity.get("weapon_path", "")),
+			"ordnance_path": str(marker_identity.get("ordnance_path", "")),
+			"ordnance_status": str(marker_identity.get("ordnance_status", "NOT_APPLICABLE")),
+			"source_revision": marker_identity.get("source_revision", {}),
 			"fidelity": fidelity,
+			"node_id": int(node.get_instance_id()) if node != null else 0,
 			"node": node.name if node != null else "-",
 			"origin": origin_txt,
 			"shot": sid_txt,
-			"ammo": str(int(identity.get("ammo", -1))) if identity.has("ammo") else "-",
-			"energy": str(snappedf(float(identity.get("energy", -1.0)), 0.01)) if identity.has("energy") else "-",
-			"reload": "READY" if float(combat_scenario.shooter.reload_remaining) <= 0.0001 else "RLD %.2fs" % float(combat_scenario.shooter.reload_remaining) if combat_scenario != null and combat_scenario.shooter != null else "-",
+			"shot_weapon": rec_weapon,
+			"firing_context": context,
+			"shot_id": int(identity.get("shot_id", 0)) if shot_matches_row else 0,
+			"shot_origin": shot_origin_txt,
+			"ammo": ammo_txt,
+			"energy": energy_txt,
+			"reload": reload_txt,
 		})
 	return rows
 
@@ -3536,13 +4333,22 @@ func refresh_hardpoint_inspector(force: bool = false) -> void:
 	for row in rows:
 		var item := hardpoint_inspector_tree.create_item(root)
 		item.set_text(0, str(row.get("hardpoint", "")))
-		item.set_text(1, str(row.get("fidelity", "")))
-		item.set_text(2, str(row.get("node", "")))
-		item.set_text(3, str(row.get("origin", "")))
-		item.set_text(4, str(row.get("shot", "")))
-		item.set_text(5, str(row.get("ammo", "")))
-		item.set_text(6, str(row.get("energy", "")))
-		item.set_text(7, str(row.get("reload", "")))
+		item.set_text(1, str(row.get("owner_role", "")))
+		item.set_text(2, str(row.get("weapon_ordnance", "")))
+		item.set_text(3, str(row.get("firing_policy", "")))
+		item.set_text(4, str(row.get("fidelity", "")))
+		item.set_text(5, str(row.get("node", "")))
+		item.set_text(6, str(row.get("origin", "")))
+		item.set_text(7, str(row.get("shot", "")))
+		item.set_text(8, str(row.get("shot_origin", "")))
+		item.set_text(9, str(row.get("ammo", "")))
+		item.set_text(10, str(row.get("energy", "")))
+		item.set_text(11, str(row.get("reload", "")))
+		item.set_metadata(0, int(row.get("shot_id", 0)))
+		item.set_metadata(1, str(row.get("hardpoint_key", "")))
+		item.set_metadata(2, int(row.get("node_id", 0)))
+		item.set_metadata(3, str(row.get("weapon_path", "")))
+		item.set_metadata(4, str(row.get("ordnance_path", "")))
 
 
 func capture_replay_snapshot(label: String = "") -> Dictionary:

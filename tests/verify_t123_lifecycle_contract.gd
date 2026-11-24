@@ -109,14 +109,15 @@ func _prep_native(ws: String, sid: String, intent: Dictionary = {}) -> Dictionar
 	var ledger_dir := NativeRunnerScript.ledger_dir()
 	DirAccess.make_dir_recursive_absolute(ledger_dir)
 	var ledger := ledger_dir.path_join("session_ledger.json")
-	var sessions := {sid: {"session_id": sid, "state": "COMPLETE"}}
-	if intent.has("ledger_state"):
-		sessions[sid]["state"] = str(intent["ledger_state"])
-	SaveLedger(ledger, sessions)
 	var sess := NativeSessionScript.new()
 	sess.session_id = sid
 	sess.stage_root = stage
 	sess.stage_id = sid + "_stage"
+	var sessions := {sid: {"session_id": sid, "state": "COMPLETE",
+		"stage_id": sid + "_stage", "stage_root": stage, "session": sess.to_dict()}}
+	if intent.has("ledger_state"):
+		sessions[sid]["state"] = str(intent["ledger_state"])
+	SaveLedger(ledger, sessions)
 	var runner = NativeRunnerScript.new()
 	runner.sessions[sid] = {"state": "COMPLETE", "session": sess.to_dict()}
 	var intent_payload := {

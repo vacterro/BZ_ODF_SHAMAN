@@ -10,17 +10,34 @@ Equivalent:
 
 ```bat
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/test_runner.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_weapon_chain_integrity.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_alternate_physical_slot.gd
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t122_recovery_coherence.gd
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t123_lifecycle_contract.gd
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t128_cleanup_contract.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t214_receipt_trust.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t214_hardpoint_inspector.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t221_native_identity.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t221_hardpoint_provenance.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t224_stage_safety.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_windows_path_identity.gd
+"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . --script res://tests/verify_t224_hardpoint_identity.gd
 "V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path . res://tests/ui_smoke.tscn
 ```
 
-## Canonical suite — last run: 2026-11-23 (`TESTED_HEADLESS`)
+## Canonical suite — last run: 2026-11-24 (`TESTED_HEADLESS`)
 
 `tests/test_runner.gd`: 1,106 checks, 0 failures. `verify_t122_recovery_coherence.gd`:
 28/28 PASS. `verify_t123_lifecycle_contract.gd`: 31/31 PASS.
-`verify_t128_cleanup_contract.gd`: 44/44 PASS. UI smoke: 0 failures.
+`verify_t128_cleanup_contract.gd`: 44/44 PASS. `verify_t214_receipt_trust.gd`:
+35/35 PASS (NFR-01..14, NDS-01..06). `verify_t214_hardpoint_inspector.gd`:
+21/21 PASS (PHI-07..27). `verify_weapon_chain_integrity.gd`: 14/14 PASS
+(WCH-01..10, including rejection of missing/NULL `ordName`, authentic Arc/Beam controls,
+and fire refusal). `verify_alternate_physical_slot.gd`: 31/31 PASS
+(ALT-SLOT-01..10, including replay identity and TANDEM barrel preservation).
+T-221 native identity 13/13 PASS (NDS-20..25, NID-01..05), T-221 hardpoint provenance 24/24 PASS (PHI-33..44, ALT-01..06), T-222 stage identity 8/8 PASS, T-222 backup inventory 12/12 PASS, T-222 3D hardpoint 8/8 PASS, T-223 reserved paths 11/11 PASS, T-223 cleanup truth 8/8 PASS, T-223 hardpoint fire 10/10 PASS, T-223 viewport picking 6/6 PASS, T-224 physical stage safety 28/28 PASS, and T-224 hardpoint identity 39/39 PASS.
+Canonical frozen-tree rerun: 1,485 checks PASS, 0 failures, `tree_changed_during_run=false`, suite record `1c236f4e4e1a4a51-20261124T182755247147Z`. The later Windows-path/stderr cleanup adds 8 checks; its source change is newest than that frozen record.
+The earlier leak was two `Node3D` hardpoint fixtures in the T-214/T-221 test harness, never a product resource leak; both verifiers now free them.
 Focused regressions also PASS: T-121 journal trust (34/34), T-121 crash phases
 (37/37), T-86 recovery integrity (75/75), T-85 save recovery (11/11),
 T-85 graph events (6/6), T-80 identity (21/21 including PHI-01..06 hardpoint

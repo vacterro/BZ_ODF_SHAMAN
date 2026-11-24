@@ -2,14 +2,11 @@
   "schema": 1,
   "kind": "saipen-suite-declaration",
   "command": [
-    "V:\\__STORE_V\\_SOFT\\Godot\\4.7.2-stable\\Godot_v4.7.2-stable_win64.exe",
-    "--headless",
-    "--path",
-    ".",
-    "--script",
-    "res://tests/verify_t128_cleanup_contract.gd"
+    "cmd",
+    "/c",
+    "tools\\run_tests.cmd"
   ],
-  "command_sha256": "43764bfc12053f9af9f7bde6780cfe78ad521f1e9d8d28635252c1a8115755b7",
+  "command_sha256": "1c236f4e4e1a4a516e2dcf6397eeb693be6dcb5d632839653d2249051cb2de31",
   "timeout_s": 3600,
-  "declared_utc": "2026-11-23T20:25:49Z"
+  "declared_utc": "2026-11-23T22:19:40Z"
 }

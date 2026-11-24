@@ -2437,54 +2437,254 @@ func _durable_session_record(session_id: String) -> Dictionary:
 	return rec if rec is Dictionary else {}
 
 
+## Prior cleanup authorizes finalization only for the exact session and stage
+## it cleaned. Missing identities are never wildcards: an incomplete durable
+## record protects the stage instead of silently widening its authority.
+func _prior_cleanup_identity_issue(session_id: String, sess) -> String:
+	var rec := _durable_session_record(session_id)
+	if rec.is_empty() or session_id == "" or sess == null:
+		return "PRIOR_CLEANUP_IDENTITY_INCOMPLETE"
+	if str(sess.stage_id) == "" or str(sess.stage_root) == "":
+		return "PRIOR_CLEANUP_IDENTITY_INCOMPLETE"
+	if not WorkspaceStore.canonical(str(sess.stage_root)).is_empty() and \
+			not _durable_cleanup_identity(rec, session_id, str(sess.stage_root), str(sess.stage_id)):
+		var rec_session: Dictionary = rec.get("session", {}) if rec.get("session", {}) is Dictionary else {}
+		if str(rec.get("stage_id", "")) != "" and \
+				str(rec.get("stage_id", "")) != str(rec_session.get("stage_id", "")) and \
+				str(rec_session.get("stage_id", "")) != "":
+			return "PRIOR_CLEANUP_STAGE_ID_MISMATCH"
+		var rec_root := str(rec.get("stage_root", ""))
+		if rec_root == "":
+			rec_root = str(rec_session.get("stage_root", ""))
+		if rec_root != "" and WorkspaceStore.canonical(rec_root) != WorkspaceStore.canonical(str(sess.stage_root)):
+			return "PRIOR_CLEANUP_STAGE_ROOT_MISMATCH"
+		if str(rec.get("stage_id", "")) != "" and str(rec.get("stage_id", "")) != str(sess.stage_id):
+			return "PRIOR_CLEANUP_STAGE_ID_MISMATCH"
+		return "PRIOR_CLEANUP_IDENTITY_INCOMPLETE"
+	return ""
+
+
 ## True only when a prior verified cleanup has removed every manifest-owned
 ## file. Missing manifest + empty stage is NOT proof: the durable ledger must
 ## also carry an ok=true, non-partial cleanup result with a matching identity.
 func _verified_prior_cleanup(session_id: String, sess) -> bool:
+	if _prior_cleanup_identity_issue(session_id, sess) != "":
+		return false
 	var rec := _durable_session_record(session_id)
-	if rec.is_empty():
+	var cl = rec.get("cleanup", null)
+	if not (cl is Dictionary):
 		return false
-	var sid := str(rec.get("session_id", ""))
-	if sid != "" and sid != session_id:
+	var cleanup: Dictionary = cl
+	return bool(cleanup.get("ok", false)) and not bool(cleanup.get("partial", false))
+
+
+## Shared durable-identity authority for discovery and finalization. Missing
+## identity is never a wildcard; a record that cannot name its session, stage
+## ID and stage root cannot authorize a cleanup verdict. When an expected
+## immutable stage ID is known it must agree by VALUE, not merely be present.
+func _durable_cleanup_identity(rec: Dictionary, sid: String, stage_root: String,
+		expected_stage_id: String = "") -> bool:
+	if rec.is_empty() or sid == "" or stage_root == "":
 		return false
-	var stage_id := str((rec.get("session", {}) as Dictionary).get("stage_id", ""))
-	if stage_id != "" and sess != null and str(sess.stage_id) != "" and stage_id != str(sess.stage_id):
+	var rec_session: Dictionary = rec.get("session", {}) if rec.get("session", {}) is Dictionary else {}
+	var top_sid := str(rec.get("session_id", ""))
+	var nested_sid := str(rec_session.get("session_id", ""))
+	var rec_sid := top_sid if top_sid != "" else nested_sid
+	var top_stage_id := str(rec.get("stage_id", ""))
+	var nested_stage_id := str(rec_session.get("stage_id", ""))
+	var rec_stage_id := top_stage_id if top_stage_id != "" else nested_stage_id
+	var top_root := str(rec.get("stage_root", ""))
+	var nested_root := str(rec_session.get("stage_root", ""))
+	var rec_root := top_root if top_root != "" else nested_root
+	if top_sid != "" and nested_sid != "" and top_sid != nested_sid:
+		return false
+	if top_stage_id != "" and nested_stage_id != "" and top_stage_id != nested_stage_id:
+		return false
+	if top_root != "" and nested_root != "" and \
+			WorkspaceStore.canonical(top_root) != WorkspaceStore.canonical(nested_root):
+		return false
+	if rec_sid == "" or rec_sid != sid or rec_stage_id == "" or rec_root == "":
+		return false
+	if expected_stage_id != "" and rec_stage_id != expected_stage_id:
+		return false
+	return WorkspaceStore.canonical(rec_root) == WorkspaceStore.canonical(stage_root)
+
+
+## One authoritative cleanup-evidence check for discovery, shared by the
+## missing-stage and present-stage branches. CLEANED_UP is only a claim: a
+## full, non-partial durable cleanup result plus matching session/stage
+## identity is required.
+func _discovery_cleanup_confirmed(sid: String, stage_root: String,
+		ledger_stage_id: String) -> bool:
+	if not _durable_cleanup_identity(_durable_session_record(sid), sid, stage_root, ledger_stage_id):
+		return false
+	var rec := _durable_session_record(sid)
+	if str(rec.get("state", "")).to_upper() != "CLEANED_UP":
+		return false
+	var rec_stage_id := str(rec.get("stage_id", ""))
+	if rec_stage_id == "":
+		rec_stage_id = str((rec.get("session", {}) as Dictionary).get("stage_id", ""))
+	if ledger_stage_id != "" and rec_stage_id != ledger_stage_id:
 		return false
 	var cl = rec.get("cleanup", null)
 	if not (cl is Dictionary):
 		return false
 	var cleanup: Dictionary = cl
-	if not bool(cleanup.get("ok", false)) or bool(cleanup.get("partial", false)):
+	return bool(cleanup.get("ok", false)) and not bool(cleanup.get("partial", false))
+
+
+## T-214 / P0-NATIVE-01..02: a receipt is a historical statement about one
+## cleanup attempt, never proof of the current filesystem. Its status is
+## classified by exact string; a shared prefix must never equate a partial
+## cleanup with a full one.
+const RECEIPT_FULL_CLEANUP := "RECEIPT_FULL_CLEANUP"
+const RECEIPT_PARTIAL_FOREIGN_FILES_PRESERVED := "RECEIPT_PARTIAL_FOREIGN_FILES_PRESERVED"
+const RECEIPT_BACKUPS_PRESERVED := "RECEIPT_BACKUPS_PRESERVED"
+const RECEIPT_FAILED := "RECEIPT_FAILED"
+const RECEIPT_UNVERIFIED := "RECEIPT_UNVERIFIED"
+
+
+func _classify_cleanup_receipt(receipt: Dictionary) -> String:
+	var status := str(receipt.get("status", ""))
+	if int(receipt.get("schema", 0)) != 1 or status == "":
+		return RECEIPT_UNVERIFIED
+	if status == "OWNED_FILES_REMOVED":
+		return RECEIPT_FULL_CLEANUP
+	if status == "OWNED_FILES_REMOVED_FOREIGN_FILES_PRESERVED" or status == "FOREIGN_FILES_PRESERVED":
+		return RECEIPT_PARTIAL_FOREIGN_FILES_PRESERVED
+	if status == "OWNED_FILES_REMOVED_BACKUPS_PRESERVED":
+		return RECEIPT_BACKUPS_PRESERVED
+	if status.begins_with("CLEANUP_") or status.begins_with("PROVENANCE_") or status == "PARTIAL_CLEANUP":
+		return RECEIPT_FAILED
+	return RECEIPT_UNVERIFIED
+
+
+## A receipt speaks only for the stage it names. Empty identity fields are not
+## a wildcard: an unbound receipt is refused, never trusted (NFR-12).
+func _receipt_identity_ok(receipt: Dictionary, session_id: String,
+		stage_root: String, stage_id: String) -> bool:
+	if session_id == "" or stage_root == "" or stage_id == "":
 		return false
-	return true
+	if str(receipt.get("session_id", "")) != session_id:
+		return false
+	if str(receipt.get("stage_id", "")) != stage_id:
+		return false
+	var r_root := str(receipt.get("stage_root", ""))
+	return r_root != "" and WorkspaceStore.canonical(r_root) == WorkspaceStore.canonical(stage_root)
 
 
-## Positive finalization evidence. A receipt counts only if it names this
-## session/stage and reports owned files removed; a clean stage satisfies the
-## inventory only when prior cleanup was verified in the durable ledger.
+## Discovery has no session object, so the receipt stage ID is only compared
+## when the durable ledger carries one; it still must never be empty.
+func _discovery_receipt_identity_ok(receipt: Dictionary, session_id: String,
+		stage_root: String, ledger_stage_id: String) -> bool:
+	if session_id == "" or stage_root == "":
+		return false
+	if str(receipt.get("session_id", "")) != session_id:
+		return false
+	var r_root := str(receipt.get("stage_root", ""))
+	if r_root == "" or WorkspaceStore.canonical(r_root) != WorkspaceStore.canonical(stage_root):
+		return false
+	var r_stage_id := str(receipt.get("stage_id", ""))
+	if r_stage_id == "":
+		return false
+	return ledger_stage_id == "" or r_stage_id == ledger_stage_id
+
+
+## Protected backup inventory. These files are deliberately skipped by the
+## ordinary walker, so a backup-only stage must still be classified honestly.
+func _stage_backup_files(stage_root: String) -> Array[String]:
+	if stage_root == "" or not DirAccess.dir_exists_absolute(stage_root):
+		return []
+	return SafeStageScript._list_protected_backup_files(stage_root)
+
+
+## Actual filesystem inventory. Stage metadata describes the stage itself;
+## anything else is payload that must be classified, never assumed absent.
+func _stage_substantive_files(stage_root: String) -> Array[String]:
+	var substantive: Array[String] = []
+	if stage_root == "" or not DirAccess.dir_exists_absolute(stage_root):
+		return substantive
+	var existing: Array[String] = []
+	SafeStageScript._list_existing_rel_files(stage_root, stage_root, existing)
+	var metadata := [SafeStageScript.MANIFEST_NAME, "native_evidence.json",
+		"stage_provenance.json", "stage_cleanup_receipt.json"]
+	for rel in existing:
+		if not metadata.has(rel) and not rel.begins_with(SafeStageScript.BACKUP_SUBDIR + "/"):
+			substantive.append(rel)
+	substantive.sort()
+	return substantive
+
+
+## Positive finalization evidence. Every input is required: exact receipt
+## identity, receipt class, durable ledger result and the CURRENT stage
+## inventory. A partial or unverified receipt can never finalize a COMPLETE
+## intent, and a file that reappeared since the receipt is state drift.
 func _finalization_evidence(session_id: String, sess) -> Dictionary:
 	var stage_root := str(sess.stage_root)
 	var result := {"ok": false, "reason": "FINALIZATION_EVIDENCE_INSUFFICIENT",
 		"ownership_verified": false, "receipt_verified": false,
+		"receipt_class": RECEIPT_UNVERIFIED,
 		"stage_contents_unclassified": false, "remaining_owned_files": -1}
 	var receipt_path := stage_root.path_join("stage_cleanup_receipt.json")
+	var identity_issue := _prior_cleanup_identity_issue(session_id, sess)
 	var prior := _verified_prior_cleanup(session_id, sess)
+	if identity_issue != "":
+		result["reason"] = identity_issue
+		return result
+	var substantive := _stage_substantive_files(stage_root)
+	var protected_backups := _stage_backup_files(stage_root)
+	result["remaining_owned_files"] = substantive.size()
+	result["protected_backup_files"] = protected_backups
+	# T-223 / FIN-09..13: a full COMPLETE verdict requires a backing receipt
+	# that accounts for any retained protected backup. Ordinary inventory
+	# alone cannot speak for the skipped backup namespace.
+	if not protected_backups.is_empty() and not FileAccess.file_exists(receipt_path):
+		result["reason"] = "PROTECTED_BACKUPS_PRESENT"
+		result["stage_contents_unclassified"] = true
+		return result
 	if FileAccess.file_exists(receipt_path):
 		var rres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(receipt_path))
-		if bool(rres.get("ok", false)) and (rres.get("data", null) is Dictionary):
-			var receipt: Dictionary = rres.get("data", {})
-			var r_sid := str(receipt.get("session_id", ""))
-			var r_stage := str(receipt.get("stage_root", ""))
-			var r_stage_id := str(receipt.get("stage_id", ""))
-			var identity_ok := (r_sid == session_id and
-				(r_stage == "" or WorkspaceStore.canonical(r_stage) == WorkspaceStore.canonical(stage_root)) and
-				(r_stage_id == "" or str(sess.stage_id) == "" or r_stage_id == str(sess.stage_id)))
-			if identity_ok and str(receipt.get("status", "")).begins_with("OWNED_FILES_REMOVED"):
-				result["receipt_verified"] = true
-				result["ownership_verified"] = true
-	if bool(result["receipt_verified"]):
+		if not bool(rres.get("ok", false)) or not (rres.get("data", null) is Dictionary):
+			result["reason"] = "CLEANUP_RECEIPT_CORRUPT"
+			return result
+		var receipt: Dictionary = rres.get("data", {})
+		var receipt_class := _classify_cleanup_receipt(receipt)
+		result["receipt_class"] = receipt_class
+		if not _receipt_identity_ok(receipt, session_id, stage_root, str(sess.stage_id)):
+			result["reason"] = "CLEANUP_RECEIPT_IDENTITY_MISMATCH"
+			return result
+		result["receipt_verified"] = true
+		if receipt_class == RECEIPT_PARTIAL_FOREIGN_FILES_PRESERVED:
+			# NFR-01..03: a partial cleanup is never promoted to COMPLETE, even
+			# when the preserved foreign files have since disappeared.
+			result["stage_contents_unclassified"] = not substantive.is_empty()
+			result["reason"] = "CLEANUP_PARTIAL_FOREIGN_FILES_PRESERVED"
+			return result
+		if receipt_class != RECEIPT_FULL_CLEANUP:
+			result["reason"] = "CLEANUP_RECEIPT_UNVERIFIED"
+			return result
+		if not prior:
+			# A successful-looking receipt without a durable ok=true/non-partial
+			# cleanup result is not ownership proof.
+			result["reason"] = "CLEANUP_RECEIPT_NOT_BACKED_BY_LEDGER"
+			return result
+		var reappeared: Array[String] = []
+		for r in receipt.get("removed_files", []):
+			if r is Dictionary:
+				var rel := str((r as Dictionary).get("rel", ""))
+				if rel != "" and FileAccess.file_exists(stage_root.path_join(rel)):
+					reappeared.append(rel)
+		if not reappeared.is_empty():
+			result["reason"] = "CLEANUP_STATE_DRIFT"
+			result["drift_files"] = reappeared
+			return result
+		if not substantive.is_empty():
+			result["reason"] = "CLEANUP_FILES_REMAIN"
+			result["stage_contents_unclassified"] = true
+			return result
 		result["ok"] = true
 		result["reason"] = ""
+		result["ownership_verified"] = true
 		result["remaining_owned_files"] = 0
 		return result
 	if not DirAccess.dir_exists_absolute(stage_root):
@@ -2494,15 +2694,6 @@ func _finalization_evidence(session_id: String, sess) -> Dictionary:
 			result["ownership_verified"] = true
 			result["remaining_owned_files"] = 0
 		return result
-	var existing: Array[String] = []
-	SafeStageScript._list_existing_rel_files(stage_root, stage_root, existing)
-	var metadata := [SafeStageScript.MANIFEST_NAME, "native_evidence.json",
-		"stage_provenance.json", "stage_cleanup_receipt.json"]
-	var substantive: Array[String] = []
-	for rel in existing:
-		if not metadata.has(rel) and not rel.begins_with(SafeStageScript.BACKUP_SUBDIR + "/"):
-			substantive.append(rel)
-	result["remaining_owned_files"] = substantive.size()
 	result["stage_contents_unclassified"] = true
 	if substantive.is_empty() and prior:
 		result["ok"] = true
@@ -2803,6 +2994,7 @@ func cleanup_stage_terminal(session_id: String) -> Dictionary:
 	if not bool(auth.get("ok", false)):
 		return {"ok": false, "reason": str(auth.get("reason", "STAGE_CLEANUP_NOT_AUTHORIZED")),
 			"cleanup_rejected": true, "session_id": session_id,
+			"durable_complete": false, "recovery_required": true,
 			"recovery_pending": bool(auth.get("recovery_pending", false))}
 	var is_stock_addon := str(record.get("launch_mode", "")) == "STOCK_ADDON"
 	var stage_leaf := WorkspaceStore.canonical(str(sess.stage_root)).get_file()
@@ -2885,9 +3077,12 @@ func discover_cleanup_intents(include_completed: bool = false) -> Array[Dictiona
 				"remaining_owned_files": 0,
 				"ownership_verified": false,
 				"receipt_verified": false,
+				"receipt_class": "",
+				"partial_evidence": "",
 				"manifest_present": false,
 				"stage_contents_unclassified": false,
 				"unknown_files": [],
+				"backup_files": [],
 				"resolution": "UNKNOWN",
 				"requires_attention": true,
 				"terminal": false,
@@ -2909,6 +3104,7 @@ func discover_cleanup_intents(include_completed: bool = false) -> Array[Dictiona
 			# 1-2: validate session identity against the durable ledger.
 			var ledger_file := ledger_path()
 			var ledger_state := ""
+			var ledger_stage_id := ""
 			if not FileAccess.file_exists(ledger_file):
 				entry["ledger_status"] = "LEDGER_NOT_FOUND"
 			else:
@@ -2928,6 +3124,9 @@ func discover_cleanup_intents(include_completed: bool = false) -> Array[Dictiona
 						var rec = (items as Dictionary).get(sid, {})
 						if rec is Dictionary and str((rec as Dictionary).get("state", "")) != "":
 							ledger_state = str((rec as Dictionary).get("state", "")).to_upper()
+							var rec_sess = (rec as Dictionary).get("session", null)
+							if rec_sess is Dictionary:
+								ledger_stage_id = str((rec_sess as Dictionary).get("stage_id", ""))
 							entry["ledger_status"] = "MATCH"
 						else:
 							entry["ledger_status"] = "RECORD_NO_STATE"
@@ -2938,22 +3137,27 @@ func discover_cleanup_intents(include_completed: bool = false) -> Array[Dictiona
 			var stage_root := str(entry["stage_root"])
 			var remaining_owned := 0
 			var unknown: Array[String] = []
-			if stage_root == "" or not DirAccess.dir_exists_absolute(stage_root):
-				entry["stage_status"] = "STAGE_MISSING"
-				# A vanished stage is only benign when the durable ledger proves
-				# a prior complete cleanup; otherwise keep it unresolved.
-				var missing_rec := _durable_session_record(sid)
-				var missing_cl = missing_rec.get("cleanup", null)
-				var ledger_confirms := str(missing_rec.get("state", "")).to_upper() == "CLEANED_UP" and \
-					missing_cl is Dictionary and bool((missing_cl as Dictionary).get("ok", false)) and \
-					not bool((missing_cl as Dictionary).get("partial", false))
-				if str(entry["intent_state"]) == "CLEANUP_COMPLETE" and \
-						str(entry.get("ledger_status", "")) == "MATCH" and \
-						ledger_state == "CLEANED_UP":
-					ledger_confirms = true
+			var backup_files: Array[String] = _stage_backup_files(stage_root)
+			entry["backup_files"] = backup_files
+			# A vanished stage is never equivalent to a proven cleanup. The
+			# same authoritative evidence check applies in every discovery
+			# branch: full durable cleanup result bound to this session/root.
+			var ledger_confirms := _discovery_cleanup_confirmed(sid, stage_root, ledger_stage_id)
+			if stage_root == "":
+				entry["stage_status"] = "INVALID_STAGE_IDENTITY"
+				entry["drift_reasons"].append("INVALID_STAGE_IDENTITY")
+				entry["resolution"] = "INVALID_STAGE_IDENTITY"
+				entry["requires_attention"] = true
+				out.append(entry)
+				n = dir.get_next()
+				continue
+			elif not DirAccess.dir_exists_absolute(stage_root):
+				entry["stage_status"] = "STAGE_MISSING_UNVERIFIED" if not ledger_confirms else "STAGE_MISSING"
 				if ledger_confirms:
 					entry["ownership_verified"] = true
 					entry["stage_contents_unclassified"] = false
+				else:
+					entry["drift_reasons"].append("STAGE_MISSING_UNVERIFIED")
 			else:
 				var inspection := SafeStageScript.inspect_stage(stage_root)
 				entry["stage_status"] = str(inspection.get("reason", "STAGE_PRESENT"))
@@ -2981,29 +3185,75 @@ func discover_cleanup_intents(include_completed: bool = false) -> Array[Dictiona
 									and not rel.begins_with(SafeStageScript.BACKUP_SUBDIR + "/"):
 								unknown.append(rel)
 				else:
-					# Missing manifest: ownership must come from a verified receipt
-					# bound to this session and stage, never from an empty inventory.
+					# Missing manifest: the receipt reports history. Ownership needs a
+					# receipt bound to this session and stage AND the actual current
+					# inventory; a partial receipt never becomes a full-cleanup verdict.
 					var receipt_path := stage_root.path_join("stage_cleanup_receipt.json")
 					entry["stage_contents_unclassified"] = true
+					var substantive := _stage_substantive_files(stage_root)
+					for rel in substantive:
+						if not unknown.has(rel):
+							unknown.append(rel)
+					if not substantive.is_empty():
+						entry["partial_evidence"] = "UNCLASSIFIED_STAGE_CONTENTS"
+					if not backup_files.is_empty():
+						entry["stage_status"] = "BACKUPS_PRESERVED"
+						entry["partial_evidence"] = "PROTECTED_STAGE_BACKUPS_PRESERVED"
 					if FileAccess.file_exists(receipt_path):
 						entry["stage_status"] = "RECEIPT_PRESENT"
 						var rres := WorkspaceStore.parse_json_safe(FileAccess.get_file_as_string(receipt_path))
-						if bool(rres.get("ok", false)) and (rres.get("data", null) is Dictionary):
+						if not bool(rres.get("ok", false)) or not (rres.get("data", null) is Dictionary):
+							entry["stage_status"] = "RECEIPT_CORRUPT"
+						else:
 							var rcp: Dictionary = rres.get("data", {})
-							var r_sid := str(rcp.get("session_id", ""))
-							var r_stage := str(rcp.get("stage_root", ""))
-							var identity_ok := r_sid == sid and \
-								(r_stage == "" or WorkspaceStore.canonical(r_stage) == WorkspaceStore.canonical(stage_root))
-							if identity_ok and str(rcp.get("status", "")).begins_with("OWNED_FILES_REMOVED"):
-								entry["receipt_verified"] = true
-								entry["ownership_verified"] = true
-								entry["stage_contents_unclassified"] = false
+							var receipt_class := _classify_cleanup_receipt(rcp)
+							entry["receipt_class"] = receipt_class
 							var foreign = rcp.get("foreign_files_preserved", [])
 							if foreign is Array:
 								for f in foreign:
-									unknown.append(str(f))
+									var rel_f := str(f)
+									if rel_f != "" and not unknown.has(rel_f):
+										unknown.append(rel_f)
+							if not _discovery_receipt_identity_ok(rcp, sid, stage_root, ledger_stage_id):
+								entry["stage_status"] = "RECEIPT_IDENTITY_MISMATCH"
+								entry["partial_evidence"] = "CLEANUP_RECEIPT_IDENTITY_MISMATCH"
+							else:
+								entry["receipt_verified"] = true
+								if not backup_files.is_empty():
+									entry["stage_status"] = "BACKUPS_PRESERVED"
+									entry["partial_evidence"] = "PROTECTED_STAGE_BACKUPS_PRESERVED"
+								if receipt_class == RECEIPT_FULL_CLEANUP and substantive.is_empty() and \
+										backup_files.is_empty() and ledger_confirms:
+									entry["ownership_verified"] = true
+									entry["stage_contents_unclassified"] = false
+									entry["partial_evidence"] = ""
+								elif receipt_class == RECEIPT_PARTIAL_FOREIGN_FILES_PRESERVED:
+									entry["stage_status"] = "PARTIAL_CLEANUP_RECEIPT"
+									entry["partial_evidence"] = "PARTIAL_FOREIGN_FILES_PRESERVED"
+								elif receipt_class == RECEIPT_BACKUPS_PRESERVED:
+									entry["stage_status"] = "BACKUPS_PRESERVED"
+									entry["partial_evidence"] = "PROTECTED_STAGE_BACKUPS_PRESERVED"
+								elif receipt_class == RECEIPT_FULL_CLEANUP:
+									entry["partial_evidence"] = "FULL_RECEIPT_WITHOUT_CLEAN_INVENTORY"
+								else:
+									entry["stage_status"] = "RECEIPT_UNVERIFIED"
+									entry["partial_evidence"] = "CLEANUP_RECEIPT_UNVERIFIED"
+					if substantive.is_empty() and backup_files.is_empty() and ledger_confirms and \
+							not FileAccess.file_exists(receipt_path):
+						# NDS-04: a verified clean inventory backed by the durable ledger
+						# is the only manifest-less path to full completion.
+						entry["ownership_verified"] = true
+						entry["stage_contents_unclassified"] = false
+						entry["partial_evidence"] = ""
+						entry["stage_status"] = "STAGE_CLEAN_VERIFIED_EMPTY"
 			entry["remaining_owned_files"] = remaining_owned
 			entry["unknown_files"] = unknown
+			entry["backup_files"] = backup_files
+			if not backup_files.is_empty() and str(entry.get("stage_status", "")) not in \
+					["RECEIPT_IDENTITY_MISMATCH", "RECEIPT_CORRUPT"] and \
+					str(entry.get("partial_evidence", "")) != "CLEANUP_RECEIPT_IDENTITY_MISMATCH":
+				entry["stage_status"] = "BACKUPS_PRESERVED"
+				entry["partial_evidence"] = "PROTECTED_STAGE_BACKUPS_PRESERVED"
 			# 7-8: classify without mutating anything. A terminal-looking string
 			# is a claim, not proof; verify it against the durable state first.
 			var intent_state := str(entry["intent_state"])
@@ -3024,18 +3274,25 @@ func discover_cleanup_intents(include_completed: bool = false) -> Array[Dictiona
 					drift.append("LEDGER_DISAGREES")
 				if remaining_owned > 0:
 					drift.append("OWNED_FILES_REMAIN")
+				var partial_evidence := str(entry.get("partial_evidence", ""))
 				if not bool(entry["ownership_verified"]):
-					drift.append("OWNERSHIP_UNVERIFIED" if not bool(entry["stage_contents_unclassified"]) \
-						else "STAGE_CONTENTS_UNCLASSIFIED")
+					# A partial intent with a verified partial receipt is the honest
+					# state, not drift. Only a COMPLETE claim is contradicted by it.
+					if intent_state == "CLEANUP_COMPLETE" or partial_evidence != "" and \
+							partial_evidence != "PARTIAL_FOREIGN_FILES_PRESERVED":
+						drift.append("OWNERSHIP_UNVERIFIED" if not bool(entry["stage_contents_unclassified"]) \
+							else "STAGE_CONTENTS_UNCLASSIFIED")
+				if intent_state == "CLEANUP_COMPLETE" and partial_evidence != "":
+					drift.append("PARTIAL_CLEANUP_EVIDENCE")
 				if intent_state == "CLEANUP_COMPLETE" and not entry["manifest_present"] and \
-						not bool(entry["receipt_verified"]) and \
+						not bool(entry["receipt_verified"]) and not bool(entry["ownership_verified"]) and \
 						str(entry.get("stage_status", "")) != "STAGE_MISSING":
 					drift.append("CLEANUP_RECEIPT_MISSING")
 				if bool(monitor.get("active", false)):
 					drift.append("ACTIVE_MONITOR")
 				entry["drift_reasons"] = drift
 			entry["terminal"] = terminal
-			entry["verified_complete"] = terminal and drift.is_empty()
+			entry["verified_complete"] = terminal and drift.is_empty() and intent_state == "CLEANUP_COMPLETE"
 			entry["requires_attention"] = (not terminal) or not drift.is_empty()
 			if terminal:
 				if not drift.is_empty():

@@ -39,7 +39,7 @@ Ordered by impact. None of these is silently removed from scope.
 - Oriented 3D bounding-box (OBB) and sphere/ramp collision; ignores exact hull mesh triangles, collision layers, and `boxCollide`.
 - Persistent actor-level combat state (`CombatActorState` / `CombatScenario`, `T-62`, `T-66`, `T-67`) unifies projectile stepping, shooter-owned ammo/energy, reload cooldown enforcement (`READY`/`RELOADING`/`INSUFFICIENT_AMMO`/`INSUFFICIENT_ENERGY`/`DESTROYED`/`DISABLED`), persistent shield/hull across sequential shots, DoT status effects, independent secondary target shields and splash propagation, and immutable spatial/ODF-isolated sandboxed `CombatReplaySnapshot` replays as `APPROXIMATED` preview models; no real shield mesh/texture animation, deflection angle, regeneration, mines, deployables, or friendly fire are simulated.
 - Approximated beam/lightning (`BoltBeamNode` for `draw_bolt`/`draw_beam`/`ArcCannonClass`), homing missile turning (`omegaTurn`), seeded `shotVariance` spread, recoil kick, moving shooter velocity inheritance, configurable Moving Target patterns (`Strafe`/`Wiggle`/`Orbit`/`Approach`), and Shooter Aim modes (`Manual`/`Track`/`Lead`/`Fixed Forward`) are implemented as `APPROXIMATED` preview models, not native engine formulas.
-- Salvos/bursts use `salvoCount`/`salvoDelay`; `altName` alternate fire is previewable via FIRE ALT, but the `switchMask`/deploy transition itself, ammo cost, and morph timing are not modelled.
+- Salvos/bursts use `salvoCount`/`salvoDelay`; `altName` alternate fire is previewable via FIRE ALT, but the `switchMask`/deploy transition itself and morph timing are not modelled. Ammo and energy use the selected alternate ordnance costs exactly once. Physical slot identity is passed independently of the alternate `WeaponProfile` into volley, request, `ShotIdentity`, snapshot and replay records.
 - Multi-target splash falloff is linear (`APPROXIMATED`) across primary and secondary targets on vehicle/obstacle/ground impacts.
 - Multi-barrel firing resolves one record per declared `weaponHardN` and preserves missing-hardpoint
   positions; SALVO cycles those records and stores the actual hardpoint in `ShotIdentity`. Replay GUI
@@ -232,6 +232,40 @@ Ordered by impact. None of these is silently removed from scope.
   `RECOVERY_FINALIZATION_PENDING` is reported. A true cross-process verifier
   (`tests/verify_t86_cross_process_save.gd` + `tests/save_group_worker.gd`) kills a real Godot
   OS process mid-save and recovers from fresh processes.
+- T-221 native identity and physical mount provenance: a missing stage is `STAGE_MISSING_UNVERIFIED`
+  unless the durable record proves a full, non-partial cleanup bound to the same session, stage ID
+  and stage root; an empty intent stage root is `INVALID_STAGE_IDENTITY`. Finalization refuses a
+  durable record whose stage root differs from the in-memory session and refuses records missing
+  required session/stage identities. Hardpoint Inspector shots bind to the physical weapon slot and
+  firing mode (PRIMARY/ALTERNATE) as well as weapon identity; the Shot ID and historical launch
+  origin share one row predicate, so a wrong hardpoint hides both. Double-clicking a shot row
+  selects its event in the Combat State Timeline. The earlier `ObjectDB` leak warning was traced
+  to Node3D fixtures in the test harness and fixed there; no product resource leak was observed.
+- T-222 durable identity and backup provenance: the shared cleanup-identity authority compares
+  durable `stage_id` by value with the in-memory session and refuses conflicting top-level/nested
+  identities; a backup-only stage is reported as `BACKUPS_PRESERVED` with `backup_files` in startup
+  discovery and `OWNED_FILES_REMOVED_BACKUPS_PRESERVED` / `CLEANUP_PARTIAL_BACKUPS_PRESERVED` from
+  cleanup. Backup bytes and ownership metadata stay intact; empty backup directories do not create
+  a false partial state. The 3D Hardpoint Inspector draws one selectable marker per resolved model
+  hardpoint, links marker clicks to the picker and inspector row, and keeps shot identity tied to
+  the physical mount and PRIMARY/ALTERNATE context.
+- `SRC-036` closure remains `BLOCKED_FRAMEWORK`: the stored contract and live CLI both expose one
+  actionable clause (`SRC-036:R001`, disposition `UNKNOWN`), while the T-221 closure event recorded
+  `requirements=0/actionable=0`; `saipen ship` was additionally refused by an ambiguous release
+  continuation with the existing `v0.0.1` tag. No source disposition, release tag or installed SAIPEN
+  code was changed from this project; an owning-framework decision is required.
+  The live CLI now supports authenticated suite receipt references (`suite:<record-id>`):
+  `SRC-036:R001`, `SRC-037:R001` and `SRC-038:R001` were verified from the canonical
+  T-221..T-223 suite record, without editing coverage files. Their tickets were unblocked
+  into TODO for normal lifecycle re-entry; historical implementation evidence is preserved.
+- T-223 reserved stage namespace: ordinary staging refuses backup, manifest, recovery-marker,
+  native-evidence, provenance and cleanup-receipt paths (case-insensitive on Windows); a verified
+  empty backup directory is removed before CLEAN, while any retained backup is reported as a
+  partial outcome with byte-exact backups and a bound receipt. Finalization refuses a backup-only
+  stage without a compatible receipt. Viewport markers derive ownership from physical weapon-slot
+  declarations; marker clicks switch the weapon picker and profile, and SINGLE fire uses the
+  selected mount while TANDEM/SALVO policies are unchanged.
+- T-224 physical file identity: `.shaman_stage_backups` is reserved as a path component at every depth; protected backup files remain inventoried and are never ordinary staged payloads. Windows staging compares case-folded relative identities for unknown files, manifest ownership, incoming duplicates and hash guards while preserving the caller's display spelling. Existing manifests containing case-aliased rows are rejected. Ordinary restaging cannot replace an existing `stage_id` (`STAGE_IDENTITY_MISMATCH`). Shared hardpoints keep all owning slots and require an explicit owner selection; marker ordnance is resolved from that owner's Weapon ODF, never borrowed from the active profile. Non-weapon model hardpoints are `INSPECTION_ONLY`, and SINGLE selection is revalidated against slot, hardpoint and source revision before every shot. Replay refuses contradictory recorded physical slot identity instead of silently reporting success.
 - AUDAPACK producer access is `BLOCKED_EXTERNAL: AUDAPACK_PRODUCER_AUTH` (bridge `/v1/status` returned
   HTTP 403). The audit ZIP is not regenerated and no COMPLETE status is claimed.
 

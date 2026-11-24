@@ -22,6 +22,8 @@ class ShotIdentity:
 	var ordnance_path: String = ""
 	var source_revision: Dictionary = {}
 	var hardpoint: String = ""
+	var weapon_slot: int = -1
+	var firing_context: String = "PRIMARY"
 	var barrel_index: int = 0
 	var barrel_mode: String = "SINGLE"
 	var volley_id: int = 0
@@ -42,7 +44,9 @@ class ShotIdentity:
 			"shot_id": shot_id, "weapon_name": weapon_name,
 			"ordnance_name": ordnance_name, "weapon_path": weapon_path,
 			"ordnance_path": ordnance_path, "source_revision": source_revision.duplicate(true),
-			"hardpoint": hardpoint, "barrel_index": barrel_index,
+			"hardpoint": hardpoint, "weapon_slot": weapon_slot,
+			"firing_context": firing_context,
+			"barrel_index": barrel_index,
 			"barrel_mode": barrel_mode, "volley_id": volley_id,
 			"projectile_model": projectile_model, "render_name": render_name,
 			"muzzle_render": muzzle_render, "fire_sound": fire_sound,
@@ -62,6 +66,8 @@ class ShotIdentity:
 		var rev = d.get("source_revision", {})
 		id.source_revision = (rev as Dictionary).duplicate(true) if rev is Dictionary else {}
 		id.hardpoint = str(d.get("hardpoint", ""))
+		id.weapon_slot = int(d.get("weapon_slot", -1))
+		id.firing_context = str(d.get("firing_context", "PRIMARY"))
 		id.barrel_index = int(d.get("barrel_index", 0))
 		id.barrel_mode = str(d.get("barrel_mode", "SINGLE"))
 		id.volley_id = int(d.get("volley_id", 0))
@@ -167,7 +173,8 @@ func reset() -> void:
 func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_position: Vector3,
 		target_health: float = -1.0, p_extra_targets: Array = [], p_obstacles: Array = [],
 		shooter_velocity: Vector3 = Vector3.ZERO, p_shooter_state: RefCounted = null,
-		p_target_state: RefCounted = null) -> Shot:
+		p_target_state: RefCounted = null, p_physical_weapon_slot: int = -1,
+		p_firing_context: String = "PRIMARY") -> Shot:
 	profile.refresh()
 	var s := Shot.new()
 	_next_shot_id += 1
@@ -259,6 +266,8 @@ func spawn(profile: WeaponProfile, origin: Vector3, direction: Vector3, target_p
 	id.weapon_name = profile.weapon_name
 	id.ordnance_name = profile.ordnance_name
 	id.weapon_path = profile.weapon_path
+	id.weapon_slot = p_physical_weapon_slot if p_physical_weapon_slot >= 0 else profile.active_slot_index
+	id.firing_context = p_firing_context.strip_edges().to_upper() if p_firing_context.strip_edges() != "" else "PRIMARY"
 	id.ordnance_path = profile.ordnance_path
 	id.source_revision = (revs as Dictionary).duplicate(true) if revs is Dictionary else {}
 	id.render_name = profile.render_name

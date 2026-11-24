@@ -88,6 +88,55 @@ static func _has_link_component(abs_path: String) -> bool:
 	return false
 
 
+## T-223 / STAGE-RES: one reserved-stage path policy for SHAMAN-owned backup
+## and metadata namespaces. T-224 extends the backup namespace to every path
+## component so inventory and validation cannot disagree about protected data.
+const RESERVED_STAGE_NAMES := [
+	"stage_manifest.json", "stage_recovery_pending.json",
+	"native_evidence.json", "stage_provenance.json", "stage_cleanup_receipt.json",
+]
+
+
+static func path_identity(rel: String) -> String:
+	var clean := WorkspaceStore.clean_rel(rel).strip_edges().replace("\\", "/")
+	if OS.get_name() == "Windows":
+		var identity_parts: Array[String] = []
+		for part in clean.split("/", false):
+			identity_parts.append(part.trim_suffix(".").trim_suffix(" ").to_lower())
+		return "/".join(PackedStringArray(identity_parts))
+	return clean
+
+
+static func _is_windows_alias_path(rel: String) -> bool:
+	if OS.get_name() != "Windows":
+		return false
+	var clean := WorkspaceStore.clean_rel(rel).strip_edges().replace("\\", "/")
+	for part in clean.split("/", false):
+		if part != part.trim_suffix(".").trim_suffix(" "):
+			return true
+	return false
+
+
+static func _is_backup_stage_path(rel: String) -> bool:
+	var clean := WorkspaceStore.clean_rel(rel).strip_edges().replace("\\", "/")
+	for part in clean.split("/", false):
+		if part.to_lower() == BACKUP_SUBDIR:
+			return true
+	return false
+
+
+static func _is_reserved_stage_path(rel: String) -> bool:
+	var clean := WorkspaceStore.clean_rel(rel).strip_edges().replace("\\", "/")
+	if clean == "":
+		return false
+	if _is_backup_stage_path(clean):
+		return true
+	for reserved in RESERVED_STAGE_NAMES:
+		if clean.to_lower() == str(reserved).to_lower():
+			return true
+	return false
+
+
 static func _same_path(a: String, b: String) -> bool:
 	var ca := WorkspaceStore.canonical(a)
 	var cb := WorkspaceStore.canonical(b)
@@ -109,6 +158,7 @@ static func _validate_manifest_dict(parsed, expected_stage_dir: String) -> Dicti
 	var files = parsed.get("files", null)
 	if not (files is Array):
 		return {"ok": false, "reason": "INVALID_STAGE_MANIFEST", "error": "stage_manifest.json files is not an Array"}
+	var seen_paths := {}
 	for item in files:
 		if not (item is Dictionary):
 			return {"ok": false, "reason": "INVALID_STAGE_MANIFEST", "error": "stage_manifest.json contains non-dict file entry"}
@@ -116,6 +166,14 @@ static func _validate_manifest_dict(parsed, expected_stage_dir: String) -> Dicti
 		var clean := WorkspaceStore.clean_rel(raw_rel)
 		if clean == "" or clean != raw_rel.replace("\\", "/").strip_edges():
 			return {"ok": false, "reason": "TRAVERSAL_REJECTED", "error": "stage_manifest.json contains unsafe path: " + raw_rel}
+		if _is_windows_alias_path(raw_rel):
+			return {"ok": false, "reason": "WINDOWS_PATH_ALIAS_REJECTED", "error": "stage_manifest.json contains a Windows alias path: " + raw_rel}
+		if _is_reserved_stage_path(clean):
+			return {"ok": false, "reason": "RESERVED_STAGE_PATH", "error": "stage_manifest.json names a reserved SHAMAN path: " + raw_rel}
+		var identity := path_identity(clean)
+		if seen_paths.has(identity):
+			return {"ok": false, "reason": "INVALID_STAGE_MANIFEST", "error": "stage_manifest.json contains duplicate physical path: " + raw_rel}
+		seen_paths[identity] = true
 		if not _is_hex_md5(str(item.get("md5", ""))):
 			return {"ok": false, "reason": "INVALID_STAGE_MANIFEST", "error": "stage_manifest.json entry missing valid md5: " + clean}
 	return {"ok": true, "manifest": parsed}
@@ -157,6 +215,18 @@ static func validate_stage_destination(stage_root: String, extra_protected: Arra
 	return {"ok": true, "stage": stage, "base": matched_base, "reason": "", "error": ""}
 
 
+## Protected backups are a separate inventory class: the ordinary walker skips
+## BACKUP_SUBDIR, so this is the authoritative reader for retained payload.
+static func _list_protected_backup_files(stage_root: String) -> Array[String]:
+	var out: Array[String] = []
+	var backup_root := stage_root.path_join(BACKUP_SUBDIR)
+	if not DirAccess.dir_exists_absolute(backup_root):
+		return out
+	_list_existing_rel_files(backup_root, stage_root, out)
+	out.sort()
+	return out
+
+
 static func _list_existing_rel_files(dir_path: String, root_path: String, out: Array[String]) -> void:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
@@ -169,8 +239,7 @@ static func _list_existing_rel_files(dir_path: String, root_path: String, out: A
 			if dir.has_method("is_link") and dir.is_link(n):
 				out.append(full.trim_prefix(root_path).trim_prefix("/"))
 			elif dir.current_is_dir():
-				if n != BACKUP_SUBDIR:
-					_list_existing_rel_files(full, root_path, out)
+				_list_existing_rel_files(full, root_path, out)
 			else:
 				out.append(full.trim_prefix(root_path).trim_prefix("/"))
 		n = dir.get_next()
@@ -201,6 +270,7 @@ static func stage(stage_root: String, files: Dictionary, metadata: Dictionary = 
 		}
 	var manifest_path := stage_dir.path_join(MANIFEST_NAME)
 	var owned_files: Dictionary = {}
+	var owned_by_identity := {}
 	var existing_stage_id := ""
 	if FileAccess.file_exists(manifest_path):
 		var jres := _parse_json_safe(FileAccess.get_file_as_string(manifest_path))
@@ -223,29 +293,58 @@ static func stage(stage_root: String, files: Dictionary, metadata: Dictionary = 
 		existing_stage_id = str(parsed.get("stage_id", ""))
 		for item in parsed.get("files", []):
 			if item is Dictionary:
-				owned_files[str(item.get("rel", ""))] = str(item.get("md5", "")).to_lower()
+				var rel := str(item.get("rel", ""))
+				owned_files[rel] = str(item.get("md5", "")).to_lower()
+				owned_by_identity[path_identity(rel)] = rel
 
 	var existing_unknown: Dictionary = {}
+	var protected_backup_files: Array[String] = []
 	if DirAccess.dir_exists_absolute(stage_dir):
 		var existing_list: Array[String] = []
 		_list_existing_rel_files(stage_dir, stage_dir, existing_list)
 		for rel_existing in existing_list:
 			if rel_existing == MANIFEST_NAME or rel_existing == RECOVERY_MARKER_NAME:
 				continue
-			if not owned_files.has(rel_existing):
-				existing_unknown[rel_existing] = true
+			if _is_backup_stage_path(rel_existing):
+				protected_backup_files.append(rel_existing)
+				continue
+			if not owned_by_identity.has(path_identity(rel_existing)):
+				existing_unknown[path_identity(rel_existing)] = true
 
 	var conflict_strategy := str(options.get("conflict_strategy", "refuse")).strip_edges().to_lower()
+	var explicit_stage_id := str(options.get("stage_id", "")).strip_edges()
+	if existing_stage_id != "" and explicit_stage_id != "" and explicit_stage_id != existing_stage_id:
+		return {
+			"ok": false,
+			"stage": stage_dir,
+			"reason": "STAGE_IDENTITY_MISMATCH",
+			"error": "existing stage_id %s cannot be replaced by %s through restaging" % [existing_stage_id, explicit_stage_id],
+		}
 	var planned: Array[Dictionary] = []
 	var modified_conflicts: Array[Dictionary] = []
 	var preserved_modified: Array[String] = []
 	var explicit_backups_needed: Dictionary = {}
+	var incoming_targets := {}
 
 	for raw_rel in files:
-		var safe := WorkspaceStore.clean_rel(str(raw_rel))
-		if safe == "" or safe == MANIFEST_NAME or safe == RECOVERY_MARKER_NAME:
-			return {"ok": false, "stage": stage_dir, "reason": "TRAVERSAL_REJECTED", "error": "unsafe staged path: " + str(raw_rel)}
-		if existing_unknown.has(safe):
+		var raw_text := str(raw_rel)
+		var safe := WorkspaceStore.clean_rel(raw_text)
+		if safe == "":
+			return {"ok": false, "stage": stage_dir, "reason": "TRAVERSAL_REJECTED", "error": "unsafe staged path: " + raw_text}
+		if _is_windows_alias_path(raw_text):
+			return {"ok": false, "stage": stage_dir, "reason": "WINDOWS_PATH_ALIAS_REJECTED", "error": "Windows alias stage path cannot be staged: " + raw_text}
+		if _is_reserved_stage_path(safe):
+			return {"ok": false, "stage": stage_dir, "reason": "RESERVED_STAGE_PATH", "error": "reserved SHAMAN stage path cannot be staged: " + raw_text}
+		var safe_identity := path_identity(safe)
+		if incoming_targets.has(safe_identity):
+			return {
+				"ok": false,
+				"stage": stage_dir,
+				"reason": "DUPLICATE_TARGET",
+				"error": "incoming paths resolve to one physical stage file: " + str(incoming_targets[safe_identity]) + " / " + safe,
+			}
+		incoming_targets[safe_identity] = safe
+		if existing_unknown.has(safe_identity):
 			return {
 				"ok": false,
 				"stage": stage_dir,
@@ -261,26 +360,28 @@ static func stage(stage_root: String, files: Dictionary, metadata: Dictionary = 
 		var bytes: PackedByteArray = raw if raw is PackedByteArray else str(raw).to_utf8_buffer()
 
 		# P0-SAFETY-01: Mandatory MD5 verification before overwriting any existing owned file.
-		if owned_files.has(safe) and FileAccess.file_exists(target):
-			var expected_md5 := str(owned_files[safe]).to_lower()
-			var current_md5 := FileAccess.get_md5(target).to_lower()
-			if current_md5 != expected_md5:
-				var conflict_info := {
-					"rel": safe,
-					"target": target,
-					"manifest_md5": expected_md5,
-					"current_md5": current_md5,
-					"incoming_bytes": bytes.size(),
-					"current_bytes": FileAccess.get_file_as_bytes(target).size(),
-				}
-				if conflict_strategy == "preserve":
-					preserved_modified.append(safe)
-					continue
-				elif conflict_strategy == "replace_with_backup":
-					explicit_backups_needed[safe] = target
-				else:
-					modified_conflicts.append(conflict_info)
-					continue
+		if owned_by_identity.has(safe_identity):
+			var owned_rel := str(owned_by_identity[safe_identity])
+			var expected_md5 := str(owned_files[owned_rel]).to_lower()
+			if FileAccess.file_exists(target):
+				var current_md5 := FileAccess.get_md5(target).to_lower()
+				if current_md5 != expected_md5:
+					var conflict_info := {
+						"rel": safe,
+						"target": target,
+						"manifest_md5": expected_md5,
+						"current_md5": current_md5,
+						"incoming_bytes": bytes.size(),
+						"current_bytes": FileAccess.get_file_as_bytes(target).size(),
+					}
+					if conflict_strategy == "preserve":
+						preserved_modified.append(safe)
+						continue
+					elif conflict_strategy == "replace_with_backup":
+						explicit_backups_needed[safe] = target
+					else:
+						modified_conflicts.append(conflict_info)
+						continue
 
 		planned.append({"rel": safe, "target": target, "bytes": bytes})
 
@@ -305,6 +406,7 @@ static func stage(stage_root: String, files: Dictionary, metadata: Dictionary = 
 			"manifest": manifest_path,
 			"planned": dry_items,
 			"preserved": preserved_modified,
+			"protected_backups": protected_backup_files,
 		}
 
 	DirAccess.make_dir_recursive_absolute(stage_dir)
@@ -371,12 +473,12 @@ static func stage(stage_root: String, files: Dictionary, metadata: Dictionary = 
 		}
 
 	# Merge any previously owned files that remain on disk and were not replaced in this call.
-	var staged_by_rel: Dictionary = {}
+	var staged_identities := {}
 	for sitem in staged:
-		staged_by_rel[str(sitem.rel)] = sitem
+		staged_identities[path_identity(str(sitem.rel))] = true
 	var merged_files: Array[Dictionary] = staged.duplicate()
 	for prev_rel in owned_files:
-		if staged_by_rel.has(prev_rel):
+		if staged_identities.has(path_identity(prev_rel)):
 			continue
 		var prev_target := WorkspaceStore.canonical(stage_dir.path_join(prev_rel))
 		if FileAccess.file_exists(prev_target):
@@ -386,7 +488,6 @@ static func stage(stage_root: String, files: Dictionary, metadata: Dictionary = 
 				"md5": str(owned_files[prev_rel]),
 			})
 
-	var explicit_stage_id := str(options.get("stage_id", "")).strip_edges()
 	var stage_id := explicit_stage_id
 	if stage_id == "":
 		stage_id = existing_stage_id if existing_stage_id != "" else stage_dir.get_file()
@@ -424,6 +525,7 @@ static func stage(stage_root: String, files: Dictionary, metadata: Dictionary = 
 		"staged": staged,
 		"preserved": preserved_modified,
 		"backups": backup_paths,
+		"protected_backups": protected_backup_files,
 	}
 
 
@@ -499,6 +601,7 @@ static func inspect_stage(stage_root: String) -> Dictionary:
 		"ownership": "UNRESOLVED", "hash_status": "UNVERIFIED",
 		"session_status": "UNKNOWN", "session_id": "",
 		"unknown_files": [], "modified_files": [], "missing_files": [],
+		"protected_backups": [],
 		"cleanup_allowed": false,
 		"reason": "STAGE_INSPECTION_INCOMPLETE",
 	}
@@ -538,13 +641,15 @@ static func inspect_stage(stage_root: String) -> Dictionary:
 	var declared := {}
 	for item in files:
 		if item is Dictionary:
-			declared[str((item as Dictionary).get("rel", ""))] = true
-	declared[MANIFEST_NAME] = true
+			declared[path_identity(str((item as Dictionary).get("rel", "")))] = true
+	declared[path_identity(MANIFEST_NAME)] = true
 	# native_evidence.json is written by SHAMAN itself; treat it as known
 	# metadata, never as a foreign file that blocks safety checks by mistake.
-	declared["native_evidence.json"] = true
+	declared[path_identity("native_evidence.json")] = true
 	for rel in existing:
-		if not declared.has(rel) and not rel.begins_with(BACKUP_SUBDIR + "/"):
+		if _is_backup_stage_path(rel):
+			result["protected_backups"].append(rel)
+		elif not declared.has(path_identity(rel)):
 			result["unknown_files"].append(rel)
 	var evidence_path := canon.path_join("native_evidence.json")
 	if FileAccess.file_exists(evidence_path):
@@ -878,21 +983,40 @@ static func cleanup(stage_root: String, extra_protected: Array[String] = [],
 	var remaining: Array[String] = []
 	_list_existing_rel_files(stage_dir, stage_dir, remaining)
 	var declared_after := {}
-	declared_after[MANIFEST_NAME] = true
-	declared_after["native_evidence.json"] = true
-	declared_after["stage_provenance.json"] = true
-	declared_after["stage_cleanup_receipt.json"] = true
+	declared_after[path_identity(MANIFEST_NAME)] = true
+	declared_after[path_identity("native_evidence.json")] = true
+	declared_after[path_identity("stage_provenance.json")] = true
+	declared_after[path_identity("stage_cleanup_receipt.json")] = true
 	for rel in remaining:
-		if not declared_after.has(rel) and not rel.begins_with(BACKUP_SUBDIR + "/"):
+		if _is_backup_stage_path(rel):
+			continue
+		if not declared_after.has(path_identity(rel)):
 			surviving_unknown.append(rel)
-	if not surviving_unknown.is_empty():
+	var protected_backups: Array[String] = []
+	for rel in remaining:
+		if _is_backup_stage_path(rel):
+			protected_backups.append(rel)
+	if not surviving_unknown.is_empty() or not protected_backups.is_empty():
+		var backup_hashes: Dictionary = {}
+		for rel_b in protected_backups:
+			backup_hashes[rel_b] = WorkspaceStore._md5_bytes(
+				FileAccess.get_file_as_bytes(stage_dir.path_join(rel_b)))
+		# A partial receipt must describe both retained classes honestly. The
+		# foreign-file status is kept when foreign files survive so T-214's
+		# receipt classifiers stay compatible; backup-only stages get their
+		# own explicit status and both classes are listed in the payload.
+		var receipt_status := "OWNED_FILES_REMOVED_FOREIGN_FILES_PRESERVED"
+		if surviving_unknown.is_empty():
+			receipt_status = "OWNED_FILES_REMOVED_BACKUPS_PRESERVED"
 		var receipt := {
 			"schema": 1,
-			"status": "OWNED_FILES_REMOVED_FOREIGN_FILES_PRESERVED",
+			"status": receipt_status,
 			"completed_at": Time.get_datetime_string_from_system(),
 			"stage_root": stage_dir,
 			"removed_files": results,
 			"foreign_files_preserved": surviving_unknown,
+			"protected_backups_preserved": protected_backups,
+			"protected_backup_hashes": backup_hashes,
 			"stage_directory_retained": true,
 		}
 		var receipt_path := stage_dir.path_join("stage_cleanup_receipt.json")
@@ -943,10 +1067,13 @@ static func cleanup(stage_root: String, extra_protected: Array[String] = [],
 				"evidence_failed": missing,
 				"error": "durable cleanup evidence could not be verified: " + ", ".join(PackedStringArray(missing)),
 			}
+		var cleanup_status := "FOREIGN_FILES_PRESERVED"
+		if surviving_unknown.is_empty() and not protected_backups.is_empty():
+			cleanup_status = "CLEANUP_PARTIAL_BACKUPS_PRESERVED"
 		return {
 			"ok": true,
 			"partial": true,
-			"status": "FOREIGN_FILES_PRESERVED",
+			"status": cleanup_status,
 			"reason": "OWNED_FILES_REMOVED",
 			"stage": stage_dir,
 			"removed": removed,
@@ -954,6 +1081,7 @@ static func cleanup(stage_root: String, extra_protected: Array[String] = [],
 			"rejected": [],
 			"results": results,
 			"foreign_files": surviving_unknown,
+			"protected_backups": protected_backups,
 			"stage_directory_retained": true,
 			"provenance_preserved": prov_ok,
 			"receipt_verified": receipt_ok,
@@ -965,8 +1093,31 @@ static func cleanup(stage_root: String, extra_protected: Array[String] = [],
 	# only exists to hold stale evidence (NC-39: empty stage dirs must go).
 	DirAccess.remove_absolute(stage_dir.path_join("native_evidence.json"))
 	DirAccess.remove_absolute(manifest_path)
+	# T-223 / BAK-16..21: remove only a VERIFIED-EMPTY SHAMAN backup directory.
+	# A nonempty backup remains protected by the partial branch above.
+	var backup_dir := stage_dir.path_join(BACKUP_SUBDIR)
+	var backup_dir_removed := true
+	if DirAccess.dir_exists_absolute(backup_dir) and \
+			_list_protected_backup_files(stage_dir).is_empty() and \
+			_list_directory_entries(backup_dir).is_empty():
+		backup_dir_removed = DirAccess.remove_absolute(backup_dir) == OK
+	elif DirAccess.dir_exists_absolute(backup_dir):
+		backup_dir_removed = false
 	# Remove stage_dir itself only if completely empty (preserves unknown files!).
-	_remove_if_empty(stage_dir)
+	var stage_root_removed := _remove_if_empty(stage_dir)
+	if not backup_dir_removed or not stage_root_removed:
+		return {
+			"ok": true,
+			"partial": true,
+			"status": "CLEANUP_RETAINED_DIRECTORY",
+			"reason": "EMPTY_BACKUP_DIRECTORY_REMOVAL_FAILED",
+			"stage": stage_dir,
+			"removed": removed,
+			"preserved": [],
+			"rejected": [],
+			"results": results,
+			"stage_directory_retained": true,
+		}
 	return {
 		"ok": true,
 		"partial": false,
@@ -1009,6 +1160,24 @@ static func _prune_empty_parents(dir_path: String, stop_root: String) -> void:
 		if not _remove_if_empty(cur):
 			break
 		cur = cur.get_base_dir()
+
+
+## T-223: enumerate immediate entries of one directory, including nested
+## directories, so an empty backup directory can be proven empty before removal.
+static func _list_directory_entries(dir_path: String) -> Array[String]:
+	var out: Array[String] = []
+	var d := DirAccess.open(dir_path)
+	if d == null:
+		out.append("<unreadable>")
+		return out
+	d.list_dir_begin()
+	var n := d.get_next()
+	while n != "":
+		if n != "." and n != "..":
+			out.append(n)
+		n = d.get_next()
+	d.list_dir_end()
+	return out
 
 
 static func _remove_if_empty(dir_path: String) -> bool:

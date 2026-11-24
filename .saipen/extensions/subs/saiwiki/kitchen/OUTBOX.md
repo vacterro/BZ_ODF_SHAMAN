@@ -123,3 +123,33 @@
 - **verified:** PASS -- saipen validate CURRENT_PASS.
 - **instructions:** no integration required; payload [] intentional.
 - **details:** No payload; producer stage satisfied.
+
+## W-009: shipped-state producer surface
+- **status:** ready
+- **summary:** Producer surface verified against shipped-state tree.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saiwiki
+- **source_head:** bfa9f51bd1122d381de93bbe5559a0e0c3116a32
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:54a42475a124ab0f27e83d600a284a9cc54d9668029c4828cfc48512b031df13
+- **coverage:** owned surface reviewed against current source.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No payload; producer stage satisfied.
+
+## W-010: closure producer surface
+- **status:** ready
+- **summary:** Producer surface verified against v0.0.1 closure commit.
+- **main_project_refs:** [README.md, docs/, VERSION, CHANGELOG.md]
+- **critical:** false
+- **producer:** saiwiki
+- **source_head:** 2844f754962bb98fb1c1f18746c9363dc690b3f9
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:54a42475a124ab0f27e83d600a284a9cc54d9668029c4828cfc48512b031df13
+- **coverage:** owned surface reviewed against closure tree.
+- **payload:** []
+- **verified:** PASS -- saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No payload; producer stage satisfied.

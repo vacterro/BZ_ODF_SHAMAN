@@ -665,7 +665,8 @@ func _blk_09(tmp: String) -> void:
 		if str(it4.get("session_id", "")) == "t86unk":
 			unk_found = true
 			unk_protected = str(it4.get("resolution", "")) == "RETRY_REQUIRES_RECONCILIATION" or \
-				str(it4.get("stage_status", "")) == "STAGE_MISSING"
+				str(it4.get("stage_status", "")) == "STAGE_MISSING" or \
+				str(it4.get("stage_status", "")) == "STAGE_MISSING_UNVERIFIED"
 	_check(unk_found and unk_protected, "NC-68: unknown/missing stage intent stays protected")
 	# NC-66: discovery is idempotent and read-only (same verdicts twice).
 	var intents5: Array[Dictionary] = NativeExperimentRunner.new().discover_cleanup_intents()

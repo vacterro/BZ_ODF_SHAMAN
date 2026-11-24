@@ -17,7 +17,8 @@ var target_path: String = ""
 var weapon_name: String = ""
 var weapon_hardpoint: String = ""
 ## All resolvable weaponNameN slots on the shooter (T-76). Each entry is
-## {slot, weapon, path, hardpoint, hardpoints}. The active slot is selected by
+## {slot, weapon, path, hardpoint, hardpoints, ordnance_name, ordnance_path,
+## ordnance_status, source_revision}. The active slot is selected by
 ## resolve(..., p_slot_index); index 0 keeps the historical first-weapon default.
 var weapon_slots: Array[Dictionary] = []
 var active_slot_index: int = 0
@@ -164,6 +165,17 @@ func _resolve_weapon_chain(weapon_override: String = "") -> bool:
 			if k.begins_with("weaponname") and str(e.core_value()).to_lower() == weapon_override.to_lower():
 				weapon_hardpoint = str(hards.get(k.trim_prefix("weaponname"), ""))
 				break
+		if weapon_slots.is_empty():
+			var slot_hps: Array[String] = []
+			if weapon_hardpoint != "":
+				slot_hps.append(weapon_hardpoint)
+			weapon_slots = [{
+				"slot": "override", "weapon": weapon_override, "path": override_hit,
+				"hardpoint": weapon_hardpoint, "hardpoints": slot_hps,
+				"resolved_index": 0, "ordnance_name": "", "ordnance_path": "",
+				"ordnance_status": "UNRESOLVED", "source_revision": {},
+			}]
+			active_slot_index = 0
 	else:
 		# weaponName1..N live under GameObjectClass (variants may put them elsewhere).
 		# T-76: enumerate every resolvable slot; the operator can switch between
@@ -191,10 +203,15 @@ func _resolve_weapon_chain(weapon_override: String = "") -> bool:
 				"path": hit,
 				"hardpoint": hp,
 				"hardpoints": hps,
+				"ordnance_name": "",
+				"ordnance_path": "",
+				"ordnance_status": "UNRESOLVED",
+				"source_revision": {},
 			})
 		slot_entries.sort_custom(func(a, b): return str(a.slot).to_int() < str(b.slot).to_int())
 		for i in range(slot_entries.size()):
 			slot_entries[i]["resolved_index"] = i
+			_resolve_slot_ordnance(slot_entries[i], shooter_doc, shooter_path)
 		weapon_slots = slot_entries.duplicate(true)
 		if weapon_slots.is_empty():
 			errors.append("Shooter ODF declares no resolvable weaponNameN.")
@@ -220,9 +237,11 @@ func _resolve_weapon_chain(weapon_override: String = "") -> bool:
 	if weapon_name == "":
 		errors.append("Shooter ODF declares no resolvable weaponNameN.")
 		return false
+	var chosen_source := slot_source(active_slot_index)
 	weapon_doc = OdfDocument.load_cached(weapon_path)
 	if weapon_doc == null:
 		errors.append("Weapon ODF could not be loaded: " + weapon_path)
+		_set_slot_ordnance(active_slot_index, "", "", "ORDNANCE_UNRESOLVED", {})
 		return false
 	# Collect matching weaponHardN / recoilNameN for multi-hardpoint weapons
 	# (e.g. Titan dual garc_c, ivtank dual minigun barrels). When the active
@@ -256,32 +275,40 @@ func _resolve_weapon_chain(weapon_override: String = "") -> bool:
 
 	ordnance_name = ""
 	ordnance_path = ""
+	ordnance_doc = null
 	is_beam_weapon = false
 	weapon_class_label = _find_value(weapon_doc, ["classLabel"]).strip_edges().to_lower()
-	for e in weapon_doc.effective_entries():
-		if e.key_raw.to_lower() == "ordname":
-			ordnance_name = e.core_value()
-			break
+	ordnance_name = _find_value(weapon_doc, ["ordName"]).strip_edges()
 	if ordnance_name == "" or ordnance_name.to_lower() == "null":
-		# Support direct beam / ArcCannonClass weapons (e.g. Titan garc_a.odf with ordName = NULL).
-		var has_direct_arc := weapon_doc.has_header("ArcCannonClass") or weapon_class_label == "arccannon" or weapon_class_label == "beam" or _find_value(weapon_doc, ["finishDist"]) != ""
-		if has_direct_arc:
-			is_beam_weapon = true
-			ordnance_name = weapon_name + " (arc)"
-			ordnance_path = weapon_path
-			ordnance_doc = weapon_doc
-			notes.append("Direct Arc/Beam weapon (%s, ordName=NULL): firing via [ArcCannonClass]." % weapon_name)
-			return true
-		errors.append("Weapon %s has no ordName." % weapon_name)
-		return false
+		if not _is_direct_weapon(weapon_doc):
+			errors.append("Weapon %s has no ordName." % weapon_name)
+			_set_slot_ordnance(active_slot_index, "", "", "ORDNANCE_UNRESOLVED", {})
+			ordnance_doc = null
+			return false
+		is_beam_weapon = true
+		ordnance_name = weapon_name + " (arc)"
+		ordnance_path = weapon_path
+		ordnance_doc = weapon_doc
+		notes.append("Direct Arc/Beam weapon (%s, ordName=NULL): firing via [ArcCannonClass]." % weapon_name)
+		_set_slot_ordnance(active_slot_index, ordnance_name, ordnance_path, "DIRECT_WEAPON",
+			source_revisions_for(shooter_path, shooter_doc, weapon_path, weapon_doc, ordnance_path, ordnance_doc))
+		return true
+	if not chosen_source.is_empty() and str(chosen_source.get("ordnance_status", "")) == "RESOLVED":
+		ordnance_path = str(chosen_source.get("ordnance_path", ""))
+		ordnance_name = str(chosen_source.get("ordnance_name", ordnance_name))
 	ordnance_path = index.resolve_path_from(ordnance_name, weapon_path)
 	if ordnance_path == "":
 		errors.append("Ordnance ODF not found in indexed roots: " + ordnance_name)
+		_set_slot_ordnance(active_slot_index, "", "", "ORDNANCE_UNRESOLVED", {})
+		ordnance_doc = null
 		return false
 	ordnance_doc = OdfDocument.load_cached(ordnance_path)
 	if ordnance_doc == null:
 		errors.append("Ordnance ODF could not be loaded: " + ordnance_path)
+		_set_slot_ordnance(active_slot_index, "", "", "ORDNANCE_UNRESOLVED", {})
 		return false
+	_set_slot_ordnance(active_slot_index, ordnance_name, ordnance_path, "RESOLVED",
+		source_revisions_for(shooter_path, shooter_doc, weapon_path, weapon_doc, ordnance_path, ordnance_doc))
 	return true
 
 
@@ -548,6 +575,98 @@ func _int_or(v: String, fallback: int) -> int:
 	return v.to_int()
 
 
+static func source_revisions_for(p_shooter_path: String, p_shooter_doc: OdfDocument,
+		p_weapon_path: String, p_weapon_doc: OdfDocument,
+		p_ordnance_path: String, p_ordnance_doc: OdfDocument) -> Dictionary:
+	var revs := {}
+	for pair in [
+		["shooter", p_shooter_path, p_shooter_doc],
+		["weapon", p_weapon_path, p_weapon_doc],
+		["ordnance", p_ordnance_path, p_ordnance_doc],
+	]:
+		var role := str(pair[0])
+		var p := str(pair[1])
+		var doc: OdfDocument = pair[2]
+		if doc != null:
+			revs[role] = {
+				"path": p,
+				"md5": WorkspaceStore._md5_bytes(doc.to_bytes()),
+				"dirty": doc.dirty,
+			}
+		elif p != "":
+			revs[role] = {"path": p, "md5": "", "dirty": false}
+	return revs
+
+
+func _is_direct_weapon(doc: OdfDocument) -> bool:
+	if doc == null:
+		return false
+	var class_label := _find_value(doc, ["classLabel"]).strip_edges().to_lower()
+	return doc.has_header("ArcCannonClass") or class_label in ["arccannon", "beam"] or \
+		_find_value(doc, ["finishDist"]) != ""
+
+
+func _set_slot_ordnance(slot_index: int, ord_name: String, ord_path: String,
+		status: String, revisions: Dictionary = {}) -> void:
+	for slot in weapon_slots:
+		if int((slot as Dictionary).get("resolved_index", -1)) == slot_index:
+			slot["ordnance_name"] = ord_name
+			slot["ordnance_path"] = ord_path
+			slot["ordnance_status"] = status
+			slot["source_revision"] = revisions.duplicate(true)
+			return
+
+
+## Resolve one physical slot independently, including unresolved slots. Marker
+## provenance must never borrow the active slot's ordnance when this fails.
+func _resolve_slot_ordnance(slot: Dictionary, p_shooter_doc: OdfDocument,
+		p_shooter_path: String) -> void:
+	var weapon_path := str(slot.get("path", ""))
+	var weapon_name := str(slot.get("weapon", ""))
+	var weapon_doc := OdfDocument.load_cached(weapon_path)
+	if weapon_doc == null:
+		slot["ordnance_status"] = "ORDNANCE_UNRESOLVED"
+		return
+	var ord_name := _find_value(weapon_doc, ["ordName"]).strip_edges()
+	if ord_name == "" or ord_name.to_lower() == "null":
+		if _is_direct_weapon(weapon_doc):
+			slot["ordnance_name"] = weapon_name + " (arc)"
+			slot["ordnance_path"] = weapon_path
+			slot["ordnance_status"] = "DIRECT_WEAPON"
+			slot["source_revision"] = source_revisions_for(p_shooter_path, p_shooter_doc,
+				weapon_path, weapon_doc, weapon_path, weapon_doc)
+		else:
+			slot["ordnance_name"] = ""
+			slot["ordnance_path"] = ""
+			slot["ordnance_status"] = "ORDNANCE_UNRESOLVED"
+			slot["source_revision"] = {}
+		return
+	var ord_path := index.resolve_path_from(ord_name, weapon_path)
+	var ord_doc := OdfDocument.load_cached(ord_path) if ord_path != "" else null
+	if ord_path == "" or ord_doc == null:
+		slot["ordnance_status"] = "ORDNANCE_UNRESOLVED"
+		return
+	slot["ordnance_name"] = ord_name
+	slot["ordnance_path"] = ord_path
+	slot["ordnance_status"] = "RESOLVED"
+	slot["source_revision"] = source_revisions_for(p_shooter_path, p_shooter_doc,
+		weapon_path, weapon_doc, ord_path, ord_doc)
+
+
+func slot_source(slot_index: int) -> Dictionary:
+	for slot in weapon_slots:
+		if int((slot as Dictionary).get("resolved_index", -1)) == slot_index:
+			return slot
+	return {}
+
+
+static func slot_source_from_slots(slots: Array, slot_index: int) -> Dictionary:
+	for slot in slots:
+		if slot is Dictionary and int((slot as Dictionary).get("resolved_index", -1)) == slot_index:
+			return slot
+	return {}
+
+
 func _bool_or(v: String, fallback: bool) -> bool:
 	if v.strip_edges() == "":
 		return fallback
@@ -562,24 +681,16 @@ func snapshot_params() -> Dictionary:
 		refresh()
 	var revs := captured_odf_revisions.duplicate(true)
 	if not is_frozen_snapshot:
-		revs = {}
-		for pair in [
-			["shooter", shooter_path, shooter_doc],
-			["weapon", weapon_path, weapon_doc],
-			["ordnance", ordnance_path, ordnance_doc],
-			["target", target_path, target_doc],
-		]:
-			var role := str(pair[0])
-			var p := str(pair[1])
-			var doc: OdfDocument = pair[2]
-			if doc != null:
-				revs[role] = {
-					"path": p,
-					"md5": WorkspaceStore._md5_bytes(doc.to_bytes()),
-					"dirty": doc.dirty,
+		revs = source_revisions_for(shooter_path, shooter_doc, weapon_path, weapon_doc, ordnance_path, ordnance_doc)
+		if target_path != "":
+			if target_doc != null:
+				revs["target"] = {
+					"path": target_path,
+					"md5": WorkspaceStore._md5_bytes(target_doc.to_bytes()),
+					"dirty": target_doc.dirty,
 				}
-			elif p != "":
-				revs[role] = {"path": p, "md5": "", "dirty": false}
+			else:
+				revs["target"] = {"path": target_path, "md5": "", "dirty": false}
 	return {
 		"shooter_path": shooter_path,
 		"weapon_path": weapon_path,

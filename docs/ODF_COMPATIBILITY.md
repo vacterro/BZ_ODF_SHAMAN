@@ -76,6 +76,30 @@ python tools/build_coverage.py
 | Renders | all 15 documented `renderBase` values |
 | Simulation | `sim_null`, `sim_chunk`, `sim_dust`, `sim_ember`, `sim_spray`, `sim_smoke` |
 
+## Repeated weapon slots (T-214 / PHI-28..32)
+
+Authentic stock ODFs declare one weapon on several consecutive slots, each with
+its own `weaponHardN`:
+
+```text
+ivtank:     weaponHard2=HP_GUN_1  weaponName2=gminigun_c
+            weaponHard3=HP_GUN_2  weaponName3=gminigun_c
+ivscout:    weaponHard1=HP_GUN_1  weaponName1=gminigun_c
+            weaponHard2=HP_GUN_2  weaponName2=gminigun_c
+```
+
+`WeaponProfile` therefore groups consecutive slots that name the SAME weapon
+into one weapon with several physical hardpoints, keeping the slot order, so
+TANDEM fires both barrels and a different weapon name in another slot is never
+dragged in. Deduplication is by resolved hardpoint node, not by weapon name.
+
+A scan of all 1,478 stock ODFs found no case where one class header repeats the
+same `weaponHardN` value on two firing slots: the repeated hardpoint names
+(`hp_hand_1`, `hp_special_1`) occur across different class headers
+(`GameObjectClass` vs `CraftClass`). No occurrence-aware identity is needed, and
+the name-based dedup in the profile builder, volley builder and Hardpoint
+Inspector is retained deliberately.
+
 ## Deliberate non-goals here
 
 - No claim that every property is honoured by BZCC.

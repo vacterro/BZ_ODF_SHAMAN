@@ -214,28 +214,42 @@
   "T-197",
   "T-199",
   "T-198",
-  "T-200"
+  "T-200",
+  "T-202",
+  "T-201",
+  "T-203",
+  "T-204",
+  "T-205",
+  "T-206",
+  "T-207",
+  "T-208",
+  "T-209",
+  "T-210",
+  "T-211",
+  "T-212",
+  "T-213",
+  "T-214"
  ],
- "last_interval_consumed": 180,
+ "last_interval_consumed": 200,
  "last_run": {
-  "counted_at_run": 191,
-  "run_id": "20261123T213047-1fe3f0d1"
+  "counted_at_run": 213,
+  "run_id": "20261123T224252-1020859d"
  },
  "maintenance": {
   "blockers": [
    {
     "code": "EVIDENCE_KEPT",
-    "detail": "8834385 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
+    "detail": "8843543 bytes under .saipen/evidence are canonical proof; no compact replacement is verified by a consumer, so none is planned"
    }
   ],
   "bytes_reclaimed": 0,
-  "fingerprint": "14d3ac352b421154830d319d819242acb9a18a3ca985f768c78b606bd5c6d331",
-  "last_attempt_fingerprint": "14d3ac352b421154830d319d819242acb9a18a3ca985f768c78b606bd5c6d331",
-  "protected_bytes": 8834385,
+  "fingerprint": "a044a5aef37f123713b1b2adb8f1165823dbdc030473c7863e2a47785d0ad140",
+  "last_attempt_fingerprint": "a044a5aef37f123713b1b2adb8f1165823dbdc030473c7863e2a47785d0ad140",
+  "protected_bytes": 8843543,
   "reason": "no reclaimable candidate exists; nothing is safe to delete",
-  "run_id": "20261123T213047-1fe3f0d1",
+  "run_id": "20261123T224252-1020859d",
   "state": "GC_BLOCKED_NO_SAFE_CANDIDATES",
-  "updated": "2026-11-23T21:30:47Z"
+  "updated": "2026-11-23T22:42:53Z"
  },
  "runs": [
   {
@@ -489,6 +503,27 @@
    "finished": "2026-11-23T21:30:47Z",
    "run_id": "20261123T213047-1fe3f0d1",
    "started": "2026-11-23T21:30:47Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 201,
+   "finished": "2026-11-23T21:41:47Z",
+   "run_id": "20261123T214147-8cead373",
+   "started": "2026-11-23T21:41:47Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 207,
+   "finished": "2026-11-23T21:44:43Z",
+   "run_id": "20261123T214443-9b9b253a",
+   "started": "2026-11-23T21:44:43Z"
+  },
+  {
+   "bytes": 0,
+   "counted_at_run": 213,
+   "finished": "2026-11-23T22:42:53Z",
+   "run_id": "20261123T224252-1020859d",
+   "started": "2026-11-23T22:42:52Z"
   }
  ],
  "schema": 1

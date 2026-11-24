@@ -328,3 +328,33 @@
 - **verified:** PASS -- canonical suite PASS; saipen validate CURRENT_PASS.
 - **instructions:** no integration required; payload [] intentional.
 - **details:** No new actionable finding.
+
+## W-024: shipped-state sensor review
+- **status:** reviewed
+- **summary:** Sensor review clean against shipped-state tree.
+- **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
+- **critical:** false
+- **producer:** saihunt
+- **source_head:** bfa9f51bd1122d381de93bbe5559a0e0c3116a32
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:4edb04181cb07e0946afd06fbe711166fa9dcc403e56b52e9be3844f0a71b0a5
+- **coverage:** owned surface reviewed against current source.
+- **payload:** []
+- **verified:** PASS -- canonical suite PASS; saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No new actionable finding.
+
+## W-025: closure-commit sensor review
+- **status:** reviewed
+- **summary:** Sensor review clean against v0.0.1 closure commit.
+- **main_project_refs:** [README.md, scripts/, tools/, tests/, docs/]
+- **critical:** false
+- **producer:** saihunt
+- **source_head:** 2844f754962bb98fb1c1f18746c9363dc690b3f9
+- **source_tree_fingerprint:** git-delta-v1:c66baf69a8306f3b95dfc7badb5f72b088f8de8408e933efadc4d149721a1195
+- **role_revision:** sha256:4edb04181cb07e0946afd06fbe711166fa9dcc403e56b52e9be3844f0a71b0a5
+- **coverage:** owned surface reviewed against shipped closure tree.
+- **payload:** []
+- **verified:** PASS -- canonical suite PASS; saipen validate CURRENT_PASS.
+- **instructions:** no integration required; payload [] intentional.
+- **details:** No new actionable finding on shipped release.

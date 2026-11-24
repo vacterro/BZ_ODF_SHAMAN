@@ -15,6 +15,16 @@ Godot `4.7.2.stable.official.ed1daf0bf`.
 - Docs: `BATTLEZONE/DOCS/ODF.md` (12,662 lines), `PARTICLE.md` (793 lines).
 - Wintage: MIT, 16 theme JSON files.
 
+## Test run — 2026-11-24 frozen-tree canonical suite
+
+Command: `saipen test suite run T-221` (declared argv `cmd /c tools\run_tests.cmd`).
+
+Result: `PASS`, exit `0`, 246.0 s, `tree_changed_during_run=false`, identical `subject_before` and `subject`
+`git:1325865668cdda3e23a620390a8476daa6d6fc3638f1b71e73ce6cb433a31c8e`.
+Record: `.saipen/evidence/suite/1c236f4e4e1a4a51-20261124T182755247147Z.json`.
+Totals: 1,485 checks, 0 failures; UI smoke 0 failures. This supersedes the earlier 1,432-check record with
+`tree_changed_during_run=true`, which remains unchanged as historical evidence.
+
 ## Test run — core
 
 Command:
@@ -250,6 +260,26 @@ sim: 500 shots in 5896.9 ms (11.79 ms each, 500 hits)
 memory: 148.4 MB static
 ```
 
+## T-224 physical stage and hardpoint identity evidence
+
+- RED before repair on Windows: `verify_t224_stage_safety.gd` reported 16 failures, including nested backup overwrite, case-alias unknown/owned collisions, duplicate targets, case-duplicate manifest and mutable `stage_id`. The hardpoint verifier reproduced silent shared-owner selection, stale SINGLE selection and inspection-only firing pollution.
+- GREEN after repair: stage safety 28/28, hardpoint identity 39/39, T-221 hardpoint provenance 24/24, T-223 hardpoint fire 10/10, T-222 backup inventory 12/12 and T-223 cleanup truth 8/8. Source fingerprints: `.saipen/evidence/t224_source_sha256.txt`.
+- Independent read-only review found and resolved cleanup metadata misclassification, a model-rebuild parse defect, silent shared-owner fallback, missing pre-fire revision revalidation and replay slot mismatch reporting.
+- `SRC-036:R001`, `SRC-037:R001` and `SRC-038:R001` now reference the authentic canonical suite record through `suite:1c236f4e4e1a4a51-20261124T153820406197Z`; no coverage JSON was hand-edited.
+
+## T-224 benchmark (2026-11-24, measurement only)
+
+```
+index: 17028 ODFs, 37161 asset names in 1458.2 ms
+parse: 500 ODFs, 0.55 MB in 777.6 ms (0.7 MB/s)
+inheritance: 100 cold merges of ivtank_vsr in 126.7 ms (1.27 ms each, 131 rows)
+sim: 500 shots in 11910.1 ms (23.82 ms each, 500 hits)
+soak_1m: 3600 frames in 1485.3 ms (timeline=41, compressed=3589, replay=78.2 ms, ok=true)
+soak_10m: 36000 frames in 1536.1 ms (timeline=91, compressed=35939, mem_delta_after_reset=3.06 MB)
+memory: 152.4 MB static
+RESULT: PASS (measurement only)
+```
+
 ## Windows package
 
 Command:
@@ -258,10 +288,10 @@ Command:
 tools\build_windows.cmd
 ```
 
-Result: exit 0, `build/BZ_ODF_SHAMAN.exe` (`112,395,360` bytes, SHA256
-`0cc94a10b57c671751d6117e3157882a35a540dfe79bcd0faf0dce576a9c6917`,
+Result: exit 0, `build/BZ_ODF_SHAMAN.exe` (`112,430,704` bytes, SHA256
+`cc841910b05ee41b99fcb10ccc4976eb844c163ff59de02ff2ca21a3d15c52df`,
 x86_64, embedded PCK, Godot 4.7.2 templates resolved from self-contained `editor_data/export_templates`),
-rebuilt 2026-11-23 after `T-128`.
+rebuilt 2026-11-24 after `T-224` (previous `T-223` EXE SHA256 `714af7f8c5345b2fd8d3c0c466f77ca9daff2eff2aa8cbefc5304f5ce692e07b`).
 The embedded PCK includes independent native launch eligibility gates (`NL-01..NL-06`), safe `STOCK_ADDON`
 launch route, active-experiment cleanup guard (`NC-01..NC-07`), unified `CombatScenario` clock & fire/reload/DoT
 state machine (`CB-01..CB-08`), immutable spatial/ODF-isolated `CombatReplaySnapshot` (`RP-01..RP-08`),
@@ -275,9 +305,11 @@ Interactive windowed GPU verification (`TESTED_GUI`, `BZ_SHAMAN_VERIFY_GUI_DIR`,
 - Authentic base-game `ivtank00.msh`, `fvtitan_skel.msh` (`6458` tris, `27` nodes, `fvatank00_d.dds`, `hp_cannon_1`/`hp_cannon_2`), and `ivscav00.msh` (`1942` tris) rendered with non-whitewashed `EMISSION_OP_MULTIPLY` materials, rigid `StaticBody3D` floors (`rigid_floor_weapon_lab=true`, `rigid_floor_particle_lab=true`), live reload HUD (`Shooter ammo: 2189/2200 energy: ∞ [READY]`), and 1bpp crisp `Verdana_m1` Golden Default chrome
 - `titan_bolt_rendered=true`, `spawned_effects=6`, `audio_pool={active:4, capacity:8, plays:6, size:8, steals:0}`, `timeline_events=26`, `telemetry_lines=26`
 - Original `BZ2R/battlezone2.exe` MD5 verified unchanged (`e2fa7458cf2604315f48915acd288689`), `bzone.cfg` SHA256 unchanged (`7a79d5bca9535ddea71cd492265adda7b2932177f769c3d4615c7407c2ba90de`), zero SHAMAN files in `BZ2R`
-- Captured & visually inspected screenshots for the fresh `T-128` EXE: `.saipen/evidence/gui_verify/t128_final/exe_weapons_lab.png`, `exe_particle_lab.png`, `exe_titan_lightning.png`, `gui_verify_report.txt` (previous baselines remain under `.saipen/evidence/gui_verify/`).
+- Captured & visually inspected screenshots for the fresh `T-224` EXE: `.saipen/evidence/gui_verify/t224_final/exe_weapons_lab.png`, `exe_particle_lab.png`, `exe_titan_lightning.png`, `gui_verify_report.txt`. The report records 8 Titan hardpoints, 4 `GENERIC_MODEL_HARDPOINT` inspection-only markers, `marker_sources_consistent=true`, exact `weapon_slot=0` and Weapon/Ordnance source revisions for both TANDEM barrels, 26 Timeline events and rendered Titan lightning. The packaged executable also headless-boots with exit 0.
 
 The exported binary also headless-boots cleanly (`build\BZ_ODF_SHAMAN.exe --headless --quit-after 120`, exit 0).
+
+The fresh 2026-11-24 package is `112,435,600` bytes with SHA256 `41ef5434595523c1717ea18564ca4eddc4ec79d0d1c5d318d38602ad561488e0`. Its windowed GPU self-verification is captured in `.saipen/evidence/gui_verify/t221_final4/`; the report records `source_navigation_ok=true`, `timeline_navigation_ok=true`, `titan_bolt_rendered=true`, `theme=goldendefault`, 17,028 indexed ODFs and 26 Timeline events.
 
 ## Capability Status Table (2026-11-23)
 

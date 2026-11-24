@@ -507,10 +507,13 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
 		enforce_reload: bool = true, p_extra_targets: Array = [],
 		fire_mode: String = "SINGLE", p_hardpoint: String = "",
 		p_barrel_index: int = 0, p_barrel_mode: String = "SINGLE",
-		p_volley_id: int = 0) -> Dictionary:
+		p_volley_id: int = 0, p_physical_weapon_slot: int = -1,
+		p_firing_context: String = "PRIMARY") -> Dictionary:
 	if profile == null:
 		return {"ok": false, "state": "DISABLED", "reason": "NO_PROFILE", "shot": null}
 	profile.refresh()
+	var physical_weapon_slot := p_physical_weapon_slot if p_physical_weapon_slot >= 0 else profile.active_slot_index
+	var firing_context := p_firing_context.strip_edges().to_upper() if p_firing_context.strip_edges() != "" else "PRIMARY"
 	if not _baseline_captured:
 		capture_replay_baseline(profile, p_obstacles)
 	if not p_obstacles.is_empty():
@@ -538,6 +541,8 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
 		"profile_snapshot": prof_snap,
 		"obstacles": _clone_obstacles(p_obstacles),
 		"hardpoint": p_hardpoint,
+		"weapon_slot": physical_weapon_slot,
+		"firing_context": firing_context,
 		"barrel_index": p_barrel_index,
 		"barrel_mode": p_barrel_mode,
 		"volley_id": p_volley_id,
@@ -591,12 +596,14 @@ func fire_shot(profile: WeaponProfile, origin: Vector3, direction: Vector3,
 		profile, origin, direction, target_position,
 		prim.hull_current if prim != null else -1.0,
 		extras, p_obstacles, shooter_velocity,
-		shooter, prim
+		shooter, prim, physical_weapon_slot, firing_context
 	)
 	shot.ammo_spent = int(res.get("ammo_spent", 0))
 	shot.energy_spent = float(res.get("energy_spent", 0.0))
 	if shot.identity != null:
 		shot.identity.hardpoint = p_hardpoint
+		shot.identity.weapon_slot = physical_weapon_slot
+		shot.identity.firing_context = firing_context
 		shot.identity.barrel_index = p_barrel_index
 		shot.identity.barrel_mode = p_barrel_mode
 		shot.identity.volley_id = p_volley_id
@@ -768,7 +775,7 @@ func build_replay_snapshot(label: String = "") -> Dictionary:
 		"initial_targets": init_targets,
 		"obstacles": _clone_obstacles(_initial_obstacles_snap),
 		"odf_revisions": odf_revs,
-		"weapon_profile": _initial_profile_snap.duplicate(true),
+		"weapon_profile": _last_profile_snap.duplicate(true) if not _last_profile_snap.is_empty() else _initial_profile_snap.duplicate(true),
 		"timeline_inputs": timeline_inputs.duplicate(true),
 		"shot_commands": shot_history.duplicate(true),
 	}
@@ -827,6 +834,7 @@ class ReplayRunner:
 	var _steps_total: int = 0
 	var _final_result: Dictionary = {}
 	var terminal_status: String = ""
+	var replay_errors: Array[String] = []
 	var max_steps_total: int = 120000
 
 	func _init(p_sandbox, p_snap: Dictionary, p_base_obs: Array, p_fallback_profile: WeaponProfile = null,
@@ -957,6 +965,14 @@ class ReplayRunner:
 				var frozen_prof: WeaponProfile = WeaponProfile.from_snapshot(psnap) if (psnap is Dictionary and not psnap.is_empty()) else fallback_profile
 				if frozen_prof == null:
 					return
+				if cmd.has("weapon_slot"):
+					var recorded_slot := int(cmd.get("weapon_slot", -1))
+					var profile_slot := int(psnap.get("active_slot_index", frozen_prof.active_slot_index))
+					var context := str(cmd.get("firing_context", "PRIMARY")).to_upper()
+					if recorded_slot >= 0 and context == "PRIMARY" and recorded_slot != profile_slot:
+						replay_errors.append("REPLAY_SHOT_IDENTITY_MISMATCH: recorded weapon_slot %d != profile slot %d" % [recorded_slot, profile_slot])
+						return
+					frozen_prof.active_slot_index = recorded_slot
 				var shot_obs: Array = CombatScenario._clone_obstacles(cmd.get("obstacles", [])) if not (cmd.get("obstacles", []) as Array).is_empty() else base_obs
 				var prim = sandbox.primary_target()
 				var fire_target_pos: Vector3 = prim.position if (has_move_events and prim != null) else CombatScenario._vec3(cmd.get("target_position", Vector3(0, 0, -50)))
@@ -975,7 +991,9 @@ class ReplayRunner:
 					str(cmd.get("hardpoint", "")),
 					int(cmd.get("barrel_index", 0)),
 					str(cmd.get("barrel_mode", "SINGLE")),
-					int(cmd.get("volley_id", 0))
+					int(cmd.get("volley_id", 0)),
+					int(cmd.get("weapon_slot", frozen_prof.active_slot_index)),
+					str(cmd.get("firing_context", "PRIMARY"))
 				)
 				if bool(fired.get("ok", false)):
 					accepted_shots += 1
@@ -1002,6 +1020,7 @@ class ReplayRunner:
 						"energy_remaining": sandbox.shooter.energy_current,
 						"splash_hits": [],
 						"destroyed": prim.destroyed if prim != null else false,
+						"shot_identity": s.identity.to_dict() if s != null and s.identity != null else {},
 					}
 					var idx := results.size()
 					results.append(entry)
@@ -1024,6 +1043,8 @@ class ReplayRunner:
 	func _finalize(reason: String = "REPLAY_COMPLETE") -> Dictionary:
 		done = true
 		terminal_status = reason
+		if not replay_errors.is_empty() and reason == "REPLAY_COMPLETE":
+			reason = "REPLAY_IDENTITY_MISMATCH"
 		if sandbox != null and sandbox.sim != null and sandbox.sim.shot_finished.is_connected(_on_shot_finished):
 			sandbox.sim.shot_finished.disconnect(_on_shot_finished)
 		var target_states := {}
@@ -1038,7 +1059,9 @@ class ReplayRunner:
 					"velocity": [t.velocity.x, t.velocity.y, t.velocity.z],
 					"yaw_rad": t.yaw_rad,
 				}
-		var complete := reason == "REPLAY_COMPLETE"
+		var complete := reason == "REPLAY_COMPLETE" and replay_errors.is_empty()
+		if not replay_errors.is_empty() and reason == "REPLAY_COMPLETE":
+			reason = "REPLAY_IDENTITY_MISMATCH"
 		_final_result = {
 			"ok": complete,
 			"complete": complete,
@@ -1055,6 +1078,8 @@ class ReplayRunner:
 			"fire_requests_replayed": results.size(),
 			"accepted_shots": accepted_shots,
 			"rejected_shots": rejected_shots,
+			"terminal_status": terminal_status,
+			"replay_errors": replay_errors.duplicate(),
 			"max_concurrent_shots": max_concurrent_shots,
 			"results": results.duplicate(true),
 			"shooter_ammo": sandbox.shooter.ammo_current,

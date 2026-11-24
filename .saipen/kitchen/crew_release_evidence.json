@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "operation": "crew_finalize_evidence",
-  "crew_epoch": "converge_intent-659f2379105a4497b31b5702e415cd04",
-  "release_op_id": "release-6492e9bd3457491fb096426a783ff4dd",
+  "crew_epoch": "converge_intent-9b71e2c3c7ba4b219671960836354d2a",
+  "release_op_id": "release-9130b79537614f7c8cd69bf2f4ee4dd2",
   "release_tag": "v0.0.1",
-  "closure_commit": "f0a75f8d38e681ec2e0a1e54961c916706ee0416",
+  "closure_commit": "2844f754962bb98fb1c1f18746c9363dc690b3f9",
   "final_state": "normal/DONE",
-  "recorded_at": "2026-11-23T21:28:51Z",
-  "ticket_id": "T-183"
+  "recorded_at": "2026-11-23T21:46:45Z",
+  "ticket_id": "T-201"
 }
