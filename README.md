@@ -1,137 +1,70 @@
-**v0.0.1**
+<div align="center">
+  <img src="assets/favicon.png" width="96" alt="BZ_ODF_SHAMAN logo">
+  <h1>BZ_ODF_SHAMAN</h1>
+  <p><strong>Visual ODF authoring, simulation & validation laboratory</strong></p>
+  <p>Explore, edit and test Battlezone: Combat Commander object definitions.</p>
 
-# BZ_ODF_SHAMAN
+  <img src="https://img.shields.io/badge/Status-Early%20development-b69a58?style=flat-square" alt="Early development">
+  <img src="https://img.shields.io/badge/Windows-x64-3e6e93?style=flat-square" alt="Windows x64">
+  <img src="https://img.shields.io/badge/Godot-4.7-478cbf?style=flat-square&logo=godotengine&logoColor=white" alt="Godot 4.7">
+  <img src="https://img.shields.io/badge/Wintage-Golden%20Default-9b8049?style=flat-square" alt="Golden Default">
 
-Visual ODF authoring, simulation and validation laboratory for **Battlezone: Combat Commander**.
-Godot 4.7 · Windows x64 · Wintage **Golden Default** theme.
+  <p><a href="#quick-start">Quick start</a> · <a href="#workspace">Workspace</a> · <a href="#development-status">Status</a> · <a href="docs/PROJECT_DETAILS.md">Technical guide</a></p>
+</div>
 
-> Status: working vertical slices P0–P4 + Autonomous Night Shift Waves B–G (`T-60..T-70`): Independent Native Launch Eligibility Gates (`STRUCTURALLY_VALID`, `RESOURCE_CLOSURE_VALID`, `STAGE_ELIGIBLE`, `CONFIG_COMPATIBLE`, `EXECUTION_ENVIRONMENT_READY`, `LAUNCH_ELIGIBLE`, `NL-01..NL-06`) enforcing `CONFIG_REQUIRES_ROOTDIR_PLACEMENT` before process launch, Safe Stock Addon launch route (`STOCK_ADDON` via stock `bzone.cfg` `@mydocsdir\addon` without modifying `BZ2R`), Active-Experiment Cleanup Guard (`ACTIVE_EXPERIMENT_CANNOT_CLEANUP` + evidence retention outside disposable stage, `NC-01..NC-07`), Unified `CombatScenario` Clock & Fire/Reload/DoT State Machine (`CB-01..CB-08`), Immutable `CombatReplaySnapshot` with Full Spatial/Hitbox Restoration & ODF Revision Isolation (`RP-01..RP-08`), Live Combat-State Timeline & Actor Inspector in Weapons Lab, Particle Lab Fidelity (`PF-01..PF-04`), and real 44-byte DOCB `.msha` header inspection.
-> Live BZCC launch comparison remains `NATIVE_VERIFIED: 0`: `STOCK_ADDON` dry-run staging (`tools\run_native_experiment.cmd`) verified complete stock closure and `CONFIG_STOCK_ADDON_ROUTE` without touching `BZ2R`, while live Steam execution in this Windows session is `BLOCKED_EXTERNAL` (`STEAM_USER_NOT_LOGGED_IN`, `ActiveUser=0x0`). See [docs/NATIVE_TESTING.md](docs/NATIVE_TESTING.md) and [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+## Overview
 
-## What works now
+An integrated editor for Battlezone: Combat Commander ODFs, resources and effects. Inspect inherited values, experiment with combat parameters, preview effects and stage changes without modifying the original game files.
 
-- **Lossless ODF core** — source-aware parser/serializer with byte-exact no-op roundtrip over
-  all **1,478** stock base-game ODFs. Edits splice only the value span; comments, ordering,
-  duplicate declarations, CRLF/LF, BOM and encoding survive.
-- **ODF inheritance** — `classLabel` parent chains are resolved across 17,028 indexed ODFs
-  (base + Workshop). Example: `ivscav_vsr → ivscav` supplies `maxHealth=3000`, `armorClass=H`;
-  `atstabvsr_c → atstab_c` supplies `damageValue(H)=100`.
-- **Schema registry** — **1,490** documented properties across **128** classes, extracted from
-  the local `ODF.md`; all **15** documented render bases and **6** simulate bases.
-- **Structured inspector** — bool/int/float/vector/color/enum/reference controls, exact-raw
-  toggle, shadowed duplicates, inherited values, documented defaults/descriptions/tooltips,
-  undo/redo, raw editor.
-- **Resource explorer + dependency graph** — 17,028 ODFs and 37,161 unique asset names
-  indexed with ranked fuzzy search, context-aware asset lookup (same package → base game → other mods),
-  duplicate candidates, missing references, cycles and *alternatives* shown per reference.
-  Search ranks exact → prefix → substring → subsequence and requires every whitespace-separated token.
-- **Weapons Lab & 3D Sandbox** — real shooter → weapon → ordnance chain (including direct `ArcCannonClass` `ordName = NULL` beams like `garc_a`), authentic **DOCB `.msh`** 3D meshes (`ivtank00.msh`, `fvtitan_skel.msh`, `ivscav00.msh`), `.material` descriptors, DDS/TGA textures and `hp_*` hardpoints (with explicit `PLACEHOLDER MESH` fallback when undecoded), rigid `StaticBody3D` floor (`y = 0`), world-space animated `BoltBeamNode` lightning (`draw_bolt`/`draw_beam`, e.g. Titan `garc_c` → `arcbolt`), floor-bouncing `sim_ember`/`sim_chunk`/`sim_spray` debris and `BottomInteractsWithTerrain` clamping, barrel recoil kick, deterministic `shotVariance` spread, moving shooter velocity inheritance, homing missile guidance (`omegaTurn`), configurable Moving Target patterns (`Stationary`/`Strafe`/`Wiggle`/`Orbit`/`Approach` + Speed/Amplitude/Frequency/XYZ/Yaw), Shooter Aim modes (`Manual`/`Track`/`Lead`/`Fixed Forward`), placeable rigid sandbox props (`Wall`, sloped `Terrain Ramp`, `Pillar`, `Box`, secondary `Targets`), Saved 3D Scene Presets & Camera Bookmarks, 3D `damageRadius` splash wireframe overlay, live-swap while browsing ODFs (`Off`/`Object A`/`Object B`/`Weapon`/`Auto`), compact `Telemetry` / interactive `Timeline` / `Scene` / `Sweep` / `Native BZCC` tabs, bounded 8-channel audio pool, **FIRE ALT** for `altName`, and split native BZCC controls backed by a durable session ledger.
-- **Parameter sweep** — batch-run one property (shotSpeed, lifeSpan, shotRadius, damageValue)
-  across a range with a baseline row and per-point damage/flight deltas. Values are in-memory
-  overrides; no ODF file is written. Results export to CSV under `user://workspace/sweeps/`.
-- **Benchmark harness** — `tools/run_bench.cmd` measures index scan, ODF parse throughput,
-  cold inheritance merges and deterministic shots; numbers, not pass thresholds.
-- **Particle Lab** — real render ODFs become an editable header graph with rigid `StaticBody3D`
-  preview floor, visual **Texture Browser** (thumbnails, search, FX/Fire/Smoke/Bolt categories),
-  11 ready-to-use documented emitter presets (`Fireball`, `Arc Lightning`, `Shockwave Ring`,
-  `Plasma Sphere`, `Bouncing Embers`, `Ground Dust`, `Bouncing Debris`, `Sparks`, `Beam Bolt`,
-  `Smoke Trail`, `Flash Light`), Quick Render Inspector with `ColorPickerButton` RGBA swatches,
-  `renderBase`/`simulateBase`/`textureBlend` dropdowns, `BottomInteractsWithTerrain` toggle,
-  per-emitter **Mute (`M`) / Solo (`S`)**, live emission rate / active count / CPU+GPU cost
-  metrics, RMB reset-to-default on every value control, scoped resets (`RESET THIS ODF` /
-  `RESET SELECTED NODE` / `RESET SELECTED EXTERNAL ODF` / confirmed `RESET DEPENDENCY GRAPH`),
-  and coordinated `SAVE DEPENDENCIES` with partial-save recovery.
-- **Persistent `ModLoadout` profiles** — save/load multi-package priority lists, explicit per-ODF
-  conflict winners shared identically by `ResourceIndex` and `NativeResourceClosureBuilder`,
-  workspace override snapshots, source hashes, and native-test eligibility reports (explicitly
-  labelled as editor resolution policy, not verified BZCC mount order).
-- **Audio Lab** — resolves declared *and inherited* sound references, parses real RIFF/WAVE
-  PCM assets, draws a waveform and plays them, with loop/volume controls.
-- **Safe export / workspace** — recoverable save transactions (verified temp, durable journal,
-  backup, replace, startup reconciliation; not advertised as crash-atomic), a `project.json` manifest
-  and persistent overrides restored on the next launch (ORIGINAL / OVERRIDE / DIRTY /
-  CONFLICT). Staged export writes every workspace override with a report and MD5; original
-  game files are never written unless you explicitly confirm an overwrite dialog. “Save all
-  edited” writes every dirty document, and “Rescan” rebuilds the index without restarting.
-  Tests run against an isolated `BZ_SHAMAN_WORKSPACE_ROOT`, never production data.
-- **Wintage themes** — all 16 theme token files shipped (MIT); live theme switching, persisted.
+## Workspace
 
-## Reference scenario (verified)
+| Module | Purpose |
+|---|---|
+| **ODF Inspector** | Source-aware editing, inheritance, typed controls, raw text and undo/redo. |
+| **Resource Explorer** | Search game and Workshop assets, inspect dependencies, conflicts and missing references. |
+| **Weapons Lab** | Interactive 3D combat sandbox, weapon and ordnance chains, telemetry and parameter sweeps. |
+| **Particle Lab** | Editable effect graphs, texture browsing, emitter presets and live previews. |
+| **Audio Lab** | Resolve, inspect and play referenced WAV assets. |
+| **Mod Profiles** | Persistent package priorities and explicit conflict resolution. |
+| **Native Testing** | Staged launch eligibility, resource-closure checks and session tracking. |
 
-The handoff's VTStats scenario resolves against installed Workshop content:
+## Quick start
 
-```
-gatstabvsr_c (ivtank_vsr)  →  atstabvsr_c (ordnance, inherits atstab_c)  →  ivscav_vsr
-shotSpeed 120 m/s · lifeSpan 0.834 s · range 100.08 m · shotRadius 0.5 (editor fallback;
-documented as not inherited, so bullet.odf's value is correctly ignored)
-target armor H · damageValue(H) = 100 · target maxHealth 3000
-```
-
-Edit `damageValue(H)` to `200` in the inspector, fire again, and telemetry reports **200.00**
-damage against the same hull. The original file on disk is unchanged; the export is staged.
-
-The workshop package `3532748119` contains the VSR files. Other installed packages also
-provide `atstab_c.odf` with different values; the resolver shows every alternative and prefers
-same-package → base game → other mods. This is a preview policy, not a claim about BZCC's
-actual addon mount order.
-
-## Run
+From the repository root on Windows:
 
 ```bat
 run.cmd
 ```
 
-or directly:
+The project uses Godot 4.7.2 in its documented development environment. On startup it indexes available base-game and Workshop resources. Keep original game assets available locally.
 
-```bat
-"V:\__STORE_V\_SOFT\Godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --path "V:\___VAC\__K\__CODE\_MISC\_BZ_ODF_SHAMAN"
-```
+## Development status
 
-First launch indexes the base game and Workshop in a background thread (~2–3 s on the
-reference machine, 17,028 ODFs), then auto-loads the VSR scenario if present, else the
-stock `ivtank4` / `ivscav12` fallback.
+**v0.0.1 — early development.** The project has working editor and simulation modules, but editor previews must not be confused with native BZCC behavior.
 
-## Tests
+- Lossless ODF round-trip, dependency resolution and staged export are documented and tested.
+- The Weapons Lab and Particle Lab provide editor-side simulation, not a replacement for the game engine.
+- Native launch staging is implemented; live native comparison remained unverified in the documented test session because Steam was not logged in.
+- Original game/Workshop files are read-only by default. Edits live in the workspace until an explicit export or confirmed overwrite.
 
-```bat
-tools\run_tests.cmd
-```
-
-Last verified run (2026-11-24): **1,106 core checks + 28 T-122 coherence + 31 T-123 lifecycle + 44 T-128 cleanup-contract + 35 T-214 receipt-trust + 21 T-214 hardpoint-inspector + 13 T-221 native-identity + 24 T-221 hardpoint-provenance + 8 T-222 stage-identity + 12 T-222 backup-inventory + 8 T-222 3D-hardpoint + 11 T-223 reserved-path + 8 T-223 cleanup-truth + 10 T-223 hardpoint-fire + 6 T-223 viewport-pick + 14 weapon-chain integrity + 31 alternate physical-slot provenance + 28 T-224 stage-safety + 8 Windows path identity + 39 T-224 hardpoint-identity checks (1,485 PASS, 0 failures; frozen-tree suite record `1c236f4e4e1a4a51-20261124T194817494416Z` with `tree_changed_during_run=false`) and UI smoke PASS**, covering: ODF core, full 1,478-file stock corpus roundtrip, precedence, fuzzy search, dirty cache, non-inherited properties, alternate weapon, parameter sweep, dependency graph, particles, explosion runtime, blend modes & UV animation (`PF-01..PF-04`), rigid floor bounce (`sim_ember`/`BottomInteractsWithTerrain`), Titan `draw_bolt` / `ArcCannonClass` lightning, homing missiles (`omegaTurn`), sloped terrain ramps, Unified `CombatScenario` Clock, Reload/DoT State Machine & Spatial/ODF-Isolated Sandboxed Replay (`CS-01..CS-12`, `CB-01..CB-08`, `RP-01..RP-08`), Live Combat-State Timeline & Actor Inspector, WAV audio, DOCB `.msh` + hardpoints + `EMISSION_OP_MULTIPLY` + real 44-byte `.msha` header inspection, Reset Safety (`RST-01..RST-22`), Native Launch Eligibility Gates & Safe Stock Addon Route (`NL-01..NL-06`, `NB-01..NB-08`), Active-Experiment Cleanup Guard & Evidence Retention (`NC-01..NC-07`), Native Resource Closure & GUI `NativeSessionService` Monitor (`RC-01..RC-07`, `NM-01..NM-10`, `N-D01..N-D10`, `N-E01..N-E08`, `ND-11..ND-15`, `SM-01..SM-07`), Persistent `ModLoadout` profiles, Saved Scene Presets, Camera Bookmarks, Particle Lab Texture Browser + 11 presets + Mute/Solo/metrics, RMB value resets, Houdini Value Ladder, Live-Swap, and real `OS.kill` transaction recovery, plus T-128 cross-session stage ownership, evidence-based cleanup finalization, strict discovery ledger/intent mapping, honest `durable_complete` API results and full recovery-token identity, and T-214 receipt trust (partial cleanup receipts can never finalize a full cleanup, retained/manifest-less stages stay visible as drift) with Hardpoint Inspector provenance (shot bound to the firing weapon, live shooter ammo/energy, current origin kept separate from launch origin). A Windows release package exports (`build/BZ_ODF_SHAMAN.exe`, `112,435,600` bytes, SHA256 `41ef5434595523c1717ea18564ca4eddc4ec79d0d1c5d318d38602ad561488e0`), headless-boots cleanly, and passes windowed GPU self-verification (`.saipen/evidence/gui_verify/t221_final4/` screenshots and report; see [docs/EVIDENCE.md](docs/EVIDENCE.md)).
+See [native testing](docs/NATIVE_TESTING.md), [preview fidelity](docs/PREVIEW_FIDELITY.md) and [known limitations](docs/KNOWN_LIMITATIONS.md) for the precise verification boundaries.
 
 ## Documentation
 
-| Document | Contents |
+| Guide | Contents |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | subsystems, data flow, design decisions |
-| [docs/ODF_COMPATIBILITY.md](docs/ODF_COMPATIBILITY.md) | parser/serializer semantics, coverage |
-| [docs/RESOURCE_RESOLUTION.md](docs/RESOURCE_RESOLUTION.md) | roots, precedence, duplicates, cycles |
-| [docs/PREVIEW_FIDELITY.md](docs/PREVIEW_FIDELITY.md) | what the simulation models and what it does not |
-| [docs/PARTICLE_GRAPH.md](docs/PARTICLE_GRAPH.md) | render graph and preview mapping |
-| [docs/NATIVE_TESTING.md](docs/NATIVE_TESTING.md) | staging, launch plan, honest blockers |
-| [docs/WINTAGE_THEMES.md](docs/WINTAGE_THEMES.md) | token → Godot theme pipeline |
-| [docs/TESTING.md](docs/TESTING.md) | test inventory and evidence |
-| [docs/EVIDENCE.md](docs/EVIDENCE.md) | captured commands and results |
-| [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | every known gap |
+| [Technical guide](docs/PROJECT_DETAILS.md) | Detailed features, reference scenario, commands and recorded test evidence. |
+| [Architecture](docs/ARCHITECTURE.md) | Subsystems and data flow. |
+| [ODF compatibility](docs/ODF_COMPATIBILITY.md) | Parser and serializer coverage. |
+| [Resource resolution](docs/RESOURCE_RESOLUTION.md) | Asset lookup and conflicts. |
+| [Particle graph](docs/PARTICLE_GRAPH.md) | Effect graph and preview mapping. |
+| [Testing & evidence](docs/TESTING.md) · [Evidence](docs/EVIDENCE.md) | Test inventory and results. |
+| [Wintage themes](docs/WINTAGE_THEMES.md) | Theme system. |
 
-## Safety
+Run the project tests from the repository root with `tools\run_tests.cmd`. See [CHANGELOG.md](CHANGELOG.md) for changes.
 
-- Original game/Workshop/Wintage/VRV files are treated as read-only inputs.
-- Saving writes to `user://workspace/odf/...` and records `user://workspace/project.json`;
-  export writes to a timestamped folder.
-- Export into a configured game root is refused.
-- Overwriting an original requires an explicit confirmation dialog.
+## Battlezone toolkit
 
-## Layout
+[Map editor — BZ_MAP_MAG](https://github.com/vacterro/BZ_MAP_MAG) · [Model converter — bzconv](https://github.com/vacterro/BZ_XSI_MSH_FBX_CONVERTER) · [Project index](https://github.com/vacterro)
 
-```
-scripts/core/   ODF document, schema, inheritance, resource index, dependency graph, theme, DOCB mesh, WAV
-scripts/sim/    weapon profiling, deterministic projectile/obstacle/multi-target simulation, parameter sweep
-scripts/lab/    Weapons Lab, Particle Lab, Audio Lab, effect runtime
-scripts/native/ NativeExperimentSession, NativeResourceClosureBuilder, SafeStageManager, NativeTestAdapter, NativeExperimentRunner
-scripts/ui/     application shell (inspector, raw editor, deps, export, GPU self-verify)
-data/           extracted schema + coverage registry
-tools/          docs extractor, coverage builder, test/build launchers
-tests/          headless test runner + UI smoke scene
-themes/         Wintage token files (MIT)
-```
+<div align="center"><sub>Edit the data. Test the behavior. Keep the evidence.</sub></div>
